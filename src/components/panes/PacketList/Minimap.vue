@@ -31,6 +31,7 @@ state.canvasWidth = computed(() => Math.floor(width - 2));
 state.canvasHeight = computed(() => Math.floor(height - 2));
 
 watch([() => frameInfo, () => manager.activeFrameNumber], () => {
+  if (!frameInfo) return; // Add safety check
   const frames = frameInfo?.frames ?? [];
   const context = state.canvasRef.getContext("2d");
   for (let i = 0; i < state.canvasHeight; i++) {

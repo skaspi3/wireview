@@ -48,9 +48,9 @@ export const areArraysEqual = (a, b) => {
 };
 
 export const clamp = (min, num, max) => {
-  console.assert(
-    min <= max,
-    `invalid arguments to clamp - ${min} is larger than ${max}`
-  );
+  if (min > max) {
+    console.warn(`clamp: min (${min}) > max (${max}). returning min.`);
+    return min;
+  }
   return Math.max(min, Math.min(max, num));
 };

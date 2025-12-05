@@ -142,7 +142,13 @@ class Manager {
   }
 
   setActiveFrameIndex(index) {
+    if (this.#state.frameCount === 0) {
+      this.#state.activeFrameIndex = null;
+      return;
+    }
     if (index < 0) index = this.#state.frameCount + index;
+    // Clamp to valid range
+    index = Math.max(0, Math.min(index, this.#state.frameCount - 1));
     this.#state.activeFrameIndex = index;
   }
 
@@ -247,7 +253,8 @@ class Manager {
     const result = await this.#core.bridge.createSession(file);
 
     // handle error
-    if (result.code) {
+    // Code -12 is often "Short Read" which is expected for live captures
+    if (result.code && result.code !== -12) {
       this.#shallowState.lastFileOpenError = {
         ...result,
         filename: file.name,
@@ -259,6 +266,44 @@ class Manager {
 
     this.#shallowState.sessionInfo = result.summary;
     this.#state.activeFrameIndex = result.summary.packet_count ? 0 : null;
+  }
+
+  async reloadFile(file) {
+    // Similar to openFile but doesn't clear sessionInfo/activeFrameIndex first
+    // allowing for "seamless" UI updates during live capture
+    this.#shallowState.activeFile = file;
+    const result = await this.#core.bridge.createSession(file);
+
+    // Code -12 is often "Short Read" which is expected for live captures
+    if (result.code && result.code !== -12) {
+      console.error("Reload failed:", result);
+      // Don't clear state on failure, just log
+      return;
+    }
+
+    this.#shallowState.sessionInfo = result.summary;
+    
+    // Ensure filteredFrames is consistent.
+    if (this.#state.displayFilter === "") {
+      this.#shallowState.filteredFrames = null;
+      this.#shallowState.filteredFramesRequest = null;
+    } else {
+      // If we have a filter, we need to re-run it against the new session
+      // to get the updated filteredFrames list
+      this.#shallowState.filteredFramesRequest = {
+        promise: this.#core.bridge.getFrames(this.#state.displayFilter, 0, 0),
+        frameNumber: this.#state.activeFrameNumber, // Try to keep position
+      };
+      // We don't await here to keep it async, but the watcher/getter handles it
+      this.#shallowState.filteredFramesRequest.promise.then(frames => {
+         this.#shallowState.filteredFrames = frames;
+      });
+    }
+    
+    // If this is the first load (activeFrameIndex is null), set it to 0
+    if (this.#state.activeFrameIndex === null && result.summary.packet_count > 0) {
+      this.#state.activeFrameIndex = 0;
+    }
   }
 
   async closeFile() {

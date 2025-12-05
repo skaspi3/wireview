@@ -53,6 +53,11 @@ const handleRowKeydown = (event) => {
     @keydown="handleRowKeydown"
     @focusin.passive="handleRowFocus"
   >
+    <!-- Debug row if table is empty but we expect frames -->
+    <div v-if="table.frames.length === 0" style="padding: 10px; color: red;">
+      No frames in view slice (Start: {{ table.startIndex }})
+    </div>
+
     <Row
       v-for="(frame, index) in table.frames"
       :frame="frame"

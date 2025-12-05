@@ -73,19 +73,9 @@ state.statusText = computed(() => {
         </p>
       </section>
       <section>
-        <h2>Open</h2>
-        <p v-if="manager.initialized">
-          Load successful. Select a file or
-          <a href="/shark1.pcapng" @click.prevent="loadDemo"
-            >try out an example</a
-          >.
-        </p>
-        <p v-else>Please wait, loading WASM binary...</p>
-        <label>
-          <PcapFileInput />
-        </label>
+        <h2>Get Started</h2>
         <p>
-          {{ state.statusText }}
+          Click the <strong style="color: #ef4444;">🔴 Start Live Capture</strong> button in the top toolbar to begin analyzing traffic from the server.
         </p>
       </section>
     </div>

@@ -10,6 +10,11 @@ class FrameDetailsTree {
       byteGroups: null,
     };
 
+    // Safety check: ensure data_sources exists
+    if (!this.#core.data_sources || !Array.isArray(this.#core.data_sources)) {
+      this.#core.data_sources = [];
+    }
+
     // Decode Base64
     for (const data_source of this.#core.data_sources)
       data_source.data = Base64.decode(data_source.data);
@@ -56,10 +61,14 @@ class FrameDetailsTree {
       if (!isNullish(data_source_idx) && !isNullish(start) && length)
         groups[data_source_idx].push({ start, length, id });
 
-      tree.forEach(parseDetail);
+      if (tree && Array.isArray(tree)) {
+        tree.forEach(parseDetail);
+      }
     };
 
-    this.#core.tree.forEach(parseDetail);
+    if (this.#core.tree && Array.isArray(this.#core.tree)) {
+      this.#core.tree.forEach(parseDetail);
+    }
 
     // sort start asc, length desc
     for (const group of groups)

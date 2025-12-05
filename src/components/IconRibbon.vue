@@ -14,11 +14,10 @@ import GoLastIcon from "./icons/GoLastIcon.vue";
 
 <template>
   <div class="ribbon">
-    <label class="icon" title="Open capture file">
+    <!-- Disabled Open File -->
+    <div class="icon disabled" title="Open capture file (Disabled for Live Mode)">
       <OpenFileIcon />
-
-      <PcapFileInput />
-    </label>
+    </div>
     <div class="icon disabled" title="Save capture file">
       <SaveCaptureIcon />
     </div>

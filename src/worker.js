@@ -5,28 +5,6 @@ const fetchBuffer = async (url) => {
   return await response.arrayBuffer();
 };
 
-let sharky = null;
-let session = null;
-
-loadWiregasm({
-  locateFile: (path, prefix) => {
-    console.log("locateFile", path, prefix);
-    if (path.endsWith(".data")) return "/wiregasm.bmp";
-    if (path.endsWith(".wasm")) return "/wiregasm.wasm";
-    return prefix + path;
-  },
-})
-  .then((result) => {
-    result.init();
-    sharky = result;
-    console.log(sharky);
-    const columns = vecToArray(sharky.getColumns());
-    postMessage({ type: "init", columns, success: true });
-  })
-  .catch((error) => {
-    console.log({ type: "init", error, success: false });
-  });
-
 const vecToArray = (vec) =>
   Array.from({ length: vec.size() }, (_, i) => vec.get(i));
 
@@ -46,10 +24,46 @@ const devectorize = (obj) => {
   return obj;
 };
 
+let sharky = null;
+let session = null;
+
+// Initialize Wiregasm and store the promise
+const initPromise = loadWiregasm({
+  locateFile: (path, prefix) => {
+    console.log("locateFile", path, prefix);
+    if (path.endsWith(".data")) return "/wiregasm.bmp";
+    if (path.endsWith(".wasm")) return "/wiregasm.wasm";
+    return prefix + path;
+  },
+}).then((result) => {
+  result.init();
+  sharky = result;
+  console.log("Worker: Wiregasm initialized");
+  const columns = vecToArray(sharky.getColumns());
+  postMessage({ type: "init", columns, success: true });
+  return result;
+}).catch((error) => {
+  console.error("Worker: Wiregasm failed to load", error);
+  postMessage({ type: "init", error: error.toString(), success: false });
+  throw error;
+});
+
 self.addEventListener("message", async ({ data }) => {
+  // Wait for initialization
+  if (!sharky) {
+    try {
+      await initPromise;
+    } catch (e) {
+      return; // Already handled in catch above
+    }
+  }
+
   console.debug("ahoy, worker got a message", data);
 
   if (data.type === "frame") {
+    if (!session) {
+      return postMessage({ id: data.id, frame: null, error: "No session" });
+    }
     const frame = devectorize(session.getFrame(data.number));
     return postMessage({
       id: data.id,
@@ -58,6 +72,10 @@ self.addEventListener("message", async ({ data }) => {
   }
 
   if (data.type === "frames") {
+    if (!session) {
+      return postMessage({ id: data.id, frames: [], error: "No session" });
+    }
+    console.log(`Worker: getFrames filter='${data.filter}' skip=${data.skip} limit=${data.limit}`);
     const framesVec = session.getFrames(
       data.filter ?? "",
       data.skip ?? 0,
@@ -86,20 +104,33 @@ self.addEventListener("message", async ({ data }) => {
   }
 
   if (data.type === "open") {
-    const filePath = `/uploads/${data.file.name}`;
-    const arrayBuffer = await data.file.arrayBuffer();
-    sharky.FS.writeFile(filePath, new Uint8Array(arrayBuffer));
+    try {
+      const filePath = `/uploads/${data.file.name}`;
+      const arrayBuffer = await data.file.arrayBuffer();
+      sharky.FS.writeFile(filePath, new Uint8Array(arrayBuffer));
 
-    session = new sharky.DissectSession(filePath);
-    console.log("created session");
+      // Clean up old session if exists
+      if (session) {
+        try { session.delete(); } catch(e) {}
+      }
 
-    const result = session.load();
-    console.log("loaded", result);
+      session = new sharky.DissectSession(filePath);
+      console.log("Worker: Created session for", data.file.name, "size:", arrayBuffer.byteLength);
 
-    return postMessage({
-      id: data.id,
-      result,
-    });
+      const result = session.load();
+      console.log("Worker: session.load() result:", result);
+
+      return postMessage({
+        id: data.id,
+        result,
+      });
+    } catch (err) {
+      console.error("Worker: Error in open:", err);
+      return postMessage({
+        id: data.id,
+        result: { code: 500, error: err.toString() }
+      });
+    }
   }
 
   if (data.type === "close") {

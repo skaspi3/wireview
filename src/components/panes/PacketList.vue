@@ -1,6 +1,7 @@
 <script setup>
 import {
   computed,
+  onMounted, // Added onMounted
   reactive,
   shallowReactive,
   useTemplateRef,
@@ -36,6 +37,35 @@ const state = reactive({
   frameReqArgsForTable: [], // filter, skip, limit (table)
 });
 
+// Force check dimensions on mount and data change
+const checkDimensions = () => {
+  if (state.scrollableRef) {
+    // Use fallback if clientHeight is 0 (e.g. element hidden or not laid out yet)
+    // This ensures we at least try to fetch some rows
+    state.clientHeight = state.scrollableRef.clientHeight || 200;
+    state.clientWidth = state.scrollableRef.clientWidth || 600;
+  }
+};
+
+onMounted(() => {
+  // Try immediately
+  checkDimensions();
+  // And after a tick for layout settlement
+  setTimeout(checkDimensions, 100);
+});
+
+// Also force check when packets arrive, in case the list was hidden/empty
+watch(() => manager.frameCount, () => {
+  // Trigger a window resize event to wake up any lazy layout engines
+  window.dispatchEvent(new Event('resize'));
+  
+  // If height is small/zero, try checking again
+  if (state.clientHeight < 50) checkDimensions();
+
+  // Force request frames immediately when count changes
+  requestFrames();
+});
+
 const shallowState = shallowReactive({
   frameBank: null,
   table: null,
@@ -44,8 +74,11 @@ const shallowState = shallowReactive({
 state.scrollY = useScroll(() => state.scrollableRef).y;
 
 state.rowCount = computed(() => {
-  const availableHeight = Math.max(0, state.clientHeight - headerHeight);
-  const fullRows = Math.floor(availableHeight / manager.rowHeight);
+  // Use fallback height if clientHeight is 0 to ensure we render SOMETHING
+  const h = state.clientHeight || 200;
+  const availableHeight = Math.max(0, h - headerHeight);
+  // Ensure we always have at least a few rows, even if layout says 0 height
+  const fullRows = Math.max(10, Math.floor(availableHeight / manager.rowHeight));
   console.debug("fullRows", fullRows, "availableHeight", availableHeight);
   return fullRows;
 });
@@ -64,19 +97,19 @@ state.firstRowIndex = computed(() => {
   console.debug("scrollY", state.scrollY, "fri", clamped);
   return clamped;
 });
-state.visibleTableWidth = computed(() => state.clientWidth - minimapWidth);
+state.visibleTableWidth = computed(() => (state.clientWidth || 600) - minimapWidth);
 
 state.minimapFirstRowIndex = computed(() =>
   Math.max(
     0,
-    Math.round((manager.frameCount - state.clientHeight) * state.scrollYPercent)
+    Math.round((manager.frameCount - (state.clientHeight || 200)) * state.scrollYPercent)
   )
 );
 
 state.frameReqArgs = computed(() => [
   manager.displayFilter,
   state.minimapFirstRowIndex,
-  state.clientHeight,
+  state.clientHeight || 200,
 ]);
 
 state.frameReqArgsForTable = computed(() => [
@@ -85,13 +118,12 @@ state.frameReqArgsForTable = computed(() => [
   state.rowCount + 1,
 ]);
 
-useResizeObserver(
-  () => state.scrollableRef,
-  () => {
-    state.clientHeight = state.scrollableRef.clientHeight;
-    state.clientWidth = state.scrollableRef.clientWidth;
-  }
-);
+useResizeObserver(state.scrollableRef, (entries) => {
+  const entry = entries[0];
+  const { width, height } = entry.contentRect;
+  state.clientWidth = width || 600;
+  state.clientHeight = height || 200;
+});
 
 const updateRowsForTable = () => {
   if (shallowState.frameBank === null) return;
@@ -115,23 +147,32 @@ const updateRowsForTable = () => {
   // want [45, 60], startSliceIdx = 5  -> startIndex = 45
 
   const minIndex = skip - offset;
-  const haveEndFrames = minIndex + frames.length === manager.frameCount;
-  const maxIndex = Math.max(
-    0,
-    skip + frames.length - state.rowCount - !haveEndFrames
-  );
-  const startIndex = clamp(minIndex, state.firstRowIndex, maxIndex);
-  const startSliceIdx = startIndex - minIndex;
+  // Ensure we don't calculate a negative maxIndex if frames.length is small
+  const safeMaxIndex = Math.max(0, skip + frames.length - state.rowCount);
+  
+  // Ensure start index is within current valid bounds
+  const startIndex = Math.min(Math.max(minIndex, state.firstRowIndex), safeMaxIndex);
+  
+  const startSliceIdx = Math.max(0, startIndex - minIndex);
+  const endSliceIdx = Math.min(frames.length, startSliceIdx + state.rowCount + 1);
+
+  console.log(`Table Slice: frames=${frames.length} minIdx=${minIndex} startIdx=${startIndex} slice=${startSliceIdx}-${endSliceIdx}`);
+
   shallowState.table = {
-    frames: frames.slice(startSliceIdx, startSliceIdx + state.rowCount + 1),
+    frames: frames.slice(startSliceIdx, endSliceIdx),
     startIndex,
   };
 };
 
 let framesRequest = null;
 const requestFrames = async () => {
-  if (framesRequest) return;
   const reqArgs = state.frameReqArgs;
+  if (framesRequest) {
+    console.log("requestFrames locked, skipping");
+    return;
+  }
+  
+  console.log("requestFrames calling manager.getFrames", reqArgs);
   const [filter, skip, limit] = reqArgs;
   framesRequest = manager.getFrames(filter, skip, limit);
   // await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -141,7 +182,10 @@ const requestFrames = async () => {
   shallowState.frameBank = { frames, offset, reqArgs };
 
   updateRowsForTable();
-  if (!areArraysEqual(reqArgs, state.frameReqArgs)) return requestFrames();
+  if (!areArraysEqual(reqArgs, state.frameReqArgs)) {
+    console.log("requestFrames args changed during fetch, retrying");
+    return requestFrames();
+  }
 };
 
 watchThrottled(() => state.frameReqArgs, requestFrames, { throttle: 111 });
@@ -169,6 +213,9 @@ watch(
       state.scrollY -= state.firstRowIndex - index;
     else if (index >= state.firstRowIndex + state.rowCount)
       state.scrollY += index - (state.firstRowIndex + state.rowCount) + 1;
+      
+    // Force update table rows as scrollY change might be throttled or delayed
+    updateRowsForTable();
   }
 );
 </script>
@@ -208,6 +255,8 @@ watch(
   position: relative;
   overflow-y: scroll;
   overflow-x: auto;
+  height: 100%; /* Force height to fill parent */
+  width: 100%;  /* Force width to fill parent */
 }
 .content {
   position: sticky;

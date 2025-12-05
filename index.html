@@ -9,9 +9,51 @@
       content="Wireshark online tool that allows visualization and analysis of packet capture files (.cap, .pcap, .pcapng) directly on the browser"
     />
     <title>Wireview</title>
+    <script src="/wiregasm.js"></script>
   </head>
   <body>
     <div id="app"></div>
+    <script>
+      // Initialize Wiregasm for App.vue
+      if (typeof loadWiregasm === 'function') {
+        loadWiregasm({
+          locateFile: (path, prefix) => {
+            if (path.endsWith('.data')) return '/wiregasm.bmp';
+            if (path.endsWith('.wasm')) return '/wiregasm.wasm';
+            return prefix + path;
+          }
+        }).then((module) => {
+          module.init();
+          
+          let currentSession = null;
+          
+          window.wiregasm = {
+            module: module,
+            load: async (data, filename) => {
+              // Cleanup previous session to free WASM memory
+              if (currentSession) {
+                try {
+                  currentSession.delete();
+                } catch (e) {
+                  console.warn("Failed to delete previous session:", e);
+                }
+                currentSession = null;
+              }
+
+              const filePath = '/' + filename;
+              module.FS.writeFile(filePath, new Uint8Array(data));
+              
+              currentSession = new module.DissectSession(filePath);
+              const result = currentSession.load();
+              return result;
+            }
+          };
+          console.log("Wiregasm initialized on window");
+        }).catch((err) => {
+          console.error("Wiregasm initialization failed:", err);
+        });
+      }
+    </script>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
