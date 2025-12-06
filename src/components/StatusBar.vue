@@ -1,9 +1,10 @@
 <script setup>
 import { computed, ref } from "vue";
-import { manager, captureStats } from "../globals";
+import { manager, captureStats, crashLog } from "../globals";
 import GitHubIcon from "./icons/GitHubIcon.vue";
 
 const showFilterPopup = ref(false);
+const showCrashLogPopup = ref(false);
 
 // BPF filter explanation (matches backend server.js filter)
 const bpfFilter = {
@@ -29,12 +30,24 @@ const statsInfo = computed(() => {
 
 const toggleFilterPopup = () => {
   showFilterPopup.value = !showFilterPopup.value;
+  if (showFilterPopup.value) showCrashLogPopup.value = false;
+};
+
+const toggleCrashLogPopup = () => {
+  showCrashLogPopup.value = !showCrashLogPopup.value;
+  if (showCrashLogPopup.value) showFilterPopup.value = false;
 };
 </script>
 <template>
   <div class="status-bar">
     <div class="bpf-filter-link" @click="toggleFilterPopup">
       Current BPF filter
+    </div>
+
+    <div class="link-separator">|</div>
+
+    <div class="bpf-filter-link" @click="toggleCrashLogPopup">
+      Crash Log ({{ crashLog.length }})
     </div>
 
     <!-- BPF Filter Popup -->
@@ -51,6 +64,25 @@ const toggleFilterPopup = () => {
       <div class="filter-raw">
         <code>{{ bpfFilter.raw }}</code>
       </div>
+    </div>
+
+    <!-- Crash Log Popup -->
+    <div v-if="showCrashLogPopup" class="filter-popup crash-log-popup">
+      <div class="filter-popup-header">
+        <strong>Crash Log</strong>
+        <div class="header-buttons">
+          <button v-if="crashLog.length > 0" class="clear-btn" @click="crashLog = []">Clear</button>
+          <button class="close-btn" @click="showCrashLogPopup = false">&times;</button>
+        </div>
+      </div>
+      <div v-if="crashLog.length === 0" class="no-crashes">
+        No crashes recorded
+      </div>
+      <ul v-else class="crash-list">
+        <li v-for="(crash, index) in crashLog" :key="index">
+          {{ crash.timestamp }} – {{ crash.packetCount.toLocaleString() }} packets
+        </li>
+      </ul>
     </div>
 
     <div style="flex-grow: 1"></div>
@@ -83,6 +115,11 @@ const toggleFilterPopup = () => {
 }
 .bpf-filter-link:hover {
   color: #60a5fa;
+}
+.link-separator {
+  color: #6b7280;
+  margin: 0 8px;
+  font-size: 13px;
 }
 .filter-popup {
   position: absolute;
@@ -134,6 +171,47 @@ const toggleFilterPopup = () => {
   font-size: 11px;
   color: #9ca3af;
   word-break: break-all;
+}
+.crash-log-popup {
+  left: 120px;
+}
+.crash-list {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  color: #d1d5db;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.crash-list li {
+  margin: 4px 0;
+  padding: 4px 8px;
+  background: #374151;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+}
+.no-crashes {
+  color: #9ca3af;
+  font-style: italic;
+}
+.header-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.clear-btn {
+  background: #374151;
+  border: 1px solid #4b5563;
+  color: #9ca3af;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.clear-btn:hover {
+  background: #4b5563;
+  color: #f3f4f6;
 }
 .stats-info {
   font-family: monospace;

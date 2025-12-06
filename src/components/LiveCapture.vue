@@ -43,7 +43,7 @@
 
 <script setup>
 import { ref, onUnmounted, onMounted } from 'vue';
-import { DEBUG } from '../globals';
+import { DEBUG, crashLog } from '../globals';
 
 const emit = defineEmits(['stream-data', 'clear', 'stop']);
 
@@ -193,6 +193,7 @@ const restartCapture = () => {
   chunkBuffer = [];
   packetCount.value = 0;
   totalBytes.value = 0;
+  crashLog.value = [];  // Clear crash log on restart
   emit('clear');
 
   // Wait for backend to stop/reset, then start again

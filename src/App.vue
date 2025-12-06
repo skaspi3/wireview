@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, ref } from 'vue';
-import { manager, frameDisplayOffset, captureStats, DEBUG } from './globals';
+import { manager, frameDisplayOffset, captureStats, crashLog, DEBUG } from './globals';
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
 import PacketList from './components/panes/PacketList.vue';
 import PacketDetails from './components/panes/PacketDetails.vue';
@@ -32,8 +32,19 @@ let recoveryInterval = null;
 const enginePreparing = ref(false);
 
 const startRecovery = (seconds = 5) => {
+  // Only record crash if not already in recovery (prevent duplicate entries)
+  const isNewCrash = !recoveryState.value;
+
   // Clear any existing recovery interval
   if (recoveryInterval) clearInterval(recoveryInterval);
+
+  // Record crash to log (only for new crashes, not repeated calls)
+  if (isNewCrash) {
+    const now = new Date();
+    const timestamp = now.toTimeString().slice(0, 8);  // HH:MM:SS
+    const packetCount = captureStats.totalCaptured.value;
+    crashLog.value.push({ timestamp, packetCount });
+  }
 
   recoveryState.value = { countdown: seconds };
 
@@ -328,9 +339,9 @@ onMounted(() => {
       </div>
     </Transition>
 
-    <!-- Engine Preparing Popup -->
+    <!-- Engine Preparing Popup (hidden during recovery to avoid overlap) -->
     <Transition name="fade">
-      <div v-if="enginePreparing" class="engine-popup">
+      <div v-if="enginePreparing && !recoveryState" class="engine-popup">
         Engine preparing to start...
       </div>
     </Transition>

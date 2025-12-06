@@ -14,3 +14,6 @@ export const captureStats = {
   totalDropped: ref(0),    // How many packets have been trimmed
   isProcessing: ref(false), // Whether buffer is currently being processed
 };
+
+// Crash log (records each crash/recovery event)
+export const crashLog = ref([]);  // Array of { timestamp: string, packetCount: number }
