@@ -24,6 +24,12 @@ const handleClear = async () => {
   console.log("Capture cleared");
 };
 
+const handleStop = () => {
+  // Cancel any pending updates
+  pendingBuffer = null;
+  console.log("Capture stopped - clearing pending updates");
+};
+
 const handleLiveStream = async (newBytes) => {
   // Combine buffers
   const newMaster = new Uint8Array(masterBuffer.length + newBytes.length);
@@ -49,7 +55,7 @@ const processBuffer = async (buffer) => {
     
     // Race against a timeout to prevent hanging forever
     const timeout = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error("Worker timed out")), 20000)
+      setTimeout(() => reject(new Error("Worker timed out")), 60000)
     );
 
     // Use reloadFile for seamless update
@@ -68,6 +74,15 @@ const processBuffer = async (buffer) => {
     }
   } catch (e) {
     console.error("Error updating live capture:", e);
+    
+    // If worker timed out, it might be stuck. Restart it.
+    if (e.message === "Worker timed out") {
+      console.warn("Restarting worker due to timeout...");
+      manager.deinitialize();
+      manager.initialize();
+      // Wait a bit for init
+      await new Promise(r => setTimeout(r, 1000));
+    }
   } finally {
     isProcessing = false;
     const duration = Date.now() - startTime;
@@ -97,7 +112,7 @@ onMounted(() => {
         <h1>Wireview</h1>
       </div>
       <div class="live-control">
-        <LiveCapture @stream-data="handleLiveStream" @clear="handleClear" />
+        <LiveCapture @stream-data="handleLiveStream" @clear="handleClear" @stop="handleStop" />
       </div>
     </header>
 

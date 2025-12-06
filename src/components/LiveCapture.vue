@@ -45,7 +45,7 @@
 <script setup>
 import { ref, onUnmounted, onMounted } from 'vue';
 
-const emit = defineEmits(['stream-data', 'clear']);
+const emit = defineEmits(['stream-data', 'clear', 'stop']);
 
 const ws = ref(null);
 const isConnected = ref(false);
@@ -61,7 +61,16 @@ let flushInterval = null;
 
 const WS_URL = `wss://${window.location.hostname}:3000`;
 
+const closeSocket = () => {
+  if (ws.value) {
+    ws.value.onclose = null; // Prevent loops
+    ws.value.close();
+    ws.value = null;
+  }
+};
+
 const connect = () => {
+  closeSocket(); // Ensure no duplicates
   error.value = null;
   try {
     ws.value = new WebSocket(WS_URL);
@@ -98,7 +107,12 @@ const connect = () => {
       }
 
       // Handle binary data (pcap chunks)
-      if (isCapturing.value && event.data) {
+      if (event.data) {
+        if (!isCapturing.value) {
+          // Debugging: why are we receiving data if stopped?
+          // console.warn("Ignored packet while stopped");
+          return;
+        }
         chunkBuffer.push(event.data);
         packetCount.value++;
         totalBytes.value += event.data.byteLength;
@@ -143,17 +157,44 @@ const startCapture = () => {
 
 const stopCapture = () => {
   if (ws.value && isConnected.value) {
-    ws.value.send(JSON.stringify({ type: 'stop' }));
+    try {
+      ws.value.send(JSON.stringify({ type: 'stop' }));
+    } catch (e) {}
   }
+  
+  // Soft stop: Keep socket open for interface selection
+  // closeSocket(); 
+  // isConnected.value = false; // Keep connected
+  
   isCapturing.value = false;
   if (flushInterval) clearInterval(flushInterval);
   flushToEngine();
+  emit('stop');
 };
 
 const restartCapture = () => {
-  stopCapture();
-  // Small delay to allow backend cleanup
-  setTimeout(startCapture, 200);
+  // Don't close socket, just stop backend capture
+  if (ws.value && isConnected.value) {
+    try {
+      ws.value.send(JSON.stringify({ type: 'stop' }));
+    } catch (e) {}
+  }
+  
+  // Clear local state
+  chunkBuffer = [];
+  packetCount.value = 0;
+  totalBytes.value = 0;
+  emit('clear');
+  
+  // Wait for backend to stop/reset, then start again
+  setTimeout(() => {
+    if (ws.value && isConnected.value) {
+      ws.value.send(JSON.stringify({
+        type: 'start',
+        interface: selectedInterface.value
+      }));
+    }
+  }, 200);
 };
 
 const flushToEngine = () => {

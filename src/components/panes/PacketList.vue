@@ -23,7 +23,6 @@ const state = reactive({
 
   // refs
   minimapRef: useTemplateRef("minimap"),
-  scrollableRef: useTemplateRef("packet-list-scrollable"),
   scrollY: null,
 
   // computed
@@ -37,32 +36,35 @@ const state = reactive({
   frameReqArgsForTable: [], // filter, skip, limit (table)
 });
 
+// Explicit ref for the element
+const scrollableEl = useTemplateRef("packet-list-scrollable");
+
 // Force check dimensions on mount and data change
 const checkDimensions = () => {
-  if (state.scrollableRef) {
-    // Use fallback if clientHeight is 0 (e.g. element hidden or not laid out yet)
-    // This ensures we at least try to fetch some rows
-    state.clientHeight = state.scrollableRef.clientHeight || 200;
-    state.clientWidth = state.scrollableRef.clientWidth || 600;
+  if (scrollableEl.value) {
+    const { clientHeight, clientWidth } = scrollableEl.value;
+    if (clientHeight > 0) state.clientHeight = clientHeight;
+    if (clientWidth > 0) state.clientWidth = clientWidth;
   }
 };
 
 onMounted(() => {
-  // Try immediately
   checkDimensions();
-  // And after a tick for layout settlement
   setTimeout(checkDimensions, 100);
+});
+
+useResizeObserver(scrollableEl, (entries) => {
+  const entry = entries[0];
+  const { width, height } = entry.contentRect;
+  console.log("Resize:", width, height);
+  if (height > 0) state.clientHeight = height;
+  if (width > 0) state.clientWidth = width;
 });
 
 // Also force check when packets arrive, in case the list was hidden/empty
 watch(() => manager.frameCount, () => {
-  // Trigger a window resize event to wake up any lazy layout engines
   window.dispatchEvent(new Event('resize'));
-  
-  // If height is small/zero, try checking again
   if (state.clientHeight < 50) checkDimensions();
-
-  // Force request frames immediately when count changes
   requestFrames();
 });
 
@@ -71,14 +73,13 @@ const shallowState = shallowReactive({
   table: null,
 });
 
-state.scrollY = useScroll(() => state.scrollableRef).y;
+state.scrollY = useScroll(scrollableEl).y;
 
 state.rowCount = computed(() => {
-  // Use fallback height if clientHeight is 0 to ensure we render SOMETHING
+  // Use fallback only if clientHeight is missing
   const h = state.clientHeight || 200;
   const availableHeight = Math.max(0, h - headerHeight);
-  // Ensure we always have at least a few rows, even if layout says 0 height
-  const fullRows = Math.max(10, Math.floor(availableHeight / manager.rowHeight));
+  const fullRows = Math.floor(availableHeight / manager.rowHeight);
   return fullRows;
 });
 
@@ -115,13 +116,6 @@ state.frameReqArgsForTable = computed(() => [
   state.firstRowIndex,
   state.rowCount + 1,
 ]);
-
-useResizeObserver(state.scrollableRef, (entries) => {
-  const entry = entries[0];
-  const { width, height } = entry.contentRect;
-  state.clientWidth = width || 600;
-  state.clientHeight = height || 200;
-});
 
 const updateRowsForTable = () => {
   if (shallowState.frameBank === null) return;
