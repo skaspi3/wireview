@@ -79,7 +79,6 @@ state.rowCount = computed(() => {
   const availableHeight = Math.max(0, h - headerHeight);
   // Ensure we always have at least a few rows, even if layout says 0 height
   const fullRows = Math.max(10, Math.floor(availableHeight / manager.rowHeight));
-  console.debug("fullRows", fullRows, "availableHeight", availableHeight);
   return fullRows;
 });
 
@@ -94,7 +93,6 @@ state.scrollYPercent = computed(() =>
 
 state.firstRowIndex = computed(() => {
   const clamped = clamp(0, state.scrollY, state.extraRows);
-  console.debug("scrollY", state.scrollY, "fri", clamped);
   return clamped;
 });
 state.visibleTableWidth = computed(() => (state.clientWidth || 600) - minimapWidth);

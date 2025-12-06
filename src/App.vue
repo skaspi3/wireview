@@ -17,6 +17,13 @@ let masterBuffer = new Uint8Array(0);
 let isProcessing = false;
 let pendingBuffer = null;
 
+const handleClear = async () => {
+  masterBuffer = new Uint8Array(0);
+  pendingBuffer = null;
+  await manager.closeFile();
+  console.log("Capture cleared");
+};
+
 const handleLiveStream = async (newBytes) => {
   // Combine buffers
   const newMaster = new Uint8Array(masterBuffer.length + newBytes.length);
@@ -90,7 +97,7 @@ onMounted(() => {
         <h1>Wireview</h1>
       </div>
       <div class="live-control">
-        <LiveCapture @stream-data="handleLiveStream" />
+        <LiveCapture @stream-data="handleLiveStream" @clear="handleClear" />
       </div>
     </header>
 
@@ -136,8 +143,9 @@ onMounted(() => {
 .toolbar {
   flex-shrink: 0;
   height: 40px;
-  background: #2e3436; /* Wireshark-ish dark grey */
-  color: white;
+  background: var(--ws-lighter-gray);
+  border-bottom: var(--ws-pane-border);
+  color: var(--ws-text-color);
   display: flex;
   align-items: center;
   padding: 0 10px;
@@ -149,6 +157,7 @@ onMounted(() => {
   font-size: 1.1rem;
   font-weight: 600;
   letter-spacing: 0.5px;
+  color: var(--ws-text-color);
 }
 
 .main-content {
@@ -163,7 +172,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background-color: #d1d5db;
+  background-color: var(--ws-almost-white);
 }
 
 /* Override default Welcome width to fit nicely */

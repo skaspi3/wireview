@@ -1,19 +1,34 @@
 <template>
   <div class="live-capture-wrapper">
-    <!-- Start Button -->
-    <button 
-      v-if="!isConnected" 
-      @click="startCapture" 
-      class="btn btn-primary"
-    >
-      <span class="icon">🔴</span> Start Live Capture
-    </button>
+    <!-- Connecting / Interface Selection State -->
+    <div v-if="!isCapturing" class="controls">
+      <div v-if="!isConnected">
+        <button @click="connect" class="btn btn-secondary">
+          🔌 Connect to Backend
+        </button>
+      </div>
+      
+      <div v-else class="selection-group">
+        <select v-model="selectedInterface" class="interface-select">
+          <option v-for="iface in interfaces" :key="iface" :value="iface">
+            {{ iface }}
+          </option>
+        </select>
+        <button @click="startCapture" class="btn btn-primary">
+          <span class="icon">🔴</span> Start
+        </button>
+      </div>
+    </div>
 
-    <!-- Stop Button & Status -->
+    <!-- Capturing State -->
     <div v-else class="status-bar">
       <span class="recording-indicator">● Rec</span>
       <span class="stats">{{ packetCount }} chunks ({{ totalBytes }} B)</span>
-      <span v-if="interfaceName" class="interface-tag">on {{ interfaceName }}</span>
+      <span class="interface-tag">on {{ selectedInterface }}</span>
+      
+      <button @click="restartCapture" class="btn btn-warning" title="Restart Capture">
+        ↺
+      </button>
       <button @click="stopCapture" class="btn btn-danger">
         Stop
       </button>
@@ -28,28 +43,26 @@
 </template>
 
 <script setup>
-import { ref, onUnmounted } from 'vue';
+import { ref, onUnmounted, onMounted } from 'vue';
 
-const emit = defineEmits(['stream-data']);
+const emit = defineEmits(['stream-data', 'clear']);
 
 const ws = ref(null);
 const isConnected = ref(false);
+const isCapturing = ref(false);
+const interfaces = ref([]);
+const selectedInterface = ref('');
+
 const packetCount = ref(0);
 const totalBytes = ref(0);
-const interfaceName = ref('');
 const error = ref(null);
 let chunkBuffer = [];
 let flushInterval = null;
 
 const WS_URL = `wss://${window.location.hostname}:3000`;
 
-const startCapture = () => {
+const connect = () => {
   error.value = null;
-  chunkBuffer = [];
-  packetCount.value = 0;
-  totalBytes.value = 0;
-  interfaceName.value = '';
-
   try {
     ws.value = new WebSocket(WS_URL);
     ws.value.binaryType = "arraybuffer";
@@ -57,69 +70,98 @@ const startCapture = () => {
     ws.value.onopen = () => {
       isConnected.value = true;
       console.log("WS Connected");
-      // Flush buffer to Wiregasm more frequently (50ms) for smoother updates
-      flushInterval = setInterval(flushToEngine, 50);
     };
 
     ws.value.onmessage = (event) => {
-      // Handle text messages (metadata)
+      // Handle text messages (protocol)
       if (typeof event.data === "string") {
         try {
           const msg = JSON.parse(event.data);
-          if (msg.type === "metadata") {
-            interfaceName.value = msg.interface;
+          
+          if (msg.type === 'interfaces') {
+            interfaces.value = msg.list;
+            if (msg.default && msg.list.includes(msg.default)) {
+              selectedInterface.value = msg.default;
+            } else if (msg.list.length > 0) {
+              selectedInterface.value = msg.list[0];
+            }
+          }
+          
+          if (msg.type === 'error') {
+            error.value = msg.message;
+            stopCapture();
           }
         } catch (e) {
-          console.warn("Received non-JSON text message:", event.data);
+          console.warn("Protocol error:", e);
         }
         return;
       }
 
       // Handle binary data (pcap chunks)
-      if (event.data) {
+      if (isCapturing.value && event.data) {
         chunkBuffer.push(event.data);
         packetCount.value++;
         totalBytes.value += event.data.byteLength;
-        // Optional: Trigger flush immediately for very low latency if volume is low?
-        // But the 50ms interval is already very fast.
       }
     };
 
     ws.value.onerror = (e) => {
       console.error(e);
-      error.value = "Connection failed. Is backend running?";
-      stopCapture();
+      error.value = "Connection failed";
+      isConnected.value = false;
+      isCapturing.value = false;
     };
 
     ws.value.onclose = () => {
-      stopCapture();
+      isConnected.value = false;
+      isCapturing.value = false;
     };
   } catch (e) {
     error.value = e.message;
   }
 };
 
+const startCapture = () => {
+  if (!ws.value || !isConnected.value) return;
+  
+  // Send start command
+  ws.value.send(JSON.stringify({
+    type: 'start',
+    interface: selectedInterface.value
+  }));
+  
+  isCapturing.value = true;
+  packetCount.value = 0;
+  totalBytes.value = 0;
+  chunkBuffer = [];
+  emit('clear');
+  
+  // Start flushing
+  if (flushInterval) clearInterval(flushInterval);
+  flushInterval = setInterval(flushToEngine, 50);
+};
+
 const stopCapture = () => {
-  isConnected.value = false;
-  if (ws.value) {
-    ws.value.close();
-    ws.value = null;
+  if (ws.value && isConnected.value) {
+    ws.value.send(JSON.stringify({ type: 'stop' }));
   }
-  if (flushInterval) {
-    clearInterval(flushInterval);
-  }
-  flushToEngine(); // Final flush
+  isCapturing.value = false;
+  if (flushInterval) clearInterval(flushInterval);
+  flushToEngine();
+};
+
+const restartCapture = () => {
+  stopCapture();
+  // Small delay to allow backend cleanup
+  setTimeout(startCapture, 200);
 };
 
 const flushToEngine = () => {
   if (chunkBuffer.length === 0) return;
 
-  // Merge all small chunks into one large Uint8Array
+  // Merge chunks
   let totalSize = 0;
-  for (const chunk of chunkBuffer) {
-    totalSize += chunk.byteLength;
-  }
-
+  for (const chunk of chunkBuffer) totalSize += chunk.byteLength;
   const combined = new Uint8Array(totalSize);
   let offset = 0;
   for (const chunk of chunkBuffer) {
@@ -127,18 +169,18 @@ const flushToEngine = () => {
     offset += chunk.byteLength;
   }
 
-  // Send to App.vue
   emit('stream-data', combined);
-  
-  // NOTE: In a real "streaming" engine we would clear the buffer here.
-  // But since Wiregasm usually expects a FULL file reload, we might need 
-  // to keep appending to a master buffer in App.vue. 
-  // For this implementation, we just send the *new* chunks.
   chunkBuffer = []; 
 };
 
+// Auto-connect on mount
+onMounted(() => {
+  connect();
+});
+
 onUnmounted(() => {
-  stopCapture();
+  if (ws.value) ws.value.close();
+  if (flushInterval) clearInterval(flushInterval);
 });
 </script>
 
@@ -149,27 +191,46 @@ onUnmounted(() => {
   margin-left: 10px;
 }
 
+.controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.selection-group {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: #374151;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.interface-select {
+  background: #1f2937;
+  color: white;
+  border: 1px solid #4b5563;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
 .btn {
-  padding: 8px 16px;
+  padding: 6px 12px;
   border-radius: 4px;
   border: none;
   cursor: pointer;
   font-weight: bold;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  font-size: 0.9em;
 }
 
-.btn-primary {
-  background-color: #3b82f6;
-  color: white;
-}
-
-.btn-danger {
-  background-color: #ef4444;
-  color: white;
-  margin-left: 10px;
-}
+.btn-primary { background-color: #3b82f6; color: white; }
+.btn-secondary { background-color: #4b5563; color: white; }
+.btn-danger { background-color: #ef4444; color: white; margin-left: 10px; }
+.btn-warning { background-color: #f59e0b; color: white; margin-left: 10px; }
 
 .status-bar {
   display: flex;
@@ -191,7 +252,7 @@ onUnmounted(() => {
   color: #9ca3af;
   margin-left: 10px;
   font-size: 0.9em;
-  border-left: 1px solid #374151;
+  border-left: 1px solid #6b7280;
   padding-left: 10px;
 }
 

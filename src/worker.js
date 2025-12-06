@@ -30,7 +30,6 @@ let session = null;
 // Initialize Wiregasm and store the promise
 const initPromise = loadWiregasm({
   locateFile: (path, prefix) => {
-    console.log("locateFile", path, prefix);
     if (path.endsWith(".data")) return "/wiregasm.bmp";
     if (path.endsWith(".wasm")) return "/wiregasm.wasm";
     return prefix + path;
@@ -38,7 +37,6 @@ const initPromise = loadWiregasm({
 }).then((result) => {
   result.init();
   sharky = result;
-  console.log("Worker: Wiregasm initialized");
   const columns = vecToArray(sharky.getColumns());
   postMessage({ type: "init", columns, success: true });
   return result;
@@ -47,6 +45,8 @@ const initPromise = loadWiregasm({
   postMessage({ type: "init", error: error.toString(), success: false });
   throw error;
 });
+
+// ... helper functions ...
 
 self.addEventListener("message", async ({ data }) => {
   // Wait for initialization

@@ -28,7 +28,7 @@ const state = reactive({
   display: flex;
   flex-direction: column;
 
-  background-color: white;
+  background-color: var(--ws-almost-white);
   font-family: var(--ws-font-family-monospace);
   font-size: var(--ws-font-size-monospace);
   line-height: var(--ws-row-height);

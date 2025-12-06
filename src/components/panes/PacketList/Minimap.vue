@@ -39,9 +39,9 @@ watch([() => frameInfo, () => manager.activeFrameNumber], () => {
     if (frameIdx < frames.length) {
       const frame = frames[frameIdx];
       if (manager.activeFrameNumber === frame.number)
-        context.fillStyle = "#404040";
+        context.fillStyle = "#094771"; // Match selection color
       else context.fillStyle = toHexColor(frame.bg);
-    } else context.fillStyle = "white";
+    } else context.fillStyle = "#1e1e1e"; // Dark background
     context.fillRect(0, i, state.canvasRef.width, 1);
   }
 });
@@ -64,8 +64,8 @@ watch([() => frameInfo, () => manager.activeFrameNumber], () => {
   position: sticky;
   right: 0;
 
-  background-color: white;
-  border: 1px solid var(--ws-darker-gray);
+  background-color: var(--ws-almost-white);
+  border: var(--ws-pane-border);
 }
 .minimap canvas {
   display: block;

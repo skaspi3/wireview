@@ -7,30 +7,34 @@
 :root {
   font-weight: 400;
 
-  --ws-almost-white: #fefefe;
-  --ws-lighter-gray: #fbfbfb;
-  --ws-light-gray: #f0f0f0;
-  --ws-gray: #e7e7e7;
-  --ws-dark-gray: #dadada;
-  --ws-darker-gray: #b9b9b9;
-  --ws-darkest-gray: #ababab;
+  /* Dark Mode Colors */
+  --ws-almost-white: #1e1e1e; /* Dark background */
+  --ws-lighter-gray: #252526; /* Slightly lighter dark */
+  --ws-light-gray: #2d2d30;   /* Panel background */
+  --ws-gray: #3e3e42;         /* Borders/Separators */
+  --ws-dark-gray: #505050;    /* Hover states */
+  --ws-darker-gray: #686868;  /* Resizers */
+  --ws-darkest-gray: #999999; /* Icons/Text */
 
-  --ws-selected-bg: #404040;
-  --ws-selected-fg: var(--ws-almost-white);
-  --ws-selected-unfocused-bg: var(--ws-light-gray);
-  --ws-selected-unfocused-fg: #12272e;
+  --ws-text-color: #cccccc;   /* Main text color */
+  --ws-text-muted: #888888;   /* Muted text */
+
+  --ws-selected-bg: #094771;  /* VS Code-like selection blue */
+  --ws-selected-fg: #ffffff;
+  --ws-selected-unfocused-bg: #37373d;
+  --ws-selected-unfocused-fg: #cccccc;
 
   --ws-font-family-monospace: monospace;
   --ws-font-monospace: var(--ws-font-family-monospace);
   --ws-font-family-sans-serif: "Segoe UI", sans-serif;
   --ws-font-sans-serif: 9pt var(--ws-font-family-sans-serif);
 
-  --ws-ugly-red: #660000;
-  --ws-ugly-green: #006600;
-  --ws-nice-blue: #97c4f0;
-  --ws-hmmm-yellow: #ffffdc;
+  --ws-ugly-red: #f48771;     /* Softer red for dark mode */
+  --ws-ugly-green: #89d185;   /* Softer green for dark mode */
+  --ws-nice-blue: #3794ff;
+  --ws-hmmm-yellow: #dcdcaa;
 
-  --ws-pane-border: 1px solid var(--ws-darker-gray);
+  --ws-pane-border: 1px solid var(--ws-gray);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -43,10 +47,11 @@ body {
   margin: 0;
   height: 100vh;
   overflow: hidden;
+  color: var(--ws-text-color); /* Apply text color globally */
 }
 
 body {
-  background-color: var(--ws-light-gray);
+  background-color: var(--ws-almost-white);
   font: var(--ws-font-sans-serif);
 }
 
@@ -56,4 +61,23 @@ body {
 
   display: flex;
   flex-direction: column;
+}
+
+/* Scrollbar Styling for Dark Mode */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--ws-almost-white);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--ws-dark-gray);
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ws-darker-gray);
+}
+::-webkit-scrollbar-corner {
+  background: var(--ws-almost-white);
 }

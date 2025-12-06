@@ -1,26 +1,15 @@
 <script setup>
-import OpenFileIcon from "./icons/OpenFileIcon.vue";
-import SaveCaptureIcon from "./icons/SaveCaptureIcon.vue";
 import CloseCaptureIcon from "./icons/CloseCaptureIcon.vue";
-import ReloadCaptureIcon from "./icons/ReloadCaptureIcon.vue";
 import FindIcon from "./icons/FindIcon.vue";
 import PreviousPacketIcon from "./icons/PreviousPacketIcon.vue";
 import NextPacketIcon from "./icons/NextPacketIcon.vue";
 import { manager } from "../globals";
-import PcapFileInput from "../PcapFileInput.vue";
 import GoFirstIcon from "./icons/GoFirstIcon.vue";
 import GoLastIcon from "./icons/GoLastIcon.vue";
 </script>
 
 <template>
   <div class="ribbon">
-    <!-- Disabled Open File -->
-    <div class="icon disabled" title="Open capture file (Disabled for Live Mode)">
-      <OpenFileIcon />
-    </div>
-    <div class="icon disabled" title="Save capture file">
-      <SaveCaptureIcon />
-    </div>
     <div
       class="icon"
       :class="{ disabled: manager.sessionInfo === null }"
@@ -28,9 +17,6 @@ import GoLastIcon from "./icons/GoLastIcon.vue";
       @click="() => manager.closeFile()"
     >
       <CloseCaptureIcon />
-    </div>
-    <div class="icon disabled" title="Reload this file">
-      <ReloadCaptureIcon />
     </div>
     <div class="separator"></div>
     <div
@@ -94,15 +80,12 @@ import GoLastIcon from "./icons/GoLastIcon.vue";
 
 <style scoped>
 .ribbon {
-  background: linear-gradient(
-    to bottom,
-    var(--ws-lighter-gray),
-    var(--ws-light-gray)
-  );
+  background: var(--ws-lighter-gray);
   padding: 4px;
   display: flex;
   align-items: center;
   gap: 1px;
+  border-bottom: var(--ws-pane-border);
 }
 .icon {
   padding: 3px;
@@ -111,21 +94,17 @@ import GoLastIcon from "./icons/GoLastIcon.vue";
   border-radius: 4px;
 }
 .icon:hover {
-  background: linear-gradient(
-    to bottom,
-    var(--ws-almost-white),
-    var(--ws-gray)
-  );
-  border-color: var(--ws-darkest-gray);
+  background: var(--ws-dark-gray);
+  border-color: var(--ws-darker-gray);
 }
 .icon:active {
-  background: var(--ws-dark-gray);
+  background: var(--ws-selected-bg);
 }
 .icon.disabled,
 .icon:has(input[disabled]) {
   pointer-events: none;
   filter: saturate(0);
-  opacity: 0.75;
+  opacity: 0.5;
 }
 .icon input[type="file"] {
   display: none;
@@ -133,12 +112,8 @@ import GoLastIcon from "./icons/GoLastIcon.vue";
 .separator {
   margin: 0 2px 0 3px;
   width: 2px;
-  height: 50%;
+  height: 16px;
   background-color: var(--ws-dark-gray);
-  border-right: 1px solid var(--ws-almost-white);
-}
-a.demo {
-  color: #555;
-  text-decoration: 1px underline dotted;
+  border-right: 1px solid var(--ws-gray);
 }
 </style>

@@ -91,7 +91,7 @@ const handleColumnResize = (event, columnIndex) => {
 .table {
   flex-grow: 1;
   align-items: stretch;
-  background-color: white;
+  background-color: var(--ws-almost-white);
 }
 .table.invisible {
   opacity: 0;
@@ -99,11 +99,7 @@ const handleColumnResize = (event, columnIndex) => {
 .table > .header {
   display: flex;
   font: var(--ws-font-sans-serif);
-  background: linear-gradient(
-    to bottom,
-    var(--ws-lighter-gray),
-    var(--ws-gray)
-  );
+  background: var(--ws-lighter-gray);
   border-bottom: var(--ws-pane-border);
   user-select: none;
 }

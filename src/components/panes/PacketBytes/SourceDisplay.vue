@@ -89,7 +89,7 @@ watch(
   flex-grow: 1;
 
   display: flex;
-  background-color: white;
+  background-color: var(--ws-almost-white);
   font-family: var(--ws-font-family-monospace);
   font-size: var(--ws-font-size-monospace);
   line-height: var(--ws-row-height);
@@ -108,7 +108,7 @@ watch(
   height: fit-content;
 }
 .display {
-  color: black;
+  color: var(--ws-text-color);
   background-color: transparent;
   white-space: pre-wrap;
   flex-shrink: 0;

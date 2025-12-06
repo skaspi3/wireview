@@ -24,6 +24,11 @@ const handleSubmit = () => {
   manager.setDisplayFilter(displayFilterInput.value);
 };
 
+const clearFilter = () => {
+  displayFilterInput.value = "";
+  manager.setDisplayFilter("");
+};
+
 // Ctrl-/ or Command-/
 const handleGlobalKeydown = (event) => {
   if (event.key === "/" && !event.shiftKey && event.ctrlKey ^ event.metaKey) {
@@ -60,6 +65,15 @@ onBeforeUnmount(() =>
         }"
       />
       <button
+        type="button"
+        class="clear-filter"
+        title="Clear display filter"
+        v-if="displayFilterInput"
+        @click="clearFilter"
+      >
+        ✕
+      </button>
+      <button
         type="submit"
         class="apply-filter"
         title="Apply display filter"
@@ -85,8 +99,8 @@ onBeforeUnmount(() =>
   flex-grow: 1;
 
   display: flex;
-  background-color: white;
-  border: 1px solid gray;
+  background-color: var(--ws-almost-white);
+  border: 1px solid var(--ws-darker-gray);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -101,6 +115,7 @@ onBeforeUnmount(() =>
   outline: none;
   border: none;
   background-color: var(--ws-display-filter-bg);
+  color: var(--ws-text-color);
   padding: 1px 4px;
 }
 .apply-filter {
@@ -131,5 +146,21 @@ onBeforeUnmount(() =>
 }
 .apply-filter svg {
   height: 100%;
+}
+.clear-filter {
+  border: none;
+  background: none;
+  padding: 0 5px;
+  outline: none;
+  cursor: pointer;
+  color: var(--ws-darkest-gray);
+  font-weight: bold;
+  font-size: 1.1em;
+  display: flex;
+  align-items: center;
+}
+.clear-filter:hover {
+  color: var(--ws-text-color);
+  background-color: var(--ws-dark-gray);
 }
 </style>
