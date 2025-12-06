@@ -173,19 +173,28 @@ const stopCapture = () => {
 };
 
 const restartCapture = () => {
-  // Don't close socket, just stop backend capture
+  // Stop accepting new chunks immediately to prevent partial data
+  isCapturing.value = false;
+
+  // Stop the flush interval
+  if (flushInterval) {
+    clearInterval(flushInterval);
+    flushInterval = null;
+  }
+
+  // Send stop command to backend
   if (ws.value && isConnected.value) {
     try {
       ws.value.send(JSON.stringify({ type: 'stop' }));
     } catch (e) {}
   }
-  
+
   // Clear local state
   chunkBuffer = [];
   packetCount.value = 0;
   totalBytes.value = 0;
   emit('clear');
-  
+
   // Wait for backend to stop/reset, then start again
   setTimeout(() => {
     if (ws.value && isConnected.value) {
@@ -193,6 +202,10 @@ const restartCapture = () => {
         type: 'start',
         interface: selectedInterface.value
       }));
+
+      // Resume capturing
+      isCapturing.value = true;
+      flushInterval = setInterval(flushToEngine, 50);
     }
   }, 200);
 };

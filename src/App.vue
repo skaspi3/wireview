@@ -103,6 +103,9 @@ const handleStop = () => {
   console.log("Capture stopped");
 };
 
+// Minimum buffer size before attempting to parse (header + at least one packet)
+const MIN_BUFFER_SIZE = 100;
+
 const handleLiveStream = async (newBytes) => {
   // Combine buffers
   const newMaster = new Uint8Array(masterBuffer.length + newBytes.length);
@@ -112,6 +115,11 @@ const handleLiveStream = async (newBytes) => {
 
   // Apply rolling buffer - trim old packets if exceeding limit
   masterBuffer = trimBuffer(masterBuffer);
+
+  // Don't try to parse until we have enough data
+  if (masterBuffer.length < MIN_BUFFER_SIZE) {
+    return;
+  }
 
   // If already processing, just return - the finally block will check if buffer grew
   if (captureStats.isProcessing.value) {
