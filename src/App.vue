@@ -19,6 +19,11 @@ let lastProcessedSize = 0;  // Track last processed buffer size
 let captureEpoch = 0;  // Incremented on each clear to invalidate stale operations
 let totalPacketsDropped = 0;  // Track how many packets we've trimmed
 
+// Reactive state for UI
+const totalPacketsCaptured = ref(0);  // Ever-increasing counter of all packets seen
+const trimNotification = ref(null);   // { count: number } when showing trim popup
+let trimNotificationTimeout = null;
+
 // Rolling buffer settings
 const MAX_BUFFER_SIZE = 20 * 1024 * 1024;  // Trim when exceeds 20MB
 const TRIM_TO_SIZE = 12 * 1024 * 1024;     // Trim down to 12MB
@@ -65,6 +70,13 @@ const trimBuffer = (buffer) => {
   totalPacketsDropped += packetsSkipped;
   console.log(`Trimmed buffer: ${buffer.length} → ${trimmed.length} bytes, dropped ${packetsSkipped} old packets (total dropped: ${totalPacketsDropped})`);
 
+  // Show trim notification popup
+  if (trimNotificationTimeout) clearTimeout(trimNotificationTimeout);
+  trimNotification.value = { count: packetsSkipped };
+  trimNotificationTimeout = setTimeout(() => {
+    trimNotification.value = null;
+  }, 2500);
+
   return trimmed;
 };
 
@@ -76,6 +88,11 @@ const handleClear = async () => {
   lastProcessedSize = 0;
   isProcessing = false;  // Allow new processing immediately
   totalPacketsDropped = 0;  // Reset dropped packet counter
+  totalPacketsCaptured.value = 0;  // Reset total packets counter
+
+  // Clear any pending trim notification
+  if (trimNotificationTimeout) clearTimeout(trimNotificationTimeout);
+  trimNotification.value = null;
 
   // Restart worker to guarantee clean state and cancel any in-flight operations
   await manager.closeFile({ restartWorker: true });
@@ -141,6 +158,12 @@ const processBuffer = async (buffer, epoch = captureEpoch) => {
     if (reloadResult && reloadResult.success) {
       success = true;
       const newFrameCount = reloadResult.frameCount || manager.frameCount;
+
+      // Update total packets captured (always increases: visible + dropped)
+      totalPacketsCaptured.value = Math.max(
+        totalPacketsCaptured.value,
+        newFrameCount + totalPacketsDropped
+      );
 
       // Auto-scroll to the bottom if new frames arrived
       if (newFrameCount > oldFrameCount) {
@@ -226,11 +249,18 @@ onMounted(() => {
     </div>
     
     <StatusBar />
-    
+
+    <!-- Trim Notification Popup -->
+    <Transition name="fade">
+      <div v-if="trimNotification" class="trim-popup">
+        Trimming {{ trimNotification.count.toLocaleString() }} old packets
+      </div>
+    </Transition>
+
     <!-- Debug Overlay -->
-    <div v-if="isProcessing || manager.packetCount > 0" 
+    <div v-if="isProcessing || manager.packetCount > 0"
          style="position: fixed; bottom: 30px; right: 10px; background: rgba(0,0,0,0.8); color: lime; padding: 5px; font-size: 10px; z-index: 9999; pointer-events: none;">
-      Proc: {{ isProcessing }} | Pkts: {{ manager.packetCount }} | Frames: {{ manager.frameCount }}
+      Proc: {{ isProcessing }} | Total: {{ totalPacketsCaptured.toLocaleString() }} | Visible: {{ manager.frameCount }}
     </div>
   </div>
 </template>
@@ -282,5 +312,34 @@ onMounted(() => {
 :deep(.welcome-container) {
   width: 100%;
   padding: 2rem;
+}
+
+/* Trim notification popup */
+.trim-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: #fbbf24;
+  padding: 16px 28px;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 500;
+  z-index: 10000;
+  pointer-events: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+/* Fade transition for popup */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>
