@@ -16,6 +16,10 @@ import LiveCapture from './components/LiveCapture.vue';
 let masterBuffer = new Uint8Array(0);
 let lastProcessedSize = 0;  // Track last processed buffer size
 let captureEpoch = 0;  // Incremented on each clear to invalidate stale operations
+let reloadCount = 0;  // Track reloads to proactively restart worker
+
+// Restart worker every N successful reloads to prevent WASM memory accumulation
+const WORKER_RESTART_INTERVAL = 100;
 
 // Reactive state for UI (trim popup only - stats moved to globals.captureStats)
 const trimNotification = ref(null);   // { count: number } when showing trim popup
@@ -84,6 +88,7 @@ const handleClear = async () => {
 
   masterBuffer = new Uint8Array(0);
   lastProcessedSize = 0;
+  reloadCount = 0;
   captureStats.isProcessing.value = false;  // Allow new processing immediately
   captureStats.totalDropped.value = 0;  // Reset dropped packet counter
   captureStats.totalCaptured.value = 0;  // Reset total packets counter
@@ -143,9 +148,9 @@ const processBuffer = async (buffer, epoch = captureEpoch) => {
   try {
     const file = new File([buffer], "live_capture.pcap", { type: 'application/vnd.tcpdump.pcap' });
 
-    // Race against a timeout to prevent hanging forever (30s with smaller buffer limit)
+    // Race against a timeout to prevent hanging forever
     const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Worker timed out")), 30000)
+      setTimeout(() => reject(new Error("Worker timed out")), 60000)
     );
 
     // Use reloadFile for seamless update
@@ -164,6 +169,7 @@ const processBuffer = async (buffer, epoch = captureEpoch) => {
     // Check if reload actually succeeded using the return value
     if (reloadResult && reloadResult.success) {
       success = true;
+      reloadCount++;
       const newFrameCount = reloadResult.frameCount || manager.frameCount;
 
       // Update total packets captured (always increases: visible + dropped)
@@ -180,6 +186,13 @@ const processBuffer = async (buffer, epoch = captureEpoch) => {
             manager.setActiveFrameIndex(manager.frameCount - 1);
           }
         }, 10);
+      }
+
+      // Proactively restart worker to prevent WASM memory accumulation
+      if (reloadCount >= WORKER_RESTART_INTERVAL) {
+        reloadCount = 0;
+        console.log("Proactive worker restart after", WORKER_RESTART_INTERVAL, "reloads");
+        await manager.closeFile({ restartWorker: true });
       }
     } else {
       const reason = reloadResult?.reason || 'unknown';
