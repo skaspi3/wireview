@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, ref } from 'vue';
-import { manager } from './globals';
+import { manager, frameDisplayOffset } from './globals';
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
 import PacketList from './components/panes/PacketList.vue';
 import PacketDetails from './components/panes/PacketDetails.vue';
@@ -68,6 +68,7 @@ const trimBuffer = (buffer) => {
   trimmed.set(buffer.slice(offset), PCAP_GLOBAL_HEADER_SIZE); // Copy recent packets
 
   totalPacketsDropped += packetsSkipped;
+  frameDisplayOffset.value += packetsSkipped;  // Shift display numbers to keep them continuous
   console.log(`Trimmed buffer: ${buffer.length} → ${trimmed.length} bytes, dropped ${packetsSkipped} old packets (total dropped: ${totalPacketsDropped})`);
 
   // Show trim notification popup
@@ -89,6 +90,7 @@ const handleClear = async () => {
   isProcessing = false;  // Allow new processing immediately
   totalPacketsDropped = 0;  // Reset dropped packet counter
   totalPacketsCaptured.value = 0;  // Reset total packets counter
+  frameDisplayOffset.value = 0;  // Reset display offset
 
   // Clear any pending trim notification
   if (trimNotificationTimeout) clearTimeout(trimNotificationTimeout);

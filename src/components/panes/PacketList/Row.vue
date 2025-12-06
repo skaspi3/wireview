@@ -1,7 +1,18 @@
 <script setup>
 import { onMounted, reactive, useTemplateRef, watch } from "vue";
-import { manager } from "../../../globals";
+import { manager, frameDisplayOffset } from "../../../globals";
 import { toHexColor } from "../../../util.js";
+
+// Get display value for a column, applying offset for frame number (column 0)
+const getColumnDisplay = (columns, colIndex) => {
+  if (colIndex === 0 && frameDisplayOffset.value > 0) {
+    const originalNumber = parseInt(columns[0], 10);
+    if (!isNaN(originalNumber)) {
+      return (originalNumber + frameDisplayOffset.value).toString();
+    }
+  }
+  return columns[colIndex];
+};
 
 const { frame, index } = defineProps({
   frame: {
@@ -50,8 +61,8 @@ watch(() => manager.activeFrameNumber, checkAndFocus, { flush: "post" });
     :data-frame-index="index"
     :tabindex="frame.number === manager.activeFrameNumber ? 0 : -1"
   >
-    <div v-for="(_, index) in frame.columns">
-      <div class="text">{{ frame.columns[index] }}</div>
+    <div v-for="(_, colIndex) in frame.columns">
+      <div class="text">{{ getColumnDisplay(frame.columns, colIndex) }}</div>
     </div>
   </div>
 </template>
