@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, ref } from 'vue';
-import { manager, frameDisplayOffset } from './globals';
+import { manager, frameDisplayOffset, captureStats } from './globals';
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
 import PacketList from './components/panes/PacketList.vue';
 import PacketDetails from './components/panes/PacketDetails.vue';
@@ -14,13 +14,10 @@ import LiveCapture from './components/LiveCapture.vue';
 
 // Master buffer to hold captured packets (rolling window)
 let masterBuffer = new Uint8Array(0);
-let isProcessing = false;
 let lastProcessedSize = 0;  // Track last processed buffer size
 let captureEpoch = 0;  // Incremented on each clear to invalidate stale operations
-let totalPacketsDropped = 0;  // Track how many packets we've trimmed
 
-// Reactive state for UI
-const totalPacketsCaptured = ref(0);  // Ever-increasing counter of all packets seen
+// Reactive state for UI (trim popup only - stats moved to globals.captureStats)
 const trimNotification = ref(null);   // { count: number } when showing trim popup
 let trimNotificationTimeout = null;
 
@@ -67,9 +64,9 @@ const trimBuffer = (buffer) => {
   trimmed.set(buffer.slice(0, PCAP_GLOBAL_HEADER_SIZE)); // Copy global header
   trimmed.set(buffer.slice(offset), PCAP_GLOBAL_HEADER_SIZE); // Copy recent packets
 
-  totalPacketsDropped += packetsSkipped;
+  captureStats.totalDropped.value += packetsSkipped;
   frameDisplayOffset.value += packetsSkipped;  // Shift display numbers to keep them continuous
-  console.log(`Trimmed buffer: ${buffer.length} → ${trimmed.length} bytes, dropped ${packetsSkipped} old packets (total dropped: ${totalPacketsDropped})`);
+  console.log(`Trimmed buffer: ${buffer.length} → ${trimmed.length} bytes, dropped ${packetsSkipped} old packets (total dropped: ${captureStats.totalDropped.value})`);
 
   // Show trim notification popup
   if (trimNotificationTimeout) clearTimeout(trimNotificationTimeout);
@@ -87,9 +84,9 @@ const handleClear = async () => {
 
   masterBuffer = new Uint8Array(0);
   lastProcessedSize = 0;
-  isProcessing = false;  // Allow new processing immediately
-  totalPacketsDropped = 0;  // Reset dropped packet counter
-  totalPacketsCaptured.value = 0;  // Reset total packets counter
+  captureStats.isProcessing.value = false;  // Allow new processing immediately
+  captureStats.totalDropped.value = 0;  // Reset dropped packet counter
+  captureStats.totalCaptured.value = 0;  // Reset total packets counter
   frameDisplayOffset.value = 0;  // Reset display offset
 
   // Clear any pending trim notification
@@ -117,7 +114,7 @@ const handleLiveStream = async (newBytes) => {
   masterBuffer = trimBuffer(masterBuffer);
 
   // If already processing, just return - the finally block will check if buffer grew
-  if (isProcessing) {
+  if (captureStats.isProcessing.value) {
     return;
   }
 
@@ -131,7 +128,7 @@ const processBuffer = async (buffer, epoch = captureEpoch) => {
     return;
   }
 
-  isProcessing = true;
+  captureStats.isProcessing.value = true;
   const startTime = Date.now();
   let success = false;
 
@@ -162,9 +159,9 @@ const processBuffer = async (buffer, epoch = captureEpoch) => {
       const newFrameCount = reloadResult.frameCount || manager.frameCount;
 
       // Update total packets captured (always increases: visible + dropped)
-      totalPacketsCaptured.value = Math.max(
-        totalPacketsCaptured.value,
-        newFrameCount + totalPacketsDropped
+      captureStats.totalCaptured.value = Math.max(
+        captureStats.totalCaptured.value,
+        newFrameCount + captureStats.totalDropped.value
       );
 
       // Auto-scroll to the bottom if new frames arrived
@@ -189,7 +186,7 @@ const processBuffer = async (buffer, epoch = captureEpoch) => {
       await manager.closeFile({ restartWorker: true });
     }
   } finally {
-    isProcessing = false;
+    captureStats.isProcessing.value = false;
     const duration = Date.now() - startTime;
     console.log(`Processed in ${duration}ms, buffer size: ${buffer.length}, success: ${success}`);
 
@@ -258,12 +255,6 @@ onMounted(() => {
         Trimming {{ trimNotification.count.toLocaleString() }} old packets
       </div>
     </Transition>
-
-    <!-- Debug Overlay -->
-    <div v-if="isProcessing || manager.packetCount > 0"
-         style="position: fixed; bottom: 30px; right: 10px; background: rgba(0,0,0,0.8); color: lime; padding: 5px; font-size: 10px; z-index: 9999; pointer-events: none;">
-      Proc: {{ isProcessing }} | Total: {{ totalPacketsCaptured.toLocaleString() }} | Visible: {{ manager.frameCount }}
-    </div>
   </div>
 </template>
 

@@ -1,6 +1,6 @@
 <script setup>
 import { computed, reactive } from "vue";
-import { manager } from "../globals";
+import { manager, captureStats } from "../globals";
 import GitHubIcon from "./icons/GitHubIcon.vue";
 import { useInterval } from "../composables.js";
 
@@ -8,21 +8,19 @@ const state = reactive({
   bridgeLoader: null,
 
   // computed
-  packetCountInfo: null,
+  statsInfo: null,
 });
 
-state.packetCountInfo = computed(() => {
-  if (manager.packetCount === 0) return "No Packets";
+state.statsInfo = computed(() => {
+  const proc = captureStats.isProcessing.value;
+  const total = captureStats.totalCaptured.value;
+  const visible = manager.frameCount;
+  const trimmed = captureStats.totalDropped.value;
 
-  const packetCountInfo = `Packets: ${manager.packetCount}`;
-  if (manager.displayFilter === "") return packetCountInfo;
+  // If no capture activity, show simple state
+  if (total === 0 && !proc) return "No Packets";
 
-  const displayedPercent = (
-    (manager.frameCount * 100) /
-    manager.packetCount
-  ).toFixed(1);
-
-  return `${packetCountInfo} · Displayed: ${manager.frameCount} (${displayedPercent}%)`;
+  return `Proc: ${proc} | Total: ${total.toLocaleString()} | Visible: ${visible.toLocaleString()} | Trimmed: ${trimmed.toLocaleString()}`;
 });
 
 const generateDescription = (request) => {
@@ -59,8 +57,8 @@ useInterval(updateLoader, 1000);
   <div class="status-bar">
     <div>{{ state.bridgeLoader || "Wireview by radiantly" }}</div>
     <div style="flex-grow: 1"></div>
-    <div>
-      {{ state.packetCountInfo }}
+    <div class="stats-info">
+      {{ state.statsInfo }}
     </div>
     <div style="flex-grow: 1"></div>
     <a
@@ -78,6 +76,11 @@ useInterval(updateLoader, 1000);
 .status-bar {
   display: flex;
   padding: 2px 5px;
+}
+.stats-info {
+  font-family: monospace;
+  font-size: 13px;
+  color: #22c55e;
 }
 .github {
   display: flex;
