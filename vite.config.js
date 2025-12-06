@@ -18,7 +18,7 @@ export default defineConfig({
     }
   ],
   server: {
-    host: '10.11.0.38', // Listen on all IPs
+    host: true, // Listen on all network interfaces
     port: 5173,
     https: {
       key: fs.readFileSync('./server.key'),
