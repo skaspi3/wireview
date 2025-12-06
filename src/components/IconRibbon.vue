@@ -1,5 +1,4 @@
 <script setup>
-import CloseCaptureIcon from "./icons/CloseCaptureIcon.vue";
 import FindIcon from "./icons/FindIcon.vue";
 import PreviousPacketIcon from "./icons/PreviousPacketIcon.vue";
 import NextPacketIcon from "./icons/NextPacketIcon.vue";
@@ -10,15 +9,6 @@ import GoLastIcon from "./icons/GoLastIcon.vue";
 
 <template>
   <div class="ribbon">
-    <div
-      class="icon"
-      :class="{ disabled: manager.sessionInfo === null }"
-      title="Close this capture file"
-      @click="() => manager.closeFile()"
-    >
-      <CloseCaptureIcon />
-    </div>
-    <div class="separator"></div>
     <div
       class="icon"
       :class="{ disabled: manager.sessionInfo === null }"

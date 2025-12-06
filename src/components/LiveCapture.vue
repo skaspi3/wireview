@@ -23,9 +23,8 @@
     <!-- Capturing State -->
     <div v-else class="status-bar">
       <span class="recording-indicator">● Rec</span>
-      <span class="stats">{{ packetCount }} chunks ({{ totalBytes }} B)</span>
       <span class="interface-tag">on {{ selectedInterface }}</span>
-      
+
       <button @click="restartCapture" class="btn btn-warning" title="Restart Capture">
         ↺
       </button>

@@ -30,8 +30,6 @@ const statsInfo = computed(() => {
   return `Max. Window: ${MAX_BUFFER_MB}MB | Total: ${total.toLocaleString()} pkt | Visible: ${visible.toLocaleString()} pkt | Trimmed: ${trimmed.toLocaleString()} pkt`;
 });
 
-const isProcessing = computed(() => captureStats.isProcessing.value);
-
 const toggleFilterPopup = () => {
   showFilterPopup.value = !showFilterPopup.value;
 };
@@ -71,9 +69,6 @@ const toggleFilterPopup = () => {
     >
       <GitHubIcon />
     </a>
-    <div class="proc-indicator" :class="{ active: isProcessing }">
-      Proc: {{ isProcessing }}
-    </div>
   </div>
 </template>
 
@@ -157,18 +152,5 @@ const toggleFilterPopup = () => {
 }
 .github svg {
   height: 100%;
-}
-.proc-indicator {
-  margin-left: 10px;
-  font-family: monospace;
-  font-size: 12px;
-  color: #6b7280;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: #374151;
-}
-.proc-indicator.active {
-  color: #fbbf24;
-  background: #422006;
 }
 </style>
