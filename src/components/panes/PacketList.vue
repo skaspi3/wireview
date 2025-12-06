@@ -168,7 +168,7 @@ const updateRowsForTable = () => {
   // Handle empty frames case
   if (!frames || frames.length === 0) {
     // Don't update table with empty data - keep previous state
-    console.warn("updateRowsForTable: no frames, skip might be out of range");
+    if (DEBUG) console.warn("updateRowsForTable: no frames, skip might be out of range");
     return;
   }
 

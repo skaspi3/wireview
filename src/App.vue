@@ -25,6 +25,36 @@ const WORKER_RESTART_INTERVAL = 100;
 const trimNotification = ref(null);   // { count: number } when showing trim popup
 let trimNotificationTimeout = null;
 
+// Recovery state for crash handler
+const recoveryState = ref(null);  // { countdown: number } when recovering
+let recoveryInterval = null;
+
+const startRecovery = (seconds = 5) => {
+  // Clear any existing recovery interval
+  if (recoveryInterval) clearInterval(recoveryInterval);
+
+  recoveryState.value = { countdown: seconds };
+
+  recoveryInterval = setInterval(() => {
+    if (recoveryState.value && recoveryState.value.countdown > 1) {
+      recoveryState.value = { countdown: recoveryState.value.countdown - 1 };
+    } else {
+      // Countdown finished, clear recovery state
+      clearInterval(recoveryInterval);
+      recoveryInterval = null;
+      recoveryState.value = null;
+    }
+  }, 1000);
+};
+
+const clearRecovery = () => {
+  if (recoveryInterval) {
+    clearInterval(recoveryInterval);
+    recoveryInterval = null;
+  }
+  recoveryState.value = null;
+};
+
 // Rolling buffer settings
 const MAX_BUFFER_SIZE = 20 * 1024 * 1024;  // Trim when exceeds 20MB
 const TRIM_TO_SIZE = 12 * 1024 * 1024;     // Trim down to 12MB
@@ -94,9 +124,10 @@ const handleClear = async () => {
   captureStats.totalCaptured.value = 0;  // Reset total packets counter
   frameDisplayOffset.value = 0;  // Reset display offset
 
-  // Clear any pending trim notification
+  // Clear any pending notifications
   if (trimNotificationTimeout) clearTimeout(trimNotificationTimeout);
   trimNotification.value = null;
+  clearRecovery();
 
   // Restart worker to guarantee clean state and cancel any in-flight operations
   await manager.closeFile({ restartWorker: true });
@@ -170,6 +201,12 @@ const processBuffer = async (buffer, epoch = captureEpoch) => {
     if (reloadResult && reloadResult.success) {
       success = true;
       reloadCount++;
+
+      // Clear recovery message on first successful packet after crash
+      if (recoveryState.value) {
+        clearRecovery();
+      }
+
       const newFrameCount = reloadResult.frameCount || manager.frameCount;
 
       // Update total packets captured (always increases: visible + dropped)
@@ -196,7 +233,12 @@ const processBuffer = async (buffer, epoch = captureEpoch) => {
       }
     } else {
       const reason = reloadResult?.reason || 'unknown';
-      console.warn(`reloadFile failed: ${reason}`);
+      if (DEBUG) console.warn(`reloadFile failed: ${reason}`);
+
+      // Show recovery message for cancelled/failed operations
+      if (reason === 'cancelled' || reason === 'epoch_changed') {
+        startRecovery(13);
+      }
     }
   } catch (e) {
     console.error("Error updating live capture:", e);
@@ -204,6 +246,7 @@ const processBuffer = async (buffer, epoch = captureEpoch) => {
     // If worker timed out or cancelled, restart it cleanly
     if (e.message === "Worker timed out" || e.cancelled) {
       console.warn("Restarting worker due to timeout/cancel...");
+      startRecovery(13);  // Show recovery message with 13 second countdown
       await manager.closeFile({ restartWorker: true });
     }
   } finally {
@@ -225,7 +268,10 @@ const processBuffer = async (buffer, epoch = captureEpoch) => {
       // On failure, still update lastProcessedSize to avoid retrying the exact same buffer
       // But don't schedule reprocess - wait for new data to come in
       lastProcessedSize = buffer.length;
-      console.warn("Processing failed, not scheduling reprocess");
+      // Only warn if not due to intentional restart (epoch change)
+      if (DEBUG && epoch === captureEpoch) {
+        console.warn("Processing failed, not scheduling reprocess");
+      }
     }
   }
 };
@@ -274,6 +320,13 @@ onMounted(() => {
     <Transition name="fade">
       <div v-if="trimNotification" class="trim-popup">
         Trimming {{ trimNotification.count.toLocaleString() }} old packets
+      </div>
+    </Transition>
+
+    <!-- Recovery Notification Popup -->
+    <Transition name="fade">
+      <div v-if="recoveryState" class="recovery-popup">
+        Recovering from unexpected error... wait {{ recoveryState.countdown }} sec
       </div>
     </Transition>
   </div>
@@ -344,6 +397,24 @@ onMounted(() => {
   pointer-events: none;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+/* Recovery notification popup */
+.recovery-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: #f87171;
+  padding: 20px 32px;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 500;
+  z-index: 10001;
+  pointer-events: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(248, 113, 113, 0.4);
 }
 
 /* Fade transition for popup */
