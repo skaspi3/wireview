@@ -29,8 +29,8 @@
   --ws-font-family-sans-serif: "Segoe UI", sans-serif;
   --ws-font-sans-serif: 9pt var(--ws-font-family-sans-serif);
 
-  --ws-ugly-red: #f48771;     /* Softer red for dark mode */
-  --ws-ugly-green: #89d185;   /* Softer green for dark mode */
+  --ws-ugly-red: #c62828;     /* Dark red for invalid filter */
+  --ws-ugly-green: #2e7d32;   /* Dark green for valid filter */
   --ws-nice-blue: #3794ff;
   --ws-hmmm-yellow: #dcdcaa;
 

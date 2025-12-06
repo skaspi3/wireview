@@ -309,6 +309,7 @@ onBeforeUnmount(() =>
                 : isFilterValid
                 ? 'var(--ws-ugly-green)'
                 : 'var(--ws-ugly-red)',
+            color: isFilterValid !== null ? '#ffffff' : 'var(--ws-text-color)',
           }"
         />
         <div v-if="showSuggestions && filteredSuggestions.length > 0" class="suggestions-dropdown">
@@ -380,7 +381,7 @@ onBeforeUnmount(() =>
   border: none;
   background-color: var(--ws-display-filter-bg);
   color: var(--ws-text-color);
-  padding: 1px 4px;
+  padding: 4px 7px;
 }
 .suggestions-dropdown {
   position: absolute;

@@ -41,6 +41,7 @@ const initPromise = loadWiregasm({
   result.init();
   sharky = result;
   const columns = vecToArray(sharky.getColumns());
+  console.log("Worker: Wiregasm initialization completed");
   postMessage({ type: "init", columns, success: true });
   return result;
 }).catch((error) => {

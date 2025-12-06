@@ -16,18 +16,15 @@ const bpfFilter = {
   ]
 };
 
-// Rolling buffer limit (must match App.vue MAX_BUFFER_SIZE)
-const MAX_BUFFER_MB = 20;
-
 const statsInfo = computed(() => {
   const total = captureStats.totalCaptured.value;
   const visible = manager.frameCount;
   const trimmed = captureStats.totalDropped.value;
 
   // If no capture activity, show simple state
-  if (total === 0 && !captureStats.isProcessing.value) return `Max. Window: ${MAX_BUFFER_MB}MB | No Packets`;
+  if (total === 0 && !captureStats.isProcessing.value) return `No Packets`;
 
-  return `Max. Window: ${MAX_BUFFER_MB}MB | Total: ${total.toLocaleString()} pkt | Visible: ${visible.toLocaleString()} pkt | Trimmed: ${trimmed.toLocaleString()} pkt`;
+  return `Total: ${total.toLocaleString()} pkt | Visible: ${visible.toLocaleString()} pkt | Trimmed: ${trimmed.toLocaleString()} pkt`;
 });
 
 const toggleFilterPopup = () => {

@@ -10,7 +10,6 @@ import DisplayFilter from './components/DisplayFilter.vue';
 import StatusBar from './components/StatusBar.vue';
 import FindFrameBar from './components/FindFrameBar.vue';
 import Welcome from './components/Welcome.vue';
-import LiveCapture from './components/LiveCapture.vue';
 
 // Master buffer to hold captured packets (rolling window)
 let masterBuffer = new Uint8Array(0);
@@ -28,6 +27,9 @@ let trimNotificationTimeout = null;
 // Recovery state for crash handler
 const recoveryState = ref(null);  // { countdown: number } when recovering
 let recoveryInterval = null;
+
+// Engine preparing state (shown during worker restart)
+const enginePreparing = ref(false);
 
 const startRecovery = (seconds = 5) => {
   // Clear any existing recovery interval
@@ -130,7 +132,9 @@ const handleClear = async () => {
   clearRecovery();
 
   // Restart worker to guarantee clean state and cancel any in-flight operations
+  enginePreparing.value = true;
   await manager.closeFile({ restartWorker: true });
+  enginePreparing.value = false;
   if (DEBUG) console.log("Capture cleared with worker restart, epoch:", myEpoch);
 };
 
@@ -229,7 +233,9 @@ const processBuffer = async (buffer, epoch = captureEpoch) => {
       if (reloadCount >= WORKER_RESTART_INTERVAL) {
         reloadCount = 0;
         console.log("Proactive worker restart after", WORKER_RESTART_INTERVAL, "reloads");
+        enginePreparing.value = true;
         await manager.closeFile({ restartWorker: true });
+        enginePreparing.value = false;
       }
     } else {
       const reason = reloadResult?.reason || 'unknown';
@@ -247,7 +253,9 @@ const processBuffer = async (buffer, epoch = captureEpoch) => {
     if (e.message === "Worker timed out" || e.cancelled) {
       console.warn("Restarting worker due to timeout/cancel...");
       startRecovery(13);  // Show recovery message with 13 second countdown
+      enginePreparing.value = true;
       await manager.closeFile({ restartWorker: true });
+      enginePreparing.value = false;
     }
   } finally {
     captureStats.isProcessing.value = false;
@@ -283,19 +291,9 @@ onMounted(() => {
 
 <template>
   <div class="app-layout">
-    <!-- Header / Toolbar -->
-    <header class="toolbar">
-      <div class="logo-area">
-        <h1>Wireview</h1>
-      </div>
-      <div class="live-control">
-        <LiveCapture @stream-data="handleLiveStream" @clear="handleClear" @stop="handleStop" />
-      </div>
-    </header>
-
     <!-- Main UI -->
     <div class="main-content">
-      <IconRibbon />
+      <IconRibbon @stream-data="handleLiveStream" @clear="handleClear" @stop="handleStop" />
       <DisplayFilter />
       <FindFrameBar v-if="!manager.findFrameBarHidden" />
       
@@ -329,6 +327,13 @@ onMounted(() => {
         Recovering from unexpected error... wait {{ recoveryState.countdown }} sec
       </div>
     </Transition>
+
+    <!-- Engine Preparing Popup -->
+    <Transition name="fade">
+      <div v-if="enginePreparing" class="engine-popup">
+        Engine preparing to start...
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -338,26 +343,6 @@ onMounted(() => {
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
-}
-
-.toolbar {
-  flex-shrink: 0;
-  height: 40px;
-  background: var(--ws-lighter-gray);
-  border-bottom: var(--ws-pane-border);
-  color: var(--ws-text-color);
-  display: flex;
-  align-items: center;
-  padding: 0 10px;
-  gap: 20px;
-}
-
-.logo-area h1 {
-  margin: 0;
-  font-size: 1.1rem;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  color: var(--ws-text-color);
 }
 
 .main-content {
@@ -415,6 +400,24 @@ onMounted(() => {
   pointer-events: none;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(248, 113, 113, 0.4);
+}
+
+/* Engine preparing popup */
+.engine-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: #60a5fa;
+  padding: 20px 32px;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 500;
+  z-index: 10001;
+  pointer-events: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(96, 165, 250, 0.4);
 }
 
 /* Fade transition for popup */

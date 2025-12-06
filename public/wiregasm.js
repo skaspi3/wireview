@@ -258,13 +258,15 @@ if (!Module["printErr"])
 
 if (!Module["handleStatus"])
   Module.handleStatus = function (type, status) {
-    console.log(type, status);
+    console.log("[Wiregasm]", type, status);
   };
 
 // initialize FS with directories
 Module["onRuntimeInitialized"] = () => {
+  console.log("[Wiregasm] Runtime initialized");
   Module.FS.mkdir("/plugins");
   Module.FS.mkdir("/uploads");
+  console.log("[Wiregasm] Dissectors loaded, ready for capture");
 };// end include: /src/lib/wiregasm/ext/mod.js
 // include: /tmp/tmpk14x2lsr.js
 

@@ -1,10 +1,9 @@
 <script setup>
 import FindIcon from "./icons/FindIcon.vue";
-import PreviousPacketIcon from "./icons/PreviousPacketIcon.vue";
-import NextPacketIcon from "./icons/NextPacketIcon.vue";
+import LiveCapture from "./LiveCapture.vue";
 import { manager } from "../globals";
-import GoFirstIcon from "./icons/GoFirstIcon.vue";
-import GoLastIcon from "./icons/GoLastIcon.vue";
+
+const emit = defineEmits(['stream-data', 'clear', 'stop']);
 </script>
 
 <template>
@@ -18,53 +17,12 @@ import GoLastIcon from "./icons/GoLastIcon.vue";
     >
       <FindIcon />
     </div>
-    <!-- In Firefox, the css :active selector does not fire if we run
-    event.preventDefault() on the mousedown event. We need to prevent default
-    so that focus is not lost (from, say, a currently focused row) -->
-    <div
-      class="icon"
-      :class="{
-        disabled: !manager.canGoToPreviousPacket,
-      }"
-      title="Go to the previous packet"
-      @mousedown.prevent
-      @mouseup="() => manager.goToNearbyPacket(-1)"
-    >
-      <PreviousPacketIcon />
-    </div>
-    <div
-      class="icon"
-      :class="{
-        disabled: !manager.canGoToNextPacket,
-      }"
-      title="Go to the next packet"
-      @mousedown.prevent
-      @mouseup="() => manager.goToNearbyPacket(1)"
-    >
-      <NextPacketIcon />
-    </div>
-    <div
-      class="icon"
-      :class="{
-        disabled: !manager.canGoToPreviousPacket,
-      }"
-      title="Go to the first packet"
-      @mousedown.prevent
-      @mouseup="() => manager.setActiveFrameIndex(0)"
-    >
-      <GoFirstIcon />
-    </div>
-    <div
-      class="icon"
-      :class="{
-        disabled: !manager.canGoToNextPacket,
-      }"
-      title="Go to the last packet"
-      @mousedown.prevent
-      @mouseup="() => manager.setActiveFrameIndex(-1)"
-    >
-      <GoLastIcon />
-    </div>
+    <div class="separator"></div>
+    <LiveCapture
+      @stream-data="(data) => emit('stream-data', data)"
+      @clear="() => emit('clear')"
+      @stop="() => emit('stop')"
+    />
   </div>
 </template>
 

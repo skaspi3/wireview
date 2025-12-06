@@ -22,7 +22,7 @@
 
     <!-- Capturing State -->
     <div v-else class="status-bar">
-      <span class="recording-indicator">● Rec</span>
+      <span class="recording-indicator">● Capture</span>
       <span class="interface-tag">on {{ selectedInterface }}</span>
 
       <button @click="restartCapture" class="btn btn-warning" title="Restart Capture">
@@ -283,8 +283,8 @@ onUnmounted(() => {
 
 .btn-primary { background-color: #3b82f6; color: white; }
 .btn-secondary { background-color: #4b5563; color: white; }
-.btn-danger { background-color: #ef4444; color: white; margin-left: 10px; }
-.btn-warning { background-color: #f59e0b; color: white; margin-left: 10px; }
+.btn-danger { background-color: #ef4444; color: white; margin-left: 10px; padding: 8px 16px; font-size: 1.0em; }
+.btn-warning { background-color: #f59e0b; color: white; margin-left: 10px; padding: 8px 14px; font-size: 1.1em; }
 
 .status-bar {
   display: flex;
@@ -300,12 +300,14 @@ onUnmounted(() => {
   color: #ef4444;
   animation: pulse 1.5s infinite;
   margin-right: 10px;
+  font-size: 1.1em;
+  font-weight: bold;
 }
 
 .interface-tag {
   color: #9ca3af;
   margin-left: 10px;
-  font-size: 0.9em;
+  font-size: 1.0em;
   border-left: 1px solid #6b7280;
   padding-left: 10px;
 }
