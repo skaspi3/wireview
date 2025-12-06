@@ -12,6 +12,7 @@ class Manager {
     this.#core = {
       bridge: new Bridge(),
       checkFilterCache: new Map(),
+      sessionEpoch: 0,  // Incremented on closeFile to invalidate stale operations
     };
     this.#state = reactive({
       rowHeight: 14, // TODO: Originally I thought we'd manipulate this to change text size, but in-browser zoom seems to work fine for this
@@ -271,18 +272,33 @@ class Manager {
   async reloadFile(file) {
     // Similar to openFile but doesn't clear sessionInfo/activeFrameIndex first
     // allowing for "seamless" UI updates during live capture
+    // Returns: { success: boolean, frameCount?: number }
+    const epochAtStart = this.#core.sessionEpoch;
+
     this.#shallowState.activeFile = file;
     const result = await this.#core.bridge.createSession(file);
+
+    // Check if operation was cancelled (worker restarted)
+    if (!result || result.cancelled) {
+      console.log("reloadFile: operation cancelled");
+      return { success: false, reason: 'cancelled' };
+    }
+
+    // Check if session was cleared while we were processing
+    if (epochAtStart !== this.#core.sessionEpoch) {
+      console.log("Session epoch changed during reloadFile, discarding result");
+      return { success: false, reason: 'epoch_changed' };
+    }
 
     // Code -12 is often "Short Read" which is expected for live captures
     if (result.code && result.code !== -12) {
       console.error("Reload failed:", result);
       // Don't clear state on failure, just log
-      return;
+      return { success: false, reason: 'parse_error', code: result.code };
     }
 
     this.#shallowState.sessionInfo = result.summary;
-    
+
     // Ensure filteredFrames is consistent.
     if (this.#state.displayFilter === "") {
       this.#shallowState.filteredFrames = null;
@@ -296,22 +312,45 @@ class Manager {
       };
       // We don't await here to keep it async, but the watcher/getter handles it
       this.#shallowState.filteredFramesRequest.promise.then(frames => {
-         this.#shallowState.filteredFrames = frames;
+        // Check epoch again before updating
+        if (epochAtStart === this.#core.sessionEpoch) {
+          this.#shallowState.filteredFrames = frames;
+        }
       });
     }
-    
+
     // If this is the first load (activeFrameIndex is null), set it to 0
     if (this.#state.activeFrameIndex === null && result.summary.packet_count > 0) {
       this.#state.activeFrameIndex = 0;
     }
+
+    return { success: true, frameCount: result.summary.packet_count };
   }
 
-  async closeFile() {
+  async closeFile(options = {}) {
+    this.#core.sessionEpoch++;  // Invalidate any in-flight operations
     this.#state.activeFrameIndex = null;
     this.#shallowState.sessionInfo = null;
+    this.#shallowState.filteredFrames = null;
+    this.#shallowState.filteredFramesRequest = null;
     this.#shallowState.lastFileOpenError = null;
     this.#shallowState.activeFile = null;
-    await this.#core.bridge.closeSession();
+
+    // If restart requested, terminate worker entirely for clean state
+    if (options.restartWorker) {
+      try {
+        await this.#core.bridge.restart();
+        console.log("Manager: Worker restarted for clean state");
+      } catch (e) {
+        console.error("Manager: Failed to restart worker:", e);
+      }
+    } else {
+      await this.#core.bridge.closeSession();
+    }
+  }
+
+  get sessionEpoch() {
+    return this.#core.sessionEpoch;
   }
 
   // say you want n frames from the mth position

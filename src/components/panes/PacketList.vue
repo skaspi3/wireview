@@ -61,17 +61,38 @@ useResizeObserver(scrollableEl, (entries) => {
   if (width > 0) state.clientWidth = width;
 });
 
+const shallowState = shallowReactive({
+  frameBank: null,
+  table: null,
+});
+
 // Also force check when packets arrive, in case the list was hidden/empty
-watch(() => manager.frameCount, () => {
+watch(() => manager.frameCount, (newCount, oldCount) => {
+  // Reset scroll if frame count dropped to 0 (capture cleared/restarted)
+  if (newCount === 0 && oldCount > 0) {
+    console.log("Frame count dropped to 0, resetting scroll");
+    state.scrollY = 0;
+    shallowState.frameBank = null;
+    shallowState.table = null;
+  }
+
   window.dispatchEvent(new Event('resize'));
   if (state.clientHeight < 50) checkDimensions();
   requestFrames();
 });
 
-const shallowState = shallowReactive({
-  frameBank: null,
-  table: null,
-});
+// Reset scroll when session is cleared
+watch(
+  () => manager.sessionInfo,
+  (newInfo, oldInfo) => {
+    if (oldInfo && !newInfo) {
+      console.log("Session cleared, resetting scroll to 0");
+      state.scrollY = 0;
+      shallowState.frameBank = null;
+      shallowState.table = null;
+    }
+  }
+);
 
 state.scrollY = useScroll(scrollableEl).y;
 
@@ -105,25 +126,51 @@ state.minimapFirstRowIndex = computed(() =>
   )
 );
 
-state.frameReqArgs = computed(() => [
-  manager.displayFilter,
-  state.minimapFirstRowIndex,
-  state.clientHeight || 200,
-]);
+state.frameReqArgs = computed(() => {
+  // Clamp skip to valid range (0 to frameCount)
+  const maxSkip = Math.max(0, manager.frameCount - 1);
+  const clampedSkip = Math.min(state.minimapFirstRowIndex, maxSkip);
 
-state.frameReqArgsForTable = computed(() => [
-  manager.displayFilter,
-  state.firstRowIndex,
-  state.rowCount + 1,
-]);
+  return [
+    manager.displayFilter,
+    Math.max(0, clampedSkip),  // Never request negative skip
+    state.clientHeight || 200,
+  ];
+});
+
+state.frameReqArgsForTable = computed(() => {
+  // Clamp skip to valid range
+  const maxSkip = Math.max(0, manager.frameCount - 1);
+  const clampedSkip = Math.min(state.firstRowIndex, maxSkip);
+
+  return [
+    manager.displayFilter,
+    Math.max(0, clampedSkip),
+    state.rowCount + 1,
+  ];
+});
 
 const updateRowsForTable = () => {
   if (shallowState.frameBank === null) return;
+
+  // Early exit if no session
+  if (manager.frameCount === 0) {
+    shallowState.table = { frames: [], startIndex: 0 };
+    return;
+  }
+
   const {
     frames,
     offset,
     reqArgs: [filter, skip, limit],
   } = shallowState.frameBank;
+
+  // Handle empty frames case
+  if (!frames || frames.length === 0) {
+    // Don't update table with empty data - keep previous state
+    console.warn("updateRowsForTable: no frames, skip might be out of range");
+    return;
+  }
 
   // so let's say starts at frame index 50, while the first table row starts at index 60
   // that is (state.firstRowIndex - skip)
@@ -163,13 +210,27 @@ const requestFrames = async () => {
     console.log("requestFrames locked, skipping");
     return;
   }
-  
+
+  // Don't request if there are no frames
+  if (manager.frameCount === 0) {
+    shallowState.frameBank = null;
+    shallowState.table = null;
+    return;
+  }
+
   console.log("requestFrames calling manager.getFrames", reqArgs);
   const [filter, skip, limit] = reqArgs;
   framesRequest = manager.getFrames(filter, skip, limit);
-  // await new Promise((resolve) => setTimeout(resolve, 1000));
   const { frames, offset } = await framesRequest;
   framesRequest = null;
+
+  // Don't update if session was cleared while we were fetching
+  if (manager.frameCount === 0) {
+    console.log("Session cleared during fetch, discarding result");
+    shallowState.frameBank = null;
+    shallowState.table = null;
+    return;
+  }
 
   shallowState.frameBank = { frames, offset, reqArgs };
 

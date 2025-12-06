@@ -69,6 +69,51 @@ class Bridge {
     this.#shallowState.initializationResult = null;
   }
 
+  // Forcefully restart the worker - use when you need to cancel all pending operations
+  async restart() {
+    console.log("Bridge: Restarting worker...");
+
+    // Reject all pending callbacks
+    for (const [id, callback] of this.#core.callbacks) {
+      callback({ id, error: "Worker restarted", cancelled: true });
+    }
+    this.#core.callbacks.clear();
+    this.#state.activeRequests.clear();
+
+    // Terminate the old worker
+    if (this.#core.worker) {
+      this.#core.worker.terminate();
+    }
+    this.#shallowState.initializationResult = null;
+
+    // Create a new worker
+    this.#core.worker = new Worker(SharkWorker);
+    this.#core.worker.addEventListener("message", (e) =>
+      this.#processMessage(e)
+    );
+
+    // Wait for initialization to complete
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("Worker init timeout"));
+      }, 30000);
+
+      const checkInit = () => {
+        if (this.#state.initialized) {
+          clearTimeout(timeout);
+          console.log("Bridge: Worker restarted successfully");
+          resolve();
+        } else if (this.#shallowState.initializationResult?.error) {
+          clearTimeout(timeout);
+          reject(new Error(this.#state.initializationError));
+        } else {
+          setTimeout(checkInit, 100);
+        }
+      };
+      checkInit();
+    });
+  }
+
   #processMessage({ data }) {
     const req = this.#state.activeRequests.get(data.id);
     if (req) {
@@ -103,13 +148,17 @@ class Bridge {
   }
 
   async getFrames(filter, skip, limit) {
-    const { frames } = await this.#postMessage({
+    const response = await this.#postMessage({
       type: "frames",
       filter,
       skip,
       limit,
     });
-    return frames;
+    // Handle cancelled operations
+    if (response.cancelled) {
+      return [];
+    }
+    return response.frames;
   }
 
   async findFrame(params) {
@@ -129,12 +178,18 @@ class Bridge {
   }
 
   async createSession(file) {
-    const { result } = await this.#postMessage({ type: "open", file });
-    return result;
+    const response = await this.#postMessage({ type: "open", file });
+    // Handle cancelled operations (worker was restarted)
+    if (response.cancelled) {
+      return { cancelled: true };
+    }
+    return response.result;
   }
 
   async closeSession() {
-    await this.#postMessage({ type: "close" });
+    const response = await this.#postMessage({ type: "close" });
+    // Ignore if cancelled
+    return response.cancelled ? { cancelled: true } : response;
   }
 }
 
