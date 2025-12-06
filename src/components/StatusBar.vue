@@ -16,17 +16,21 @@ const bpfFilter = {
   ]
 };
 
+// Rolling buffer limit (must match App.vue MAX_BUFFER_SIZE)
+const MAX_BUFFER_MB = 20;
+
 const statsInfo = computed(() => {
-  const proc = captureStats.isProcessing.value;
   const total = captureStats.totalCaptured.value;
   const visible = manager.frameCount;
   const trimmed = captureStats.totalDropped.value;
 
   // If no capture activity, show simple state
-  if (total === 0 && !proc) return "No Packets";
+  if (total === 0 && !captureStats.isProcessing.value) return `Max. Window: ${MAX_BUFFER_MB}MB | No Packets`;
 
-  return `Proc: ${proc} | Total: ${total.toLocaleString()} | Visible: ${visible.toLocaleString()} | Trimmed: ${trimmed.toLocaleString()}`;
+  return `Max. Window: ${MAX_BUFFER_MB}MB | Total: ${total.toLocaleString()} pkt | Visible: ${visible.toLocaleString()} pkt | Trimmed: ${trimmed.toLocaleString()} pkt`;
 });
+
+const isProcessing = computed(() => captureStats.isProcessing.value);
 
 const toggleFilterPopup = () => {
   showFilterPopup.value = !showFilterPopup.value;
@@ -67,6 +71,9 @@ const toggleFilterPopup = () => {
     >
       <GitHubIcon />
     </a>
+    <div class="proc-indicator" :class="{ active: isProcessing }">
+      Proc: {{ isProcessing }}
+    </div>
   </div>
 </template>
 
@@ -150,5 +157,18 @@ const toggleFilterPopup = () => {
 }
 .github svg {
   height: 100%;
+}
+.proc-indicator {
+  margin-left: 10px;
+  font-family: monospace;
+  font-size: 12px;
+  color: #6b7280;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #374151;
+}
+.proc-indicator.active {
+  color: #fbbf24;
+  background: #422006;
 }
 </style>
