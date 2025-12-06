@@ -1,5 +1,6 @@
 import { computed, reactive, shallowReactive } from "vue";
 import SharkWorker from "../worker.js?no-inline&url";
+import { DEBUG } from "../debug";
 
 class Bridge {
   #core;
@@ -71,7 +72,7 @@ class Bridge {
 
   // Forcefully restart the worker - use when you need to cancel all pending operations
   async restart() {
-    console.log("Bridge: Restarting worker...");
+    if (DEBUG) console.log("Bridge: Restarting worker...");
 
     // Reject all pending callbacks
     for (const [id, callback] of this.#core.callbacks) {
@@ -101,7 +102,7 @@ class Bridge {
       const checkInit = () => {
         if (this.#state.initialized) {
           clearTimeout(timeout);
-          console.log("Bridge: Worker restarted successfully");
+          if (DEBUG) console.log("Bridge: Worker restarted successfully");
           resolve();
         } else if (this.#shallowState.initializationResult?.error) {
           clearTimeout(timeout);
@@ -119,8 +120,8 @@ class Bridge {
     if (req) {
       const timeTaken = Date.now() - req.timestamp;
       this.#state.activeRequests.delete(data.id);
-      console.log(timeTaken + "ms", data);
-    } else console.log(data);
+      if (DEBUG) console.log(timeTaken + "ms", data);
+    } else if (DEBUG) console.log(data);
 
     if (data.type === "init") this.#shallowState.initializationResult = data;
 

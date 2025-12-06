@@ -44,6 +44,7 @@
 
 <script setup>
 import { ref, onUnmounted, onMounted } from 'vue';
+import { DEBUG } from '../globals';
 
 const emit = defineEmits(['stream-data', 'clear', 'stop']);
 
@@ -78,7 +79,7 @@ const connect = () => {
 
     ws.value.onopen = () => {
       isConnected.value = true;
-      console.log("WS Connected");
+      if (DEBUG) console.log("WS Connected");
     };
 
     ws.value.onmessage = (event) => {

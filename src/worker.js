@@ -1,5 +1,8 @@
 importScripts("/wiregasm.js");
 
+// Debug flag: set to true for verbose logging
+const DEBUG = false;
+
 const fetchBuffer = async (url) => {
   const response = await fetch(url);
   return await response.arrayBuffer();
@@ -58,7 +61,7 @@ self.addEventListener("message", async ({ data }) => {
     }
   }
 
-  console.debug("ahoy, worker got a message", data);
+  if (DEBUG) console.debug("ahoy, worker got a message", data);
 
   if (data.type === "frame") {
     if (!session) {
@@ -75,7 +78,7 @@ self.addEventListener("message", async ({ data }) => {
     if (!session) {
       return postMessage({ id: data.id, frames: [], error: "No session" });
     }
-    console.log(`Worker: getFrames filter='${data.filter}' skip=${data.skip} limit=${data.limit}`);
+    if (DEBUG) console.log(`Worker: getFrames filter='${data.filter}' skip=${data.skip} limit=${data.limit}`);
     const framesVec = session.getFrames(
       data.filter ?? "",
       data.skip ?? 0,
@@ -115,10 +118,10 @@ self.addEventListener("message", async ({ data }) => {
       }
 
       session = new sharky.DissectSession(filePath);
-      console.log("Worker: Created session for", data.file.name, "size:", arrayBuffer.byteLength);
+      if (DEBUG) console.log("Worker: Created session for", data.file.name, "size:", arrayBuffer.byteLength);
 
       const result = session.load();
-      console.log("Worker: session.load() result:", result);
+      if (DEBUG) console.log("Worker: session.load() result:", result);
 
       return postMessage({
         id: data.id,

@@ -1,6 +1,6 @@
 <script setup>
 import { reactive } from "vue";
-import { manager } from "../globals";
+import { manager, DEBUG } from "../globals";
 
 const state = reactive({
   searchInProgress: false,
@@ -51,7 +51,7 @@ const handleSubmit = () => {
               result.search_pos + result.search_len,
             ]
           : null;
-        console.log("range", range);
+        if (DEBUG) console.log("range", range);
         manager.setActiveFieldInfo(result.field_info_ptr || null, range);
       }
     })

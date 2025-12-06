@@ -1,5 +1,6 @@
 import { ref } from "vue";
 import Manager from "./classes/Manager";
+export { DEBUG } from "./debug";
 
 export const manager = new Manager();
 

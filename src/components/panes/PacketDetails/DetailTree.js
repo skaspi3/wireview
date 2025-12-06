@@ -1,7 +1,7 @@
 import { h, reactive, watch } from "vue";
 import DetailRow from "./DetailRow.vue";
 import FrameDetailsTree from "../../../classes/FrameDetailsTree";
-import { manager } from "../../../globals";
+import { manager, DEBUG } from "../../../globals";
 
 export default {
   props: {
@@ -47,7 +47,7 @@ export default {
 
     const onMousedown = (event) => {
       const detailId = getDetailId(event.target);
-      console.log(event, detailId);
+      if (DEBUG) console.log(event, detailId);
       if (detailId === null) return;
 
       manager.setActiveFieldInfo(detailId);

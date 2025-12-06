@@ -2,6 +2,7 @@ import { computed, reactive, shallowReactive, watch } from "vue";
 import { calculateFontSize, clamp } from "../util";
 import Bridge from "./Bridge";
 import FrameDetailsTree from "./FrameDetailsTree";
+import { DEBUG } from "../debug";
 
 class Manager {
   #core;
@@ -280,13 +281,13 @@ class Manager {
 
     // Check if operation was cancelled (worker restarted)
     if (!result || result.cancelled) {
-      console.log("reloadFile: operation cancelled");
+      if (DEBUG) console.log("reloadFile: operation cancelled");
       return { success: false, reason: 'cancelled' };
     }
 
     // Check if session was cleared while we were processing
     if (epochAtStart !== this.#core.sessionEpoch) {
-      console.log("Session epoch changed during reloadFile, discarding result");
+      if (DEBUG) console.log("Session epoch changed during reloadFile, discarding result");
       return { success: false, reason: 'epoch_changed' };
     }
 
@@ -340,7 +341,7 @@ class Manager {
     if (options.restartWorker) {
       try {
         await this.#core.bridge.restart();
-        console.log("Manager: Worker restarted for clean state");
+        if (DEBUG) console.log("Manager: Worker restarted for clean state");
       } catch (e) {
         console.error("Manager: Failed to restart worker:", e);
       }

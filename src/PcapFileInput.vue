@@ -1,8 +1,8 @@
 <script setup>
-import { manager } from "./globals";
+import { manager, DEBUG } from "./globals";
 
 const onFileSelect = (e) => {
-  console.log("file selected", e.target.files);
+  if (DEBUG) console.log("file selected", e.target.files);
 
   manager.openFile(e.target.files[0]);
 };

@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, ref } from 'vue';
-import { manager, frameDisplayOffset, captureStats } from './globals';
+import { manager, frameDisplayOffset, captureStats, DEBUG } from './globals';
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
 import PacketList from './components/panes/PacketList.vue';
 import PacketDetails from './components/panes/PacketDetails.vue';
@@ -66,7 +66,7 @@ const trimBuffer = (buffer) => {
 
   captureStats.totalDropped.value += packetsSkipped;
   frameDisplayOffset.value += packetsSkipped;  // Shift display numbers to keep them continuous
-  console.log(`Trimmed buffer: ${buffer.length} → ${trimmed.length} bytes, dropped ${packetsSkipped} old packets (total dropped: ${captureStats.totalDropped.value})`);
+  if (DEBUG) console.log(`Trimmed buffer: ${buffer.length} → ${trimmed.length} bytes, dropped ${packetsSkipped} old packets (total dropped: ${captureStats.totalDropped.value})`);
 
   // Show trim notification popup
   if (trimNotificationTimeout) clearTimeout(trimNotificationTimeout);
@@ -95,12 +95,12 @@ const handleClear = async () => {
 
   // Restart worker to guarantee clean state and cancel any in-flight operations
   await manager.closeFile({ restartWorker: true });
-  console.log("Capture cleared with worker restart, epoch:", myEpoch);
+  if (DEBUG) console.log("Capture cleared with worker restart, epoch:", myEpoch);
 };
 
 const handleStop = () => {
   // No pending queue to clear anymore - we use lastProcessedSize tracking
-  console.log("Capture stopped");
+  if (DEBUG) console.log("Capture stopped");
 };
 
 // Minimum buffer size before attempting to parse (header + at least one packet)
@@ -132,7 +132,7 @@ const handleLiveStream = async (newBytes) => {
 const processBuffer = async (buffer, epoch = captureEpoch) => {
   // Check if this operation is stale (capture was cleared while queued)
   if (epoch !== captureEpoch) {
-    console.log("Discarding stale buffer processing, epoch mismatch:", epoch, "vs", captureEpoch);
+    if (DEBUG) console.log("Discarding stale buffer processing, epoch mismatch:", epoch, "vs", captureEpoch);
     return;
   }
 
@@ -157,7 +157,7 @@ const processBuffer = async (buffer, epoch = captureEpoch) => {
 
     // Check again after async operation - epoch may have changed during processing
     if (epoch !== captureEpoch) {
-      console.log("Discarding stale result after processing, epoch mismatch");
+      if (DEBUG) console.log("Discarding stale result after processing, epoch mismatch");
       return;
     }
 
@@ -196,7 +196,7 @@ const processBuffer = async (buffer, epoch = captureEpoch) => {
   } finally {
     captureStats.isProcessing.value = false;
     const duration = Date.now() - startTime;
-    console.log(`Processed in ${duration}ms, buffer size: ${buffer.length}, success: ${success}`);
+    if (DEBUG) console.log(`Processed in ${duration}ms, buffer size: ${buffer.length}, success: ${success}`);
 
     // Only update lastProcessedSize and schedule reprocess on SUCCESS
     // This prevents infinite retry loops when pcap parsing fails
@@ -205,7 +205,7 @@ const processBuffer = async (buffer, epoch = captureEpoch) => {
 
       // If more data came in while processing, run again immediately (with small yield)
       if (epoch === captureEpoch && masterBuffer.length > lastProcessedSize) {
-        console.log(`Buffer grew from ${lastProcessedSize} to ${masterBuffer.length}, scheduling reprocess`);
+        if (DEBUG) console.log(`Buffer grew from ${lastProcessedSize} to ${masterBuffer.length}, scheduling reprocess`);
         setTimeout(() => processBuffer(masterBuffer, epoch), 50);
       }
     } else {

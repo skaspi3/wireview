@@ -9,7 +9,7 @@ import {
 } from "vue";
 import { useResizeObserver, useScroll, watchThrottled } from "@vueuse/core";
 import { areArraysEqual, clamp } from "../../util";
-import { manager } from "../../globals";
+import { manager, DEBUG } from "../../globals";
 import Minimap from "./PacketList/Minimap.vue";
 import PacketTable from "./PacketList/PacketTable.vue";
 import PacketTableRows from "./PacketList/PacketTableRows.vue";
@@ -56,7 +56,7 @@ onMounted(() => {
 useResizeObserver(scrollableEl, (entries) => {
   const entry = entries[0];
   const { width, height } = entry.contentRect;
-  console.log("Resize:", width, height);
+  if (DEBUG) console.log("Resize:", width, height);
   if (height > 0) state.clientHeight = height;
   if (width > 0) state.clientWidth = width;
 });
@@ -70,7 +70,7 @@ const shallowState = shallowReactive({
 watch(() => manager.frameCount, (newCount, oldCount) => {
   // Reset scroll if frame count dropped to 0 (capture cleared/restarted)
   if (newCount === 0 && oldCount > 0) {
-    console.log("Frame count dropped to 0, resetting scroll");
+    if (DEBUG) console.log("Frame count dropped to 0, resetting scroll");
     state.scrollY = 0;
     shallowState.frameBank = null;
     shallowState.table = null;
@@ -86,7 +86,7 @@ watch(
   () => manager.sessionInfo,
   (newInfo, oldInfo) => {
     if (oldInfo && !newInfo) {
-      console.log("Session cleared, resetting scroll to 0");
+      if (DEBUG) console.log("Session cleared, resetting scroll to 0");
       state.scrollY = 0;
       shallowState.frameBank = null;
       shallowState.table = null;
@@ -195,7 +195,7 @@ const updateRowsForTable = () => {
   const startSliceIdx = Math.max(0, startIndex - minIndex);
   const endSliceIdx = Math.min(frames.length, startSliceIdx + state.rowCount + 1);
 
-  console.log(`Table Slice: frames=${frames.length} minIdx=${minIndex} startIdx=${startIndex} slice=${startSliceIdx}-${endSliceIdx}`);
+  if (DEBUG) console.log(`Table Slice: frames=${frames.length} minIdx=${minIndex} startIdx=${startIndex} slice=${startSliceIdx}-${endSliceIdx}`);
 
   shallowState.table = {
     frames: frames.slice(startSliceIdx, endSliceIdx),
@@ -207,7 +207,7 @@ let framesRequest = null;
 const requestFrames = async () => {
   const reqArgs = state.frameReqArgs;
   if (framesRequest) {
-    console.log("requestFrames locked, skipping");
+    if (DEBUG) console.log("requestFrames locked, skipping");
     return;
   }
 
@@ -218,7 +218,7 @@ const requestFrames = async () => {
     return;
   }
 
-  console.log("requestFrames calling manager.getFrames", reqArgs);
+  if (DEBUG) console.log("requestFrames calling manager.getFrames", reqArgs);
   const [filter, skip, limit] = reqArgs;
   framesRequest = manager.getFrames(filter, skip, limit);
   const { frames, offset } = await framesRequest;
@@ -226,7 +226,7 @@ const requestFrames = async () => {
 
   // Don't update if session was cleared while we were fetching
   if (manager.frameCount === 0) {
-    console.log("Session cleared during fetch, discarding result");
+    if (DEBUG) console.log("Session cleared during fetch, discarding result");
     shallowState.frameBank = null;
     shallowState.table = null;
     return;
@@ -236,7 +236,7 @@ const requestFrames = async () => {
 
   updateRowsForTable();
   if (!areArraysEqual(reqArgs, state.frameReqArgs)) {
-    console.log("requestFrames args changed during fetch, retrying");
+    if (DEBUG) console.log("requestFrames args changed during fetch, retrying");
     return requestFrames();
   }
 };
@@ -261,7 +261,7 @@ watch(
   (index) => {
     if (index === null) return;
 
-    console.log("idx", index, state.firstRowIndex, document.activeElement);
+    if (DEBUG) console.log("idx", index, state.firstRowIndex, document.activeElement);
     if (index < state.firstRowIndex)
       state.scrollY -= state.firstRowIndex - index;
     else if (index >= state.firstRowIndex + state.rowCount)
