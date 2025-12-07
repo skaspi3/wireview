@@ -9,7 +9,6 @@ import IconRibbon from './components/IconRibbon.vue';
 import DisplayFilter from './components/DisplayFilter.vue';
 import StatusBar from './components/StatusBar.vue';
 import FindFrameBar from './components/FindFrameBar.vue';
-import Welcome from './components/Welcome.vue';
 
 // Master buffer to hold captured packets (rolling window)
 let masterBuffer = new Uint8Array(0);
@@ -320,7 +319,7 @@ onMounted(async () => {
       <FindFrameBar v-if="!manager.findFrameBarHidden" />
       
       <div class="workspace">
-        <DefaultLayout v-if="manager.sessionInfo"
+        <DefaultLayout
           :style="{
             '--ws-row-height': manager.rowHeight + 'px',
             '--ws-font-size-monospace': manager.fontSize + 'px',
@@ -330,7 +329,6 @@ onMounted(async () => {
           <template #slot2><PacketDetails /></template>
           <template #slot3><PacketBytes /></template>
         </DefaultLayout>
-        <Welcome v-else />
       </div>
     </div>
     
@@ -380,12 +378,6 @@ onMounted(async () => {
   flex-direction: column;
   min-height: 0;
   background-color: var(--ws-almost-white);
-}
-
-/* Override default Welcome width to fit nicely */
-:deep(.welcome-container) {
-  width: 100%;
-  padding: 2rem;
 }
 
 /* Trim notification popup */
