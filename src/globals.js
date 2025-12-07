@@ -4,6 +4,10 @@ export { DEBUG } from "./debug";
 
 export const manager = new Manager();
 
+// Initialize Wiregasm immediately when module loads (before Vue mounts)
+// This starts the Web Worker and Wiregasm initialization as early as possible
+manager.initialize();
+
 // Display offset for frame numbers (increases when packets are trimmed)
 // This makes frame numbers appear continuous even when old packets are dropped
 export const frameDisplayOffset = ref(0);

@@ -296,7 +296,8 @@ const processBuffer = async (buffer, epoch = captureEpoch) => {
 };
 
 onMounted(async () => {
-  manager.initialize();
+  // Note: manager.initialize() is now called in globals.js at module load time
+  // to start Wiregasm initialization as early as possible
 
   // Fetch Wiregasm version
   try {
