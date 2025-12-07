@@ -330,7 +330,7 @@ onBeforeUnmount(() =>
         type="button"
         class="clear-filter"
         title="Clear display filter"
-        v-if="displayFilterInput"
+        v-if="displayFilterInput || manager.displayFilter"
         @click="clearFilter"
       >
         ✕
