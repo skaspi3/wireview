@@ -74,6 +74,15 @@ export default defineConfig(({ mode }) => {
       // This fixes the "WebSocket connection failed" HMR error in your screenshot
       hmr: {
         clientPort: port
+      },
+      // Proxy WebSocket connections to backend on localhost
+      proxy: {
+        '/ws': {
+          target: 'ws://127.0.0.1:3000',
+          ws: true,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/ws/, '')
+        }
       }
     }
   };

@@ -59,7 +59,8 @@ const error = ref(null);
 let chunkBuffer = [];
 let flushInterval = null;
 
-const WS_URL = `wss://${window.location.hostname}:3000`;
+// WebSocket proxied through Vite - same origin, /ws path
+const WS_URL = `wss://${window.location.host}/ws`;
 
 const closeSocket = () => {
   if (ws.value) {
