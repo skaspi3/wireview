@@ -1,46 +1,41 @@
 <script setup>
 import { computed, ref } from "vue";
-import { manager, captureStats, crashLog, wiregasmVersion, nodeVersion, backendPort, backendStatus } from "../globals";
+import { packets, captureStats, nodeVersion, backendStatus, certInfo } from "../globals";
 import GitHubIcon from "./icons/GitHubIcon.vue";
 
 const showFilterPopup = ref(false);
-const showCrashLogPopup = ref(false);
+const showCertPopup = ref(false);
 
 // BPF filter explanation (matches backend server.js filter)
 const bpfFilter = {
-  raw: "not port 3000 and not port 22 and not port 5173 and not port 443",
+  raw: "not port 3000 and not port 22 and not port 5173 and not port 443 and not net 169.254.0.0/16",
   excluded: [
     { port: 3000, description: "Backend WebSocket" },
     { port: 22, description: "SSH" },
     { port: 5173, description: "Vite dev server" },
     { port: 443, description: "HTTPS" },
+    { range: "169.254.0.0/16", description: "Link-local addresses" },
   ]
 };
 
 const statsInfo = computed(() => {
   const total = captureStats.totalCaptured.value;
-  const visible = manager.frameCount;
+  const visible = packets.value.length;
   const trimmed = captureStats.totalDropped.value;
 
   // If no capture activity, show simple state
-  if (total === 0 && !captureStats.isProcessing.value) return `No Packets`;
+  if (total === 0) return `No Packets`;
 
   return `Total: ${total.toLocaleString()} pkt | Visible: ${visible.toLocaleString()} pkt | Trimmed: ${trimmed.toLocaleString()} pkt`;
 });
 
 const toggleFilterPopup = () => {
   showFilterPopup.value = !showFilterPopup.value;
-  if (showFilterPopup.value) showCrashLogPopup.value = false;
-};
-
-const toggleCrashLogPopup = () => {
-  showCrashLogPopup.value = !showCrashLogPopup.value;
-  if (showCrashLogPopup.value) showFilterPopup.value = false;
 };
 
 const statusTitle = computed(() => {
   switch (backendStatus.value) {
-    case 'connected': return 'Backend connected';
+    case 'connected': return 'Backend connected (thin-client mode)';
     case 'connecting': return 'Connecting to backend...';
     default: return 'Backend disconnected';
   }
@@ -52,12 +47,6 @@ const statusTitle = computed(() => {
       Current BPF filter
     </div>
 
-    <div class="link-separator">|</div>
-
-    <div class="bpf-filter-link" @click="toggleCrashLogPopup">
-      Crash Log ({{ crashLog.length }})
-    </div>
-
     <!-- BPF Filter Popup -->
     <div v-if="showFilterPopup" class="filter-popup">
       <div class="filter-popup-header">
@@ -65,8 +54,10 @@ const statusTitle = computed(() => {
         <button class="close-btn" @click="showFilterPopup = false">&times;</button>
       </div>
       <ul class="filter-list">
-        <li v-for="item in bpfFilter.excluded" :key="item.port">
-          Port {{ item.port }} – {{ item.description }}
+        <li v-for="item in bpfFilter.excluded" :key="item.port || item.range">
+          <template v-if="item.port">Port {{ item.port }}</template>
+          <template v-else>{{ item.range }}</template>
+          – {{ item.description }}
         </li>
       </ul>
       <div class="filter-raw">
@@ -74,40 +65,31 @@ const statusTitle = computed(() => {
       </div>
     </div>
 
-    <!-- Crash Log Popup -->
-    <div v-if="showCrashLogPopup" class="filter-popup crash-log-popup">
-      <div class="filter-popup-header">
-        <strong>Crash Log</strong>
-        <div class="header-buttons">
-          <button v-if="crashLog.length > 0" class="clear-btn" @click="crashLog = []">Clear</button>
-          <button class="close-btn" @click="showCrashLogPopup = false">&times;</button>
-        </div>
-      </div>
-      <div v-if="crashLog.length === 0" class="no-crashes">
-        No crashes recorded
-      </div>
-      <ul v-else class="crash-list">
-        <li v-for="(crash, index) in crashLog" :key="index">
-          {{ crash.timestamp }} – {{ crash.packetCount.toLocaleString() }} packets
-        </li>
-      </ul>
-    </div>
-
     <div style="flex-grow: 1"></div>
     <div class="stats-info">
       {{ statsInfo }}
     </div>
     <div style="flex-grow: 1"></div>
-    <span v-if="wiregasmVersion" class="version-info">
-      Wiregasm {{ wiregasmVersion }}
+    <span class="version-info thin-client-badge">
+      Thin Client Mode
     </span>
     <span v-if="nodeVersion" class="version-info">
-      Node.js {{ nodeVersion }}
+      | Node.js {{ nodeVersion }}
     </span>
-    <span v-if="backendPort" class="version-info wss-info">
-      <span class="led" :class="backendStatus" :title="statusTitle"></span>
-      <span class="lock-icon" title="Encrypted connection (WSS)">🔒</span>
-      WSS: {{ backendPort }}
+    <span class="version-info wss-info">
+      | <span class="led" :class="backendStatus" :title="statusTitle"></span>
+      | <span class="lock-icon" @mouseenter="showCertPopup = true" @mouseleave="showCertPopup = false">
+          🔒
+          <div v-if="showCertPopup" class="cert-popup">
+            <template v-if="certInfo">
+              <div class="cert-title">TLS Certificate</div>
+              <div v-if="certInfo.subject === certInfo.issuer" class="cert-self-signed">Self-Signed</div>
+            </template>
+            <template v-else>
+              <div class="cert-title">TLS Certificate</div>
+            </template>
+          </div>
+        </span>
     </span>
     <a
       class="github"
@@ -253,6 +235,10 @@ const statusTitle = computed(() => {
   margin-right: 10px;
   font-family: monospace;
 }
+.thin-client-badge {
+  color: #60a5fa;
+  font-weight: bold;
+}
 .wss-info {
   display: flex;
   align-items: center;
@@ -283,8 +269,42 @@ const statusTitle = computed(() => {
   50% { opacity: 0.4; }
 }
 .lock-icon {
-  font-size: 10px;
+  font-size: 14px;
   filter: grayscale(100%);
-  opacity: 0.7;
+  opacity: 0.8;
+  position: relative;
+  cursor: pointer;
+}
+.cert-popup {
+  position: absolute;
+  bottom: 24px;
+  right: 0;
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 8px 12px;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  font-size: 11px;
+  color: #d1d5db;
+}
+.cert-title {
+  font-weight: 600;
+  color: #ffffff;
+  font-size: 12px;
+}
+.cert-row {
+  margin: 4px 0;
+  word-break: break-all;
+}
+.cert-row span {
+  color: #9ca3af;
+  margin-right: 6px;
+}
+.cert-self-signed {
+  color: #f59e0b;
+  font-size: 11px;
+  margin-top: 4px;
 }
 </style>

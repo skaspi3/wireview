@@ -4,10 +4,10 @@
     <div v-if="!isCapturing" class="controls">
       <div v-if="!isConnected">
         <button @click="connect" class="btn btn-secondary">
-          🔌 Connect to Backend
+          Connect to Backend
         </button>
       </div>
-      
+
       <div v-else class="selection-group">
         <select v-model="selectedInterface" class="interface-select">
           <option v-for="iface in interfaces" :key="iface" :value="iface">
@@ -15,7 +15,7 @@
           </option>
         </select>
         <button @click="startCapture" class="btn btn-primary">
-          <span class="icon">🔴</span> Start
+          <span class="icon">●</span> Start
         </button>
       </div>
     </div>
@@ -43,9 +43,9 @@
 
 <script setup>
 import { ref, onUnmounted, onMounted } from 'vue';
-import { DEBUG, crashLog, nodeVersion, backendPort, backendStatus } from '../globals';
+import { DEBUG, nodeVersion, backendPort, backendStatus, certInfo, packets, captureStats } from '../globals';
 
-const emit = defineEmits(['stream-data', 'clear', 'stop']);
+const emit = defineEmits(['clear', 'stop']);
 
 const ws = ref(null);
 const isConnected = ref(false);
@@ -53,14 +53,14 @@ const isCapturing = ref(false);
 const interfaces = ref([]);
 const selectedInterface = ref('');
 
-const packetCount = ref(0);
-const totalBytes = ref(0);
 const error = ref(null);
-let chunkBuffer = [];
-let flushInterval = null;
 
 // WebSocket proxied through Vite - same origin, /ws path
 const WS_URL = `wss://${window.location.host}/ws`;
+
+// Expose ws for packet details requests
+const getWebSocket = () => ws.value;
+defineExpose({ getWebSocket });
 
 const closeSocket = () => {
   if (ws.value) {
@@ -76,55 +76,69 @@ const connect = () => {
   backendStatus.value = 'connecting';
   try {
     ws.value = new WebSocket(WS_URL);
-    ws.value.binaryType = "arraybuffer";
 
     ws.value.onopen = () => {
       isConnected.value = true;
       backendStatus.value = 'connected';
-      if (DEBUG) console.log("WS Connected");
+      if (DEBUG) console.log("WS Connected (thin-client mode)");
     };
 
     ws.value.onmessage = (event) => {
-      // Handle text messages (protocol)
-      if (typeof event.data === "string") {
-        try {
-          const msg = JSON.parse(event.data);
-          
-          if (msg.type === 'interfaces') {
-            interfaces.value = msg.list;
-            if (msg.default && msg.list.includes(msg.default)) {
-              selectedInterface.value = msg.default;
-            } else if (msg.list.length > 0) {
-              selectedInterface.value = msg.list[0];
-            }
-            if (msg.nodeVersion) {
-              nodeVersion.value = msg.nodeVersion;
-            }
-            if (msg.backendPort) {
-              backendPort.value = msg.backendPort;
-            }
-          }
-          
-          if (msg.type === 'error') {
-            error.value = msg.message;
-            stopCapture();
-          }
-        } catch (e) {
-          console.warn("Protocol error:", e);
-        }
-        return;
-      }
+      try {
+        const msg = JSON.parse(event.data);
 
-      // Handle binary data (pcap chunks)
-      if (event.data) {
-        if (!isCapturing.value) {
-          // Debugging: why are we receiving data if stopped?
-          // console.warn("Ignored packet while stopped");
-          return;
+        if (msg.type === 'interfaces') {
+          interfaces.value = msg.list;
+          if (msg.default && msg.list.includes(msg.default)) {
+            selectedInterface.value = msg.default;
+          } else if (msg.list.length > 0) {
+            selectedInterface.value = msg.list[0];
+          }
+          if (msg.nodeVersion) {
+            nodeVersion.value = msg.nodeVersion;
+          }
+          if (msg.backendPort) {
+            backendPort.value = msg.backendPort;
+          }
+          if (msg.certInfo) {
+            certInfo.value = msg.certInfo;
+          }
         }
-        chunkBuffer.push(event.data);
-        packetCount.value++;
-        totalBytes.value += event.data.byteLength;
+
+        // Handle packet summaries from server
+        if (msg.type === 'packet') {
+          if (!isCapturing.value) return;
+
+          packets.value.push(msg.data);
+          captureStats.totalCaptured.value++;
+
+          // Limit packets in memory (rolling buffer)
+          const MAX_PACKETS = 10000;
+          if (packets.value.length > MAX_PACKETS) {
+            const dropped = packets.value.length - MAX_PACKETS;
+            packets.value = packets.value.slice(dropped);
+            captureStats.totalDropped.value += dropped;
+          }
+        }
+
+        // Handle packet details response
+        if (msg.type === 'packetDetails') {
+          // This will be handled by the requesting component via a callback
+          if (window._packetDetailsCallback) {
+            window._packetDetailsCallback(msg.frame, msg.details);
+          }
+        }
+
+        if (msg.type === 'stopped') {
+          if (DEBUG) console.log("Capture stopped by server");
+        }
+
+        if (msg.type === 'error') {
+          error.value = msg.message;
+          stopCapture();
+        }
+      } catch (e) {
+        console.warn("Protocol error:", e);
       }
     };
 
@@ -149,22 +163,15 @@ const connect = () => {
 
 const startCapture = () => {
   if (!ws.value || !isConnected.value) return;
-  
+
   // Send start command
   ws.value.send(JSON.stringify({
     type: 'start',
     interface: selectedInterface.value
   }));
-  
+
   isCapturing.value = true;
-  packetCount.value = 0;
-  totalBytes.value = 0;
-  chunkBuffer = [];
   emit('clear');
-  
-  // Start flushing
-  if (flushInterval) clearInterval(flushInterval);
-  flushInterval = setInterval(flushToEngine, 50);
 };
 
 const stopCapture = () => {
@@ -173,26 +180,13 @@ const stopCapture = () => {
       ws.value.send(JSON.stringify({ type: 'stop' }));
     } catch (e) {}
   }
-  
-  // Soft stop: Keep socket open for interface selection
-  // closeSocket(); 
-  // isConnected.value = false; // Keep connected
-  
+
   isCapturing.value = false;
-  if (flushInterval) clearInterval(flushInterval);
-  flushToEngine();
   emit('stop');
 };
 
 const restartCapture = () => {
-  // Stop accepting new chunks immediately to prevent partial data
   isCapturing.value = false;
-
-  // Stop the flush interval
-  if (flushInterval) {
-    clearInterval(flushInterval);
-    flushInterval = null;
-  }
 
   // Send stop command to backend
   if (ws.value && isConnected.value) {
@@ -201,11 +195,6 @@ const restartCapture = () => {
     } catch (e) {}
   }
 
-  // Clear local state
-  chunkBuffer = [];
-  packetCount.value = 0;
-  totalBytes.value = 0;
-  crashLog.value = [];  // Clear crash log on restart
   emit('clear');
 
   // Wait for backend to stop/reset, then start again
@@ -215,29 +204,9 @@ const restartCapture = () => {
         type: 'start',
         interface: selectedInterface.value
       }));
-
-      // Resume capturing
       isCapturing.value = true;
-      flushInterval = setInterval(flushToEngine, 50);
     }
   }, 200);
-};
-
-const flushToEngine = () => {
-  if (chunkBuffer.length === 0) return;
-
-  // Merge chunks
-  let totalSize = 0;
-  for (const chunk of chunkBuffer) totalSize += chunk.byteLength;
-  const combined = new Uint8Array(totalSize);
-  let offset = 0;
-  for (const chunk of chunkBuffer) {
-    combined.set(new Uint8Array(chunk), offset);
-    offset += chunk.byteLength;
-  }
-
-  emit('stream-data', combined);
-  chunkBuffer = []; 
 };
 
 // Auto-connect on mount
@@ -247,7 +216,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (ws.value) ws.value.close();
-  if (flushInterval) clearInterval(flushInterval);
 });
 </script>
 

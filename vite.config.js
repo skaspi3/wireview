@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import fs from 'fs'
 import os from 'os'
+import { execSync } from 'child_process'
 
 // Get the IP address of the interface connected to default gateway
 const getDefaultGatewayIP = () => {
@@ -37,6 +38,27 @@ const getDefaultGatewayIP = () => {
 
 const host = getDefaultGatewayIP();
 
+// Read TLS certificate info
+const getCertInfo = () => {
+  try {
+    const certPath = './server.crt';
+    if (!fs.existsSync(certPath)) return null;
+
+    const subject = execSync(`openssl x509 -noout -subject -in "${certPath}"`, { encoding: 'utf8' }).trim().replace('subject=', '');
+    const issuer = execSync(`openssl x509 -noout -issuer -in "${certPath}"`, { encoding: 'utf8' }).trim().replace('issuer=', '');
+    const dates = execSync(`openssl x509 -noout -dates -in "${certPath}"`, { encoding: 'utf8' }).trim();
+    const fingerprint = execSync(`openssl x509 -noout -fingerprint -sha256 -in "${certPath}"`, { encoding: 'utf8' }).trim().replace('sha256 Fingerprint=', '').replace('SHA256 Fingerprint=', '');
+
+    const validFrom = dates.match(/notBefore=(.+)/)?.[1] || '';
+    const validTo = dates.match(/notAfter=(.+)/)?.[1] || '';
+
+    return { subject, issuer, validFrom, validTo, fingerprint };
+  } catch (e) {
+    console.warn('Could not read certificate info:', e.message);
+    return null;
+  }
+};
+
 export default defineConfig(({ mode }) => {
   // Load env file from current directory
   const env = loadEnv(mode, process.cwd(), '');
@@ -48,19 +70,17 @@ export default defineConfig(({ mode }) => {
       {
         name: 'configure-response-headers',
         configureServer: (server) => {
+          // API endpoint for certificate info
           server.middlewares.use((req, res, next) => {
-            // REQUIRED for Wiregasm/SharedArrayBuffer
-            res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
-            res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-
-            // Aggressive caching for large WASM files (1 year)
-            // These files are versioned, so long cache is safe
-            if (req.url?.match(/\.(wasm|bmp|data)$/)) {
-              res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            if (req.url === '/api/cert-info') {
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify(getCertInfo()));
+              return;
             }
-
             next();
           });
+
+          // Note: COOP/COEP headers removed - not needed in thin-client mode (no Wiregasm/WASM)
         }
       }
     ],
@@ -75,13 +95,22 @@ export default defineConfig(({ mode }) => {
       hmr: {
         clientPort: port
       },
-      // Proxy WebSocket connections to backend on localhost
+      // Proxy WebSocket and API connections to backend on localhost
       proxy: {
         '/ws': {
           target: 'ws://127.0.0.1:3000',
           ws: true,
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/ws/, '')
+        },
+        // Thin-client API endpoints
+        '/api/packet': {
+          target: 'http://127.0.0.1:3000',
+          changeOrigin: true,
+        },
+        '/api/packets': {
+          target: 'http://127.0.0.1:3000',
+          changeOrigin: true,
         }
       }
     }

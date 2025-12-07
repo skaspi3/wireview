@@ -2,6 +2,9 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# Install openssl for certificate parsing
+RUN apk add --no-cache openssl
+
 # Copy package files first for better caching
 COPY package*.json ./
 

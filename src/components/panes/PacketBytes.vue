@@ -1,44 +1,78 @@
 <script setup>
-import { computed, reactive, watch } from "vue";
-import { manager } from "../../globals";
-import SourceDisplay from "./PacketBytes/SourceDisplay.vue";
-import DataSourceTabBar from "./PacketBytes/DataSourceTabBar.vue";
+import { ref, watch } from "vue";
+import { packets, activePacketIndex, DEBUG } from "../../globals";
 
-const state = reactive({
-  activeSourceIndex: null,
+// Hex dump content
+const hexDump = ref('');
+const isLoading = ref(false);
 
-  // computed
-  tabHeaders: [],
-});
-state.tabHeaders = computed(
-  () => manager.activeFrameDetails?.getSourceNames() ?? []
-);
-watch(
-  () => manager.activeFrameDetails,
-  (activeFrameDetails) => {
-    state.activeSourceIndex = activeFrameDetails?.sourceCount ? 0 : null;
+// Fetch hex dump when selection changes
+watch(activePacketIndex, async (index) => {
+  if (index === null || index < 0 || index >= packets.value.length) {
+    hexDump.value = '';
+    return;
   }
-);
+
+  const packet = packets.value[index];
+  if (!packet) {
+    hexDump.value = '';
+    return;
+  }
+
+  isLoading.value = true;
+  try {
+    const response = await fetch(`/api/packet/hex?frame=${packet.number}`);
+    if (response.ok) {
+      hexDump.value = await response.text();
+    } else {
+      hexDump.value = 'Failed to load hex dump';
+    }
+  } catch (e) {
+    console.error("Failed to fetch hex dump:", e);
+    hexDump.value = 'Error loading hex dump';
+  } finally {
+    isLoading.value = false;
+  }
+});
 </script>
 
 <template>
-  <div class="packet-bytes-wrapper" v-if="state.activeSourceIndex !== null">
-    <SourceDisplay :sourceIndex="state.activeSourceIndex" />
-    <DataSourceTabBar
-      :tabHeaders="state.tabHeaders"
-      v-model:index="state.activeSourceIndex"
-    />
+  <div class="packet-bytes-wrapper">
+    <div v-if="activePacketIndex === null" class="no-selection">
+      Select a packet to view hex dump
+    </div>
+    <div v-else-if="isLoading" class="loading">
+      Loading...
+    </div>
+    <pre v-else class="hex-display">{{ hexDump }}</pre>
   </div>
 </template>
 
 <style scoped>
 .packet-bytes-wrapper {
   flex-grow: 1;
-
   display: flex;
   flex-direction: column;
-  align-items: stretch;
   min-height: 0;
   min-width: 0;
+  background: #f5f5f5;
+  overflow: auto;
+}
+
+.no-selection,
+.loading {
+  padding: 20px;
+  color: #666;
+  text-align: center;
+}
+
+.hex-display {
+  margin: 0;
+  padding: 8px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre;
+  overflow: auto;
 }
 </style>

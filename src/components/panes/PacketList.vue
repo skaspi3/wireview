@@ -1,276 +1,120 @@
 <script setup>
-import {
-  computed,
-  onMounted, // Added onMounted
-  reactive,
-  shallowReactive,
-  useTemplateRef,
-  watch,
-} from "vue";
-import { useResizeObserver, useScroll, watchThrottled } from "@vueuse/core";
-import { areArraysEqual, clamp } from "../../util";
-import { manager, DEBUG } from "../../globals";
-import Minimap from "./PacketList/Minimap.vue";
-import PacketTable from "./PacketList/PacketTable.vue";
-import PacketTableRows from "./PacketList/PacketTableRows.vue";
+import { computed, ref, watch, onMounted, useTemplateRef } from "vue";
+import { useResizeObserver, useScroll } from "@vueuse/core";
+import { packets, activePacketIndex, DEBUG } from "../../globals";
 
-// Row code
-const headerHeight = 20; // TODO: use resizeObserver to set this?
+// Row height for virtual scrolling
+const rowHeight = 20;
+const headerHeight = 24;
 
-const state = reactive({
-  clientHeight: 0,
-  clientWidth: 0,
+// State
+const clientHeight = ref(400);
+const clientWidth = ref(800);
+const scrollY = ref(0);
 
-  // refs
-  minimapRef: useTemplateRef("minimap"),
-  scrollY: null,
-
-  // computed
-  rowCount: 0, // count of rows that are completely visible
-  extraRows: 0, // rows that aren't in the view
-  scrollYPercent: 0, // how much percent is scrolled
-  firstRowIndex: 0, // the index of the current first row
-  visibleTableWidth: 0, // available width for table (total width - minimap width)
-  minimapFirstRowIndex: 0, // first row of the minimap index
-  frameReqArgs: [], // filter, skip, limit (minimap)
-  frameReqArgsForTable: [], // filter, skip, limit (table)
-});
-
-// Explicit ref for the element
+// Template ref for scrollable element
 const scrollableEl = useTemplateRef("packet-list-scrollable");
 
-// Force check dimensions on mount and data change
-const checkDimensions = () => {
-  if (scrollableEl.value) {
-    const { clientHeight, clientWidth } = scrollableEl.value;
-    if (clientHeight > 0) state.clientHeight = clientHeight;
-    if (clientWidth > 0) state.clientWidth = clientWidth;
-  }
-};
+// Computed values
+const visibleRowCount = computed(() => {
+  const available = Math.max(0, clientHeight.value - headerHeight);
+  return Math.floor(available / rowHeight);
+});
 
+const extraRows = computed(() => {
+  return Math.max(0, packets.value.length - visibleRowCount.value);
+});
+
+const firstRowIndex = computed(() => {
+  return Math.min(scrollY.value, extraRows.value);
+});
+
+const visiblePackets = computed(() => {
+  const start = firstRowIndex.value;
+  const end = start + visibleRowCount.value + 1;
+  return packets.value.slice(start, end);
+});
+
+// Resize observer
 onMounted(() => {
-  checkDimensions();
-  setTimeout(checkDimensions, 100);
+  if (scrollableEl.value) {
+    clientHeight.value = scrollableEl.value.clientHeight || 400;
+    clientWidth.value = scrollableEl.value.clientWidth || 800;
+  }
 });
 
 useResizeObserver(scrollableEl, (entries) => {
   const entry = entries[0];
-  const { width, height } = entry.contentRect;
-  if (DEBUG) console.log("Resize:", width, height);
-  if (height > 0) state.clientHeight = height;
-  if (width > 0) state.clientWidth = width;
+  if (entry.contentRect.height > 0) clientHeight.value = entry.contentRect.height;
+  if (entry.contentRect.width > 0) clientWidth.value = entry.contentRect.width;
 });
 
-const shallowState = shallowReactive({
-  frameBank: null,
-  table: null,
+// Scroll handling
+const { y: scrollYPos } = useScroll(scrollableEl);
+watch(scrollYPos, (val) => {
+  scrollY.value = Math.floor(val);
 });
 
-// Also force check when packets arrive, in case the list was hidden/empty
-watch(() => manager.frameCount, (newCount, oldCount) => {
-  // Reset scroll if frame count dropped to 0 (capture cleared/restarted)
-  if (newCount === 0 && oldCount > 0) {
-    if (DEBUG) console.log("Frame count dropped to 0, resetting scroll");
-    state.scrollY = 0;
-    shallowState.frameBank = null;
-    shallowState.table = null;
-  }
-
-  window.dispatchEvent(new Event('resize'));
-  if (state.clientHeight < 50) checkDimensions();
-  requestFrames();
-});
-
-// Reset scroll when session is cleared
-watch(
-  () => manager.sessionInfo,
-  (newInfo, oldInfo) => {
-    if (oldInfo && !newInfo) {
-      if (DEBUG) console.log("Session cleared, resetting scroll to 0");
-      state.scrollY = 0;
-      shallowState.frameBank = null;
-      shallowState.table = null;
-    }
-  }
-);
-
-state.scrollY = useScroll(scrollableEl).y;
-
-state.rowCount = computed(() => {
-  // Use fallback only if clientHeight is missing
-  const h = state.clientHeight || 200;
-  const availableHeight = Math.max(0, h - headerHeight);
-  const fullRows = Math.floor(availableHeight / manager.rowHeight);
-  return fullRows;
-});
-
-state.extraRows = computed(() =>
-  Math.max(0, manager.frameCount - state.rowCount)
-);
-
-state.scrollYPercent = computed(() =>
-  // clamping is required because many mobile browsers under/overscroll
-  clamp(0, state.extraRows ? state.scrollY / state.extraRows : 0, 1)
-);
-
-state.firstRowIndex = computed(() => {
-  const clamped = clamp(0, state.scrollY, state.extraRows);
-  return clamped;
-});
-state.visibleTableWidth = computed(() => (state.clientWidth || 600) - minimapWidth);
-
-state.minimapFirstRowIndex = computed(() =>
-  Math.max(
-    0,
-    Math.round((manager.frameCount - (state.clientHeight || 200)) * state.scrollYPercent)
-  )
-);
-
-state.frameReqArgs = computed(() => {
-  // Clamp skip to valid range (0 to frameCount)
-  const maxSkip = Math.max(0, manager.frameCount - 1);
-  const clampedSkip = Math.min(state.minimapFirstRowIndex, maxSkip);
-
-  return [
-    manager.displayFilter,
-    Math.max(0, clampedSkip),  // Never request negative skip
-    state.clientHeight || 200,
-  ];
-});
-
-state.frameReqArgsForTable = computed(() => {
-  // Clamp skip to valid range
-  const maxSkip = Math.max(0, manager.frameCount - 1);
-  const clampedSkip = Math.min(state.firstRowIndex, maxSkip);
-
-  return [
-    manager.displayFilter,
-    Math.max(0, clampedSkip),
-    state.rowCount + 1,
-  ];
-});
-
-const updateRowsForTable = () => {
-  if (shallowState.frameBank === null) return;
-
-  // Early exit if no session
-  if (manager.frameCount === 0) {
-    shallowState.table = { frames: [], startIndex: 0 };
-    return;
-  }
-
-  const {
-    frames,
-    offset,
-    reqArgs: [filter, skip, limit],
-  } = shallowState.frameBank;
-
-  // Handle empty frames case
-  if (!frames || frames.length === 0) {
-    // Don't update table with empty data - keep previous state
-    if (DEBUG) console.warn("updateRowsForTable: no frames, skip might be out of range");
-    return;
-  }
-
-  // so let's say starts at frame index 50, while the first table row starts at index 60
-  // that is (state.firstRowIndex - skip)
-
-  // normal case
-  // have [50,,, 100], offset = 0
-  // want [60, 75], startSliceIdx = 10 -> startIndex = 60
-
-  // have [50,,, 100], offset = 0
-  // want [45, 60], startSliceIdx = 0  -> startIndex = 50
-
-  // have [50,,, 100], offset = 10
-  // want [45, 60], startSliceIdx = 5  -> startIndex = 45
-
-  const minIndex = skip - offset;
-  // Ensure we don't calculate a negative maxIndex if frames.length is small
-  const safeMaxIndex = Math.max(0, skip + frames.length - state.rowCount);
-  
-  // Ensure start index is within current valid bounds
-  const startIndex = Math.min(Math.max(minIndex, state.firstRowIndex), safeMaxIndex);
-  
-  const startSliceIdx = Math.max(0, startIndex - minIndex);
-  const endSliceIdx = Math.min(frames.length, startSliceIdx + state.rowCount + 1);
-
-  if (DEBUG) console.log(`Table Slice: frames=${frames.length} minIdx=${minIndex} startIdx=${startIndex} slice=${startSliceIdx}-${endSliceIdx}`);
-
-  shallowState.table = {
-    frames: frames.slice(startSliceIdx, endSliceIdx),
-    startIndex,
-  };
-};
-
-let framesRequest = null;
-const requestFrames = async () => {
-  const reqArgs = state.frameReqArgs;
-  if (framesRequest) {
-    if (DEBUG) console.log("requestFrames locked, skipping");
-    return;
-  }
-
-  // Don't request if there are no frames
-  if (manager.frameCount === 0) {
-    shallowState.frameBank = null;
-    shallowState.table = null;
-    return;
-  }
-
-  if (DEBUG) console.log("requestFrames calling manager.getFrames", reqArgs);
-  const [filter, skip, limit] = reqArgs;
-  framesRequest = manager.getFrames(filter, skip, limit);
-  const { frames, offset } = await framesRequest;
-  framesRequest = null;
-
-  // Don't update if session was cleared while we were fetching
-  if (manager.frameCount === 0) {
-    if (DEBUG) console.log("Session cleared during fetch, discarding result");
-    shallowState.frameBank = null;
-    shallowState.table = null;
-    return;
-  }
-
-  shallowState.frameBank = { frames, offset, reqArgs };
-
-  updateRowsForTable();
-  if (!areArraysEqual(reqArgs, state.frameReqArgs)) {
-    if (DEBUG) console.log("requestFrames args changed during fetch, retrying");
-    return requestFrames();
-  }
-};
-
-watchThrottled(() => state.frameReqArgs, requestFrames, { throttle: 111 });
-
-watch(() => state.frameReqArgsForTable, updateRowsForTable);
-
-const minimapWidth = 34;
-
-// Scrolling via mousewheel scrolls too much because a row contributes only 1px to the scrollbar
+// Handle mousewheel
 const handleWheel = (event) => {
   if (!event.deltaY) return;
   event.preventDefault();
-  state.scrollY += Math.round(event.deltaY / manager.rowHeight);
+  scrollY.value = Math.max(0, Math.min(extraRows.value, scrollY.value + Math.round(event.deltaY / rowHeight)));
+  if (scrollableEl.value) {
+    scrollableEl.value.scrollTop = scrollY.value;
+  }
 };
 
-// ensure that active row is in viewport
-// may not be in viewport already due to keyboard navigation
-watch(
-  () => manager.activeFrameIndex,
-  (index) => {
-    if (index === null) return;
+// Select packet
+const selectPacket = (index) => {
+  activePacketIndex.value = index;
+};
 
-    if (DEBUG) console.log("idx", index, state.firstRowIndex, document.activeElement);
-    if (index < state.firstRowIndex)
-      state.scrollY -= state.firstRowIndex - index;
-    else if (index >= state.firstRowIndex + state.rowCount)
-      state.scrollY += index - (state.firstRowIndex + state.rowCount) + 1;
-      
-    // Force update table rows as scrollY change might be throttled or delayed
-    updateRowsForTable();
+// Auto-scroll to bottom when new packets arrive
+watch(() => packets.value.length, (newLen, oldLen) => {
+  if (newLen > oldLen && scrollY.value >= oldLen - visibleRowCount.value - 1) {
+    // Was at bottom, stay at bottom
+    scrollY.value = Math.max(0, newLen - visibleRowCount.value);
+    if (scrollableEl.value) {
+      scrollableEl.value.scrollTop = scrollY.value;
+    }
   }
-);
+});
+
+// Ensure active packet is visible
+watch(activePacketIndex, (index) => {
+  if (index === null) return;
+  if (index < firstRowIndex.value) {
+    scrollY.value = index;
+  } else if (index >= firstRowIndex.value + visibleRowCount.value) {
+    scrollY.value = index - visibleRowCount.value + 1;
+  }
+  if (scrollableEl.value) {
+    scrollableEl.value.scrollTop = scrollY.value;
+  }
+});
+
+// Protocol colors (Wireshark-style)
+const getProtocolColor = (protocol) => {
+  const colors = {
+    'TCP': '#e7e6ff',
+    'UDP': '#daeeff',
+    'DNS': '#daffe7',
+    'HTTP': '#a0ffa0',
+    'TLS': '#e7e6ff',
+    'ICMP': '#fce0ff',
+    'ARP': '#faf0d7',
+    'IPv6': '#e0e0e0',
+    'IP': '#e0e0e0',
+  };
+  return colors[protocol] || '#ffffff';
+};
+
+// Format time
+const formatTime = (time) => {
+  if (typeof time !== 'number') return '0.000000';
+  return time.toFixed(6);
+};
 </script>
 
 <template>
@@ -279,44 +123,110 @@ watch(
     ref="packet-list-scrollable"
     @wheel="handleWheel"
   >
-    <div
-      class="content"
-      :style="{
-        '--minimap-width': `${minimapWidth}px`,
-      }"
-    >
-      <PacketTable :visibleWidth="state.visibleTableWidth">
-        <PacketTableRows :table="shallowState.table" />
-      </PacketTable>
-      <Minimap
-        ref="minimap"
-        :frameInfo="shallowState.frameBank"
-        :width="minimapWidth"
-        :height="state.clientHeight"
-      />
+    <div class="content">
+      <table class="packet-table">
+        <thead>
+          <tr>
+            <th class="col-no">No.</th>
+            <th class="col-time">Time</th>
+            <th class="col-src">Source</th>
+            <th class="col-dst">Destination</th>
+            <th class="col-proto">Protocol</th>
+            <th class="col-len">Length</th>
+            <th class="col-info">Info</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="(pkt, i) in visiblePackets"
+            :key="pkt.number"
+            :class="{ selected: activePacketIndex === firstRowIndex + i }"
+            :style="{ backgroundColor: getProtocolColor(pkt.protocol) }"
+            @click="selectPacket(firstRowIndex + i)"
+          >
+            <td class="col-no">{{ pkt.number }}</td>
+            <td class="col-time">{{ formatTime(pkt.time) }}</td>
+            <td class="col-src">{{ pkt.src }}</td>
+            <td class="col-dst">{{ pkt.dst }}</td>
+            <td class="col-proto">{{ pkt.protocol }}</td>
+            <td class="col-len">{{ pkt.length }}</td>
+            <td class="col-info">{{ pkt.info }}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
-    <div
-      :style="{
-        height: state.extraRows + 'px',
-      }"
-    ></div>
+    <!-- Spacer for scrolling -->
+    <div :style="{ height: extraRows + 'px' }"></div>
   </div>
 </template>
+
 <style scoped>
 .packet-list-scrollable {
   flex-grow: 1;
   position: relative;
   overflow-y: scroll;
   overflow-x: auto;
-  height: 100%; /* Force height to fill parent */
-  width: 100%;  /* Force width to fill parent */
+  height: 100%;
+  width: 100%;
+  background: white;
 }
+
 .content {
   position: sticky;
   top: 0;
   width: 100%;
-  height: 100%;
-
-  display: flex;
 }
+
+.packet-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+}
+
+.packet-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.packet-table th {
+  background: #e8e8e8;
+  border: 1px solid #ccc;
+  padding: 4px 8px;
+  text-align: left;
+  font-weight: normal;
+  white-space: nowrap;
+}
+
+.packet-table td {
+  border: none;
+  padding: 2px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 20px;
+  line-height: 20px;
+}
+
+.packet-table tbody tr {
+  cursor: pointer;
+}
+
+.packet-table tbody tr:hover {
+  filter: brightness(0.95);
+}
+
+.packet-table tbody tr.selected {
+  background-color: #3875d7 !important;
+  color: white;
+}
+
+.col-no { width: 60px; text-align: right; }
+.col-time { width: 100px; }
+.col-src { width: 150px; }
+.col-dst { width: 150px; }
+.col-proto { width: 70px; }
+.col-len { width: 60px; text-align: right; }
+.col-info { flex: 1; }
 </style>

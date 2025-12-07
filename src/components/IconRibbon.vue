@@ -1,25 +1,12 @@
 <script setup>
-import FindIcon from "./icons/FindIcon.vue";
 import LiveCapture from "./LiveCapture.vue";
-import { manager } from "../globals";
 
-const emit = defineEmits(['stream-data', 'clear', 'stop']);
+const emit = defineEmits(['clear', 'stop']);
 </script>
 
 <template>
   <div class="ribbon">
-    <div
-      class="icon"
-      :class="{ disabled: manager.sessionInfo === null }"
-      title="Find a packet"
-      @mousedown.prevent
-      @mouseup="() => manager.setFindFrameBarHidden()"
-    >
-      <FindIcon />
-    </div>
-    <div class="separator"></div>
     <LiveCapture
-      @stream-data="(data) => emit('stream-data', data)"
       @clear="() => emit('clear')"
       @stop="() => emit('stop')"
     />
