@@ -4,9 +4,14 @@ export { DEBUG } from "./debug";
 
 export const manager = new Manager();
 
-// Initialize Wiregasm immediately when module loads (before Vue mounts)
-// This starts the Web Worker and Wiregasm initialization as early as possible
-manager.initialize();
+// Initialize Wiregasm as soon as DOM is ready (after Vite server is up)
+// This is earlier than Vue's onMounted but ensures the server can serve files
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => manager.initialize());
+} else {
+  // DOM already ready
+  manager.initialize();
+}
 
 // Display offset for frame numbers (increases when packets are trimmed)
 // This makes frame numbers appear continuous even when old packets are dropped
