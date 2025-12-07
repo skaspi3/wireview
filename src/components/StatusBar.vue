@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from "vue";
-import { packets, captureStats, nodeVersion, backendStatus, certInfo } from "../globals";
+import { packets, nodeVersion, backendStatus, certInfo } from "../globals";
 import GitHubIcon from "./icons/GitHubIcon.vue";
 
 const showFilterPopup = ref(false);
@@ -19,14 +19,9 @@ const bpfFilter = {
 };
 
 const statsInfo = computed(() => {
-  const total = captureStats.totalCaptured.value;
-  const visible = packets.value.length;
-  const trimmed = captureStats.totalDropped.value;
-
-  // If no capture activity, show simple state
-  if (total === 0) return `No Packets`;
-
-  return `Total: ${total.toLocaleString()} pkt | Visible: ${visible.toLocaleString()} pkt | Trimmed: ${trimmed.toLocaleString()} pkt`;
+  const count = packets.value.length;
+  if (count === 0) return 'No Packets';
+  return `${count.toLocaleString()} packets`;
 });
 
 const toggleFilterPopup = () => {
@@ -172,47 +167,6 @@ const statusTitle = computed(() => {
   font-size: 11px;
   color: #9ca3af;
   word-break: break-all;
-}
-.crash-log-popup {
-  left: 120px;
-}
-.crash-list {
-  margin: 0;
-  padding-left: 0;
-  list-style: none;
-  color: #d1d5db;
-  max-height: 200px;
-  overflow-y: auto;
-}
-.crash-list li {
-  margin: 4px 0;
-  padding: 4px 8px;
-  background: #374151;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 12px;
-}
-.no-crashes {
-  color: #9ca3af;
-  font-style: italic;
-}
-.header-buttons {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.clear-btn {
-  background: #374151;
-  border: 1px solid #4b5563;
-  color: #9ca3af;
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.clear-btn:hover {
-  background: #4b5563;
-  color: #f3f4f6;
 }
 .stats-info {
   font-family: monospace;

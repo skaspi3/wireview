@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue';
-import { DEBUG, clearPackets, packets, activePacketIndex } from './globals';
+import { clearPackets } from './globals';
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
 import PacketList from './components/panes/PacketList.vue';
 import PacketDetails from './components/panes/PacketDetails.vue';
@@ -8,24 +8,16 @@ import PacketBytes from './components/panes/PacketBytes.vue';
 import IconRibbon from './components/IconRibbon.vue';
 import StatusBar from './components/StatusBar.vue';
 
-// =====================================================================
-// THIN CLIENT MODE - No Wiregasm/WASM, packets processed on server
-// =====================================================================
-
 // Row height for packet list (used for virtual scrolling)
 const rowHeight = ref(20);
 
 const handleClear = () => {
   clearPackets();
-  if (DEBUG) console.log("Capture cleared");
 };
 
 const handleStop = () => {
-  if (DEBUG) console.log("Capture stopped");
+  // Capture stopped
 };
-
-// Auto-scroll to bottom when new packets arrive
-const autoScrollEnabled = ref(true);
 </script>
 
 <template>

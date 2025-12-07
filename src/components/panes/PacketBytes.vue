@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch } from "vue";
-import { packets, activePacketIndex, DEBUG } from "../../globals";
+import { packets, activePacketIndex } from "../../globals";
 
 // Hex dump content
 const hexDump = ref('');
@@ -55,24 +55,25 @@ watch(activePacketIndex, async (index) => {
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  background: #f5f5f5;
+  background: #1e1e1e;
   overflow: auto;
 }
 
 .no-selection,
 .loading {
   padding: 20px;
-  color: #666;
+  color: #888;
   text-align: center;
 }
 
 .hex-display {
   margin: 0;
   padding: 8px;
-  font-family: 'Consolas', 'Monaco', monospace;
+  font-family: var(--ws-font-family-monospace);
   font-size: 12px;
   line-height: 1.4;
   white-space: pre;
   overflow: auto;
+  color: #ccc;
 }
 </style>

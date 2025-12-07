@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch, onMounted, useTemplateRef } from "vue";
 import { useResizeObserver, useScroll } from "@vueuse/core";
-import { packets, activePacketIndex, DEBUG } from "../../globals";
+import { packets, activePacketIndex } from "../../globals";
 
 // Row height for virtual scrolling
 const rowHeight = 20;
@@ -94,7 +94,7 @@ watch(activePacketIndex, (index) => {
   }
 });
 
-// Protocol colors (Wireshark-style)
+// Protocol colors (Wireshark light-style)
 const getProtocolColor = (protocol) => {
   const colors = {
     'TCP': '#e7e6ff',
@@ -168,7 +168,7 @@ const formatTime = (time) => {
   overflow-x: auto;
   height: 100%;
   width: 100%;
-  background: white;
+  background: #e8f4fc;
 }
 
 .content {
@@ -180,8 +180,9 @@ const formatTime = (time) => {
 .packet-table {
   width: 100%;
   border-collapse: collapse;
-  font-family: 'Consolas', 'Monaco', monospace;
+  font-family: var(--ws-font-family-monospace);
   font-size: 12px;
+  color: #000;
 }
 
 .packet-table thead {
@@ -191,12 +192,13 @@ const formatTime = (time) => {
 }
 
 .packet-table th {
-  background: #e8e8e8;
-  border: 1px solid #ccc;
+  background: #2d2d30;
+  border: 1px solid #3e3e42;
   padding: 4px 8px;
   text-align: left;
   font-weight: normal;
   white-space: nowrap;
+  color: #ccc;
 }
 
 .packet-table td {
@@ -219,7 +221,7 @@ const formatTime = (time) => {
 
 .packet-table tbody tr.selected {
   background-color: #3875d7 !important;
-  color: white;
+  color: #fff;
 }
 
 .col-no { width: 60px; text-align: right; }

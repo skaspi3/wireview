@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch, computed } from "vue";
-import { packets, activePacketIndex, activePacketDetails, DEBUG } from "../../globals";
+import { packets, activePacketIndex, activePacketDetails } from "../../globals";
 
 // Collapsed state for tree nodes
 const collapsed = ref({});
@@ -161,15 +161,16 @@ const parseLayerFields = (data, prefix) => {
   overflow: auto;
   min-width: 0;
   min-height: 0;
-  background-color: #f5f5f5;
-  font-family: 'Consolas', 'Monaco', monospace;
+  background-color: #1e1e1e;
+  font-family: var(--ws-font-family-monospace);
   font-size: 12px;
   line-height: 20px;
+  color: #ccc;
 }
 
 .no-selection {
   padding: 20px;
-  color: #666;
+  color: #888;
   text-align: center;
 }
 
@@ -179,14 +180,15 @@ const parseLayerFields = (data, prefix) => {
 
 .layer-header {
   padding: 2px 4px;
-  background: #e0e0e0;
+  background: #2d2d30;
   cursor: pointer;
   font-weight: bold;
   user-select: none;
+  color: #ccc;
 }
 
 .layer-header:hover {
-  background: #d0d0d0;
+  background: #3e3e42;
 }
 
 .toggle {
@@ -210,7 +212,7 @@ const parseLayerFields = (data, prefix) => {
 }
 
 .field-header:hover {
-  background: #e8e8e8;
+  background: #3e3e42;
 }
 
 .nested-children {
@@ -222,15 +224,15 @@ const parseLayerFields = (data, prefix) => {
 }
 
 .field:hover {
-  background: #e0e8f0;
+  background: #3e3e42;
 }
 
 .field-name {
-  color: #333;
+  color: #ccc;
 }
 
 .field-value {
-  color: #0066cc;
+  color: #3794ff;
   margin-left: 8px;
 }
 </style>

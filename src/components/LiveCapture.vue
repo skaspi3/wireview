@@ -42,8 +42,8 @@
 </template>
 
 <script setup>
-import { ref, onUnmounted, onMounted } from 'vue';
-import { DEBUG, nodeVersion, backendPort, backendStatus, certInfo, packets, captureStats } from '../globals';
+import { ref, triggerRef, onUnmounted, onMounted } from 'vue';
+import { nodeVersion, backendPort, backendStatus, certInfo, packets } from '../globals';
 
 const emit = defineEmits(['clear', 'stop']);
 
@@ -54,6 +54,17 @@ const interfaces = ref([]);
 const selectedInterface = ref('');
 
 const error = ref(null);
+
+// Batched update for performance
+let pendingUpdate = false;
+const scheduleUpdate = () => {
+  if (pendingUpdate) return;
+  pendingUpdate = true;
+  requestAnimationFrame(() => {
+    triggerRef(packets);
+    pendingUpdate = false;
+  });
+};
 
 // WebSocket proxied through Vite - same origin, /ws path
 const WS_URL = `wss://${window.location.host}/ws`;
@@ -80,7 +91,6 @@ const connect = () => {
     ws.value.onopen = () => {
       isConnected.value = true;
       backendStatus.value = 'connected';
-      if (DEBUG) console.log("WS Connected (thin-client mode)");
     };
 
     ws.value.onmessage = (event) => {
@@ -108,17 +118,8 @@ const connect = () => {
         // Handle packet summaries from server
         if (msg.type === 'packet') {
           if (!isCapturing.value) return;
-
           packets.value.push(msg.data);
-          captureStats.totalCaptured.value++;
-
-          // Limit packets in memory (rolling buffer)
-          const MAX_PACKETS = 10000;
-          if (packets.value.length > MAX_PACKETS) {
-            const dropped = packets.value.length - MAX_PACKETS;
-            packets.value = packets.value.slice(dropped);
-            captureStats.totalDropped.value += dropped;
-          }
+          scheduleUpdate();
         }
 
         // Handle packet details response
@@ -130,7 +131,7 @@ const connect = () => {
         }
 
         if (msg.type === 'stopped') {
-          if (DEBUG) console.log("Capture stopped by server");
+          // Capture stopped by server
         }
 
         if (msg.type === 'error') {
