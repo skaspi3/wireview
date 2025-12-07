@@ -110,6 +110,14 @@ class Manager {
     return this.#core.bridge.initialized;
   }
 
+  get initProgress() {
+    return this.#core.bridge.initProgress;
+  }
+
+  get initStage() {
+    return this.#core.bridge.initStage;
+  }
+
   get columns() {
     return this.#core.bridge.columns;
   }

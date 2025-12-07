@@ -21,6 +21,9 @@ class Bridge {
       initialized: false,
       initializationError: "",
       columns: [],
+      // Progress tracking
+      initProgress: 0,
+      initStage: "Starting...",
     });
 
     this.#shallowState = shallowReactive({
@@ -58,6 +61,14 @@ class Bridge {
     return this.#state.activeRequest;
   }
 
+  get initProgress() {
+    return this.#state.initProgress;
+  }
+
+  get initStage() {
+    return this.#state.initStage;
+  }
+
   initialize() {
     this.#core.worker = new Worker(SharkWorker);
     this.#core.worker.addEventListener("message", (e) =>
@@ -86,6 +97,8 @@ class Bridge {
       this.#core.worker.terminate();
     }
     this.#shallowState.initializationResult = null;
+    this.#state.initProgress = 0;
+    this.#state.initStage = "Starting...";
 
     // Create a new worker
     this.#core.worker = new Worker(SharkWorker);
@@ -123,7 +136,17 @@ class Bridge {
       if (DEBUG) console.log(timeTaken + "ms", data);
     } else if (DEBUG) console.log(data);
 
-    if (data.type === "init") this.#shallowState.initializationResult = data;
+    if (data.type === "init-progress") {
+      this.#state.initProgress = data.percent;
+      this.#state.initStage = data.stage;
+      return;
+    }
+
+    if (data.type === "init") {
+      this.#state.initProgress = 100;
+      this.#state.initStage = "Ready";
+      this.#shallowState.initializationResult = data;
+    }
 
     this.#core.callbacks.get(data.id)?.(data);
     this.#core.callbacks.delete(data.id);

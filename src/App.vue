@@ -354,6 +354,21 @@ onMounted(async () => {
         Engine preparing to start...
       </div>
     </Transition>
+
+    <!-- Initial Loading Overlay (shown until Wiregasm is initialized) -->
+    <Transition name="fade">
+      <div v-if="!manager.initialized" class="loading-overlay">
+        <div class="loading-content">
+          <div class="loading-spinner"></div>
+          <div class="loading-text">Initializing packet analysis engine...</div>
+          <div class="loading-subtext">{{ manager.initStage }}</div>
+          <div class="progress-container">
+            <div class="progress-bar" :style="{ width: manager.initProgress + '%' }"></div>
+          </div>
+          <div class="progress-percent">{{ manager.initProgress }}%</div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -443,5 +458,72 @@ onMounted(async () => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* Initial loading overlay */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10002;
+}
+
+.loading-content {
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 60px;
+  height: 60px;
+  border: 4px solid rgba(96, 165, 250, 0.2);
+  border-top-color: #60a5fa;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 24px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  color: #e2e8f0;
+  font-size: 1.3rem;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.loading-subtext {
+  color: #94a3b8;
+  font-size: 0.95rem;
+  margin-bottom: 20px;
+}
+
+.progress-container {
+  width: 280px;
+  height: 8px;
+  background: rgba(96, 165, 250, 0.2);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 0 auto 12px;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-percent {
+  color: #60a5fa;
+  font-size: 1.1rem;
+  font-weight: 600;
 }
 </style>

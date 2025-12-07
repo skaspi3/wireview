@@ -48,10 +48,17 @@ export default defineConfig(({ mode }) => {
       {
         name: 'configure-response-headers',
         configureServer: (server) => {
-          server.middlewares.use((_req, res, next) => {
+          server.middlewares.use((req, res, next) => {
             // REQUIRED for Wiregasm/SharedArrayBuffer
             res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
             res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+
+            // Aggressive caching for large WASM files (1 year)
+            // These files are versioned, so long cache is safe
+            if (req.url?.match(/\.(wasm|bmp|data)$/)) {
+              res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            }
+
             next();
           });
         }

@@ -30,7 +30,14 @@ const devectorize = (obj) => {
 let sharky = null;
 let session = null;
 
+// Send progress updates to main thread
+const sendProgress = (percent, stage) => {
+  postMessage({ type: "init-progress", percent, stage });
+};
+
 // Initialize Wiregasm and store the promise
+sendProgress(5, "Loading WASM module...");
+
 const initPromise = loadWiregasm({
   locateFile: (path, prefix) => {
     if (path.endsWith(".data")) return "/wiregasm.bmp";
@@ -38,7 +45,9 @@ const initPromise = loadWiregasm({
     return prefix + path;
   },
 }).then((result) => {
+  sendProgress(70, "Registering protocol dissectors...");
   result.init();
+  sendProgress(95, "Finalizing...");
   sharky = result;
   const columns = vecToArray(sharky.getColumns());
   console.log("Worker: Wiregasm initialization completed");
