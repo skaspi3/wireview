@@ -141,11 +141,9 @@ const handleClear = async () => {
   trimNotification.value = null;
   clearRecovery();
 
-  // Restart worker to guarantee clean state and cancel any in-flight operations
-  enginePreparing.value = true;
-  await manager.closeFile({ restartWorker: true });
-  enginePreparing.value = false;
-  if (DEBUG) console.log("Capture cleared with worker restart, epoch:", myEpoch);
+  // Just close the session, don't restart worker (keeps Wiregasm initialized)
+  await manager.closeFile();
+  if (DEBUG) console.log("Capture cleared, epoch:", myEpoch);
 };
 
 const handleStop = () => {
