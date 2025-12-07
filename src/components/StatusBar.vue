@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from "vue";
-import { manager, captureStats, crashLog, wiregasmVersion, nodeVersion, backendPort } from "../globals";
+import { manager, captureStats, crashLog, wiregasmVersion, nodeVersion, backendPort, backendStatus } from "../globals";
 import GitHubIcon from "./icons/GitHubIcon.vue";
 
 const showFilterPopup = ref(false);
@@ -37,6 +37,14 @@ const toggleCrashLogPopup = () => {
   showCrashLogPopup.value = !showCrashLogPopup.value;
   if (showCrashLogPopup.value) showFilterPopup.value = false;
 };
+
+const statusTitle = computed(() => {
+  switch (backendStatus.value) {
+    case 'connected': return 'Backend connected';
+    case 'connecting': return 'Connecting to backend...';
+    default: return 'Backend disconnected';
+  }
+});
 </script>
 <template>
   <div class="status-bar">
@@ -96,8 +104,10 @@ const toggleCrashLogPopup = () => {
     <span v-if="nodeVersion" class="version-info">
       Node.js {{ nodeVersion }}
     </span>
-    <span v-if="backendPort" class="version-info">
-      [WSS: {{ backendPort }}]
+    <span v-if="backendPort" class="version-info wss-info">
+      <span class="led" :class="backendStatus" :title="statusTitle"></span>
+      <span class="lock-icon" title="Encrypted connection (WSS)">🔒</span>
+      WSS: {{ backendPort }}
     </span>
     <a
       class="github"
@@ -242,5 +252,39 @@ const toggleCrashLogPopup = () => {
   color: #9ca3af;
   margin-right: 10px;
   font-family: monospace;
+}
+.wss-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.led {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 3px currentColor;
+}
+.led.disconnected {
+  background-color: #ef4444;
+  color: #ef4444;
+}
+.led.connecting {
+  background-color: #f59e0b;
+  color: #f59e0b;
+  animation: pulse-led 1s infinite;
+}
+.led.connected {
+  background-color: #22c55e;
+  color: #22c55e;
+}
+@keyframes pulse-led {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.lock-icon {
+  font-size: 10px;
+  filter: grayscale(100%);
+  opacity: 0.7;
 }
 </style>

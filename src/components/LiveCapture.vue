@@ -43,7 +43,7 @@
 
 <script setup>
 import { ref, onUnmounted, onMounted } from 'vue';
-import { DEBUG, crashLog, nodeVersion, backendPort } from '../globals';
+import { DEBUG, crashLog, nodeVersion, backendPort, backendStatus } from '../globals';
 
 const emit = defineEmits(['stream-data', 'clear', 'stop']);
 
@@ -72,12 +72,14 @@ const closeSocket = () => {
 const connect = () => {
   closeSocket(); // Ensure no duplicates
   error.value = null;
+  backendStatus.value = 'connecting';
   try {
     ws.value = new WebSocket(WS_URL);
     ws.value.binaryType = "arraybuffer";
 
     ws.value.onopen = () => {
       isConnected.value = true;
+      backendStatus.value = 'connected';
       if (DEBUG) console.log("WS Connected");
     };
 
@@ -130,14 +132,17 @@ const connect = () => {
       error.value = "Connection failed";
       isConnected.value = false;
       isCapturing.value = false;
+      backendStatus.value = 'disconnected';
     };
 
     ws.value.onclose = () => {
       isConnected.value = false;
       isCapturing.value = false;
+      backendStatus.value = 'disconnected';
     };
   } catch (e) {
     error.value = e.message;
+    backendStatus.value = 'disconnected';
   }
 };
 
