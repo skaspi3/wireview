@@ -6,6 +6,7 @@ import PacketList from './components/panes/PacketList.vue';
 import PacketDetails from './components/panes/PacketDetails.vue';
 import PacketBytes from './components/panes/PacketBytes.vue';
 import IconRibbon from './components/IconRibbon.vue';
+import DisplayFilter from './components/DisplayFilter.vue';
 import StatusBar from './components/StatusBar.vue';
 
 // Row height for packet list (used for virtual scrolling)
@@ -25,6 +26,7 @@ const handleStop = () => {
     <!-- Main UI -->
     <div class="main-content">
       <IconRibbon @clear="handleClear" @stop="handleStop" />
+      <DisplayFilter />
 
       <div class="workspace">
         <DefaultLayout
