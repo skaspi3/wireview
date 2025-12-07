@@ -43,7 +43,7 @@
 
 <script setup>
 import { ref, onUnmounted, onMounted } from 'vue';
-import { DEBUG, crashLog } from '../globals';
+import { DEBUG, crashLog, nodeVersion, backendPort } from '../globals';
 
 const emit = defineEmits(['stream-data', 'clear', 'stop']);
 
@@ -93,6 +93,12 @@ const connect = () => {
               selectedInterface.value = msg.default;
             } else if (msg.list.length > 0) {
               selectedInterface.value = msg.list[0];
+            }
+            if (msg.nodeVersion) {
+              nodeVersion.value = msg.nodeVersion;
+            }
+            if (msg.backendPort) {
+              backendPort.value = msg.backendPort;
             }
           }
           

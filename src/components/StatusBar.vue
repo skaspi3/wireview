@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from "vue";
-import { manager, captureStats, crashLog } from "../globals";
+import { manager, captureStats, crashLog, wiregasmVersion, nodeVersion, backendPort } from "../globals";
 import GitHubIcon from "./icons/GitHubIcon.vue";
 
 const showFilterPopup = ref(false);
@@ -90,6 +90,15 @@ const toggleCrashLogPopup = () => {
       {{ statsInfo }}
     </div>
     <div style="flex-grow: 1"></div>
+    <span v-if="wiregasmVersion" class="version-info">
+      Wiregasm {{ wiregasmVersion }}
+    </span>
+    <span v-if="nodeVersion" class="version-info">
+      Node.js {{ nodeVersion }}
+    </span>
+    <span v-if="backendPort" class="version-info">
+      [WSS: {{ backendPort }}]
+    </span>
     <a
       class="github"
       href="https://github.com/radiantly/Wireview"
@@ -227,5 +236,11 @@ const toggleCrashLogPopup = () => {
 }
 .github svg {
   height: 100%;
+}
+.version-info {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-right: 10px;
+  font-family: monospace;
 }
 </style>

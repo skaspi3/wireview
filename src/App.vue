@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, ref } from 'vue';
-import { manager, frameDisplayOffset, captureStats, crashLog, DEBUG } from './globals';
+import { manager, frameDisplayOffset, captureStats, crashLog, wiregasmVersion, DEBUG } from './globals';
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
 import PacketList from './components/panes/PacketList.vue';
 import PacketDetails from './components/panes/PacketDetails.vue';
@@ -295,8 +295,18 @@ const processBuffer = async (buffer, epoch = captureEpoch) => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
   manager.initialize();
+
+  // Fetch Wiregasm version
+  try {
+    const response = await fetch('/wiregasm-version.txt');
+    if (response.ok) {
+      wiregasmVersion.value = (await response.text()).trim();
+    }
+  } catch (e) {
+    // Ignore errors fetching version
+  }
 });
 </script>
 

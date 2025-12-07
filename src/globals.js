@@ -17,3 +17,8 @@ export const captureStats = {
 
 // Crash log (records each crash/recovery event)
 export const crashLog = ref([]);  // Array of { timestamp: string, packetCount: number }
+
+// Version info (displayed in status bar)
+export const wiregasmVersion = ref('');
+export const nodeVersion = ref('');
+export const backendPort = ref(null);

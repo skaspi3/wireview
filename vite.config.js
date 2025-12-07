@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import fs from 'fs'
 import os from 'os'
@@ -37,31 +37,37 @@ const getDefaultGatewayIP = () => {
 
 const host = getDefaultGatewayIP();
 
-export default defineConfig({
-  plugins: [
-    vue(),
-    {
-      name: 'configure-response-headers',
-      configureServer: (server) => {
-        server.middlewares.use((_req, res, next) => {
-          // REQUIRED for Wiregasm/SharedArrayBuffer
-          res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
-          res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-          next();
-        });
+export default defineConfig(({ mode }) => {
+  // Load env file from current directory
+  const env = loadEnv(mode, process.cwd(), '');
+  const port = parseInt(env.VITE_DEV_PORT) || 5173;
+
+  return {
+    plugins: [
+      vue(),
+      {
+        name: 'configure-response-headers',
+        configureServer: (server) => {
+          server.middlewares.use((_req, res, next) => {
+            // REQUIRED for Wiregasm/SharedArrayBuffer
+            res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+            res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+            next();
+          });
+        }
+      }
+    ],
+    server: {
+      host, // Bind to default gateway interface only
+      port,
+      https: {
+        key: fs.readFileSync('./server.key'),
+        cert: fs.readFileSync('./server.crt'),
+      },
+      // This fixes the "WebSocket connection failed" HMR error in your screenshot
+      hmr: {
+        clientPort: port
       }
     }
-  ],
-  server: {
-    host, // Bind to default gateway interface only
-    port: 5173,
-    https: {
-      key: fs.readFileSync('./server.key'),
-      cert: fs.readFileSync('./server.crt'),
-    },
-    // This fixes the "WebSocket connection failed" HMR error in your screenshot
-    hmr: {
-      clientPort: 5173 
-    }
-  }
+  };
 })

@@ -383,6 +383,10 @@ onBeforeUnmount(() =>
   color: var(--ws-text-color);
   padding: 4px 7px;
 }
+.filter-container .filter-bar input[type="text"]::placeholder {
+  color: #e0e0e0;
+  opacity: 1;
+}
 .suggestions-dropdown {
   position: absolute;
   top: 100%;
@@ -435,8 +439,7 @@ onBeforeUnmount(() =>
 }
 .apply-filter:disabled {
   pointer-events: none;
-  filter: grayscale(100%);
-  opacity: 0.4;
+  opacity: 0.5;
 }
 .apply-filter:hover {
   filter: brightness(1.25);
