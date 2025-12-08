@@ -4,6 +4,7 @@ import { packets, activePacketIndex, activePacketDetails } from "../../globals";
 
 // Collapsed state for tree nodes
 const collapsed = ref({});
+const isLoading = ref(false);
 
 // Toggle collapse state
 const toggleCollapse = (path) => {
@@ -17,14 +18,19 @@ const isCollapsed = (path) => collapsed.value[path] !== false;
 watch(activePacketIndex, async (index) => {
   if (index === null || index < 0 || index >= packets.value.length) {
     activePacketDetails.value = null;
+    isLoading.value = false;
     return;
   }
 
   const packet = packets.value[index];
   if (!packet) {
     activePacketDetails.value = null;
+    isLoading.value = false;
     return;
   }
+
+  isLoading.value = true;
+  activePacketDetails.value = null;
 
   try {
     // Fetch detailed packet info from server
@@ -39,6 +45,8 @@ watch(activePacketIndex, async (index) => {
   } catch (e) {
     console.error("Failed to fetch packet details:", e);
     activePacketDetails.value = null;
+  } finally {
+    isLoading.value = false;
   }
 });
 
@@ -113,8 +121,14 @@ const parseLayerFields = (data, prefix) => {
 
 <template>
   <div class="details-container">
-    <div v-if="!activePacketDetails" class="no-selection">
+    <div v-if="activePacketIndex === null" class="no-selection">
       Select a packet to view details
+    </div>
+    <div v-else-if="isLoading" class="loading">
+      Fetching from server...
+    </div>
+    <div v-else-if="!activePacketDetails" class="no-selection">
+      No details available
     </div>
     <div v-else class="tree">
       <template v-for="layer in detailsTree" :key="layer.path">
@@ -168,7 +182,8 @@ const parseLayerFields = (data, prefix) => {
   color: #ccc;
 }
 
-.no-selection {
+.no-selection,
+.loading {
   padding: 20px;
   color: #888;
   text-align: center;

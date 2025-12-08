@@ -42,7 +42,7 @@ watch(activePacketIndex, async (index) => {
       Select a packet to view hex dump
     </div>
     <div v-else-if="isLoading" class="loading">
-      Loading...
+      Fetching from server...
     </div>
     <pre v-else class="hex-display">{{ hexDump }}</pre>
   </div>

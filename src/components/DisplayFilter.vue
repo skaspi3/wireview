@@ -426,11 +426,21 @@ const handleKeydown = (event) => {
       return;
     }
 
-    // Tab or Enter when dropdown is open: insert the selected suggestion
-    if (event.key === "Tab" || event.key === "Enter") {
+    // Tab: insert the selected suggestion
+    if (event.key === "Tab") {
       event.preventDefault();
       event.stopPropagation();
       insertSuggestion(filteredSuggestions.value[selectedIndex.value]);
+      return;
+    }
+
+    // Enter when dropdown is open: insert suggestion AND apply filter
+    if (event.key === "Enter") {
+      event.preventDefault();
+      event.stopPropagation();
+      insertSuggestion(filteredSuggestions.value[selectedIndex.value]);
+      // Apply filter immediately after inserting
+      setTimeout(() => handleSubmit(), 0);
       return;
     }
   }
