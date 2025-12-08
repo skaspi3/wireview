@@ -43,7 +43,7 @@
 
 <script setup>
 import { ref, triggerRef, onUnmounted, onMounted } from 'vue';
-import { nodeVersion, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError } from '../globals';
+import { nodeVersion, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, trackReceived, trackSent } from '../globals';
 
 const emit = defineEmits(['clear', 'stop']);
 
@@ -81,6 +81,14 @@ const closeSocket = () => {
   }
 };
 
+// Helper to send and track bytes
+const sendMessage = (data) => {
+  if (!ws.value) return;
+  const msg = JSON.stringify(data);
+  trackSent(msg.length);
+  ws.value.send(msg);
+};
+
 const connect = () => {
   closeSocket(); // Ensure no duplicates
   error.value = null;
@@ -95,6 +103,10 @@ const connect = () => {
     };
 
     ws.value.onmessage = (event) => {
+      // Track received bytes
+      const dataSize = typeof event.data === 'string' ? event.data.length : event.data.size;
+      trackReceived(dataSize);
+
       try {
         const msg = JSON.parse(event.data);
 
@@ -205,10 +217,10 @@ const startCapture = () => {
   if (!ws.value || !isConnected.value) return;
 
   // Send start command
-  ws.value.send(JSON.stringify({
+  sendMessage({
     type: 'start',
     interface: selectedInterface.value
-  }));
+  });
 
   isCapturing.value = true;
   emit('clear');
@@ -217,7 +229,7 @@ const startCapture = () => {
 const stopCapture = () => {
   if (ws.value && isConnected.value) {
     try {
-      ws.value.send(JSON.stringify({ type: 'stop' }));
+      sendMessage({ type: 'stop' });
     } catch (e) {}
   }
 
@@ -231,7 +243,7 @@ const restartCapture = () => {
   // Send stop command to backend
   if (ws.value && isConnected.value) {
     try {
-      ws.value.send(JSON.stringify({ type: 'stop' }));
+      sendMessage({ type: 'stop' });
     } catch (e) {}
   }
 
@@ -240,10 +252,10 @@ const restartCapture = () => {
   // Wait for backend to stop/reset, then start again
   setTimeout(() => {
     if (ws.value && isConnected.value) {
-      ws.value.send(JSON.stringify({
+      sendMessage({
         type: 'start',
         interface: selectedInterface.value
-      }));
+      });
       isCapturing.value = true;
     }
   }, 200);

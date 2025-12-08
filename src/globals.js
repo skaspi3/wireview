@@ -29,6 +29,20 @@ export const backendStatus = ref('disconnected');
 // TLS certificate info
 export const certInfo = ref(null);
 
+// Data transfer tracking (bytes)
+export const bytesReceived = ref(0);
+export const bytesSent = ref(0);
+
+// Helper to track received data
+export const trackReceived = (bytes) => {
+  bytesReceived.value += bytes;
+};
+
+// Helper to track sent data
+export const trackSent = (bytes) => {
+  bytesSent.value += bytes;
+};
+
 // Fetch certificate info from Vite API
 fetch('/api/cert-info')
   .then(res => res.json())
@@ -43,6 +57,8 @@ export const clearPackets = () => {
   activePacketDetails.value = null;
   displayFilter.value = '';
   filterError.value = null;
+  bytesReceived.value = 0;
+  bytesSent.value = 0;
 };
 
 // Apply filter by sending request to backend
@@ -51,8 +67,10 @@ export const applyDisplayFilter = (filter) => {
     filterError.value = 'Not connected to backend';
     return;
   }
-  websocket.value.send(JSON.stringify({
+  const msg = JSON.stringify({
     type: 'applyFilter',
     filter: filter
-  }));
+  });
+  trackSent(msg.length);
+  websocket.value.send(msg);
 };

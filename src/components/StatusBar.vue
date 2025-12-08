@@ -1,6 +1,6 @@
 <script setup>
-import { computed, ref } from "vue";
-import { packets, allPackets, nodeVersion, backendStatus, backendPort, certInfo, displayFilter } from "../globals";
+import { computed, ref, onMounted, onUnmounted } from "vue";
+import { packets, allPackets, nodeVersion, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesSent } from "../globals";
 import GitHubIcon from "./icons/GitHubIcon.vue";
 
 const showFilterPopup = ref(false);
@@ -47,6 +47,30 @@ const toggleFilterPopup = () => {
   showFilterPopup.value = !showFilterPopup.value;
 };
 
+// Data transfer display - updated every 5 seconds
+const dataTransferDisplay = ref('');
+let dataTransferInterval = null;
+
+const formatBytes = (bytes) => {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+};
+
+const updateDataTransfer = () => {
+  const recv = formatBytes(bytesReceived.value);
+  dataTransferDisplay.value = `RCV: ${recv}`;
+};
+
+onMounted(() => {
+  updateDataTransfer();
+  dataTransferInterval = setInterval(updateDataTransfer, 5000);
+});
+
+onUnmounted(() => {
+  if (dataTransferInterval) clearInterval(dataTransferInterval);
+});
+
 const statusTitle = computed(() => {
   switch (backendStatus.value) {
     case 'connected': return 'Backend connected (thin-client mode)';
@@ -89,6 +113,7 @@ const statusTitle = computed(() => {
 
     <!-- Right section -->
     <div class="right-section">
+      <span class="data-transfer-info">{{ dataTransferDisplay }}</span>
       <span class="version-info thin-client-badge">
         Thin Client Mode
       </span>
@@ -229,6 +254,13 @@ const statusTitle = computed(() => {
   color: #60a5fa;
   font-weight: 500;
 }
+.data-transfer-info {
+  font-family: monospace;
+  font-size: 13px;
+  color: #a78bfa;
+  font-weight: 500;
+  margin-right: 16px;
+}
 .github {
   display: flex;
   min-width: 0;
@@ -248,6 +280,7 @@ const statusTitle = computed(() => {
 .thin-client-badge {
   color: #60a5fa;
   font-weight: bold;
+  font-size: 13px;
 }
 .wss-info {
   display: flex;
@@ -283,8 +316,7 @@ const statusTitle = computed(() => {
 .backend-popup {
   position: absolute;
   bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 0;
   background: #1f2937;
   border: 1px solid #374151;
   border-radius: 6px;

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch } from "vue";
-import { packets, activePacketIndex } from "../../globals";
+import { packets, activePacketIndex, trackReceived, trackSent } from "../../globals";
 
 // Hex dump content
 const hexDump = ref('');
@@ -21,9 +21,13 @@ watch(activePacketIndex, async (index) => {
 
   isLoading.value = true;
   try {
-    const response = await fetch(`/api/packet/hex?frame=${packet.number}`);
+    const url = `/api/packet/hex?frame=${packet.number}`;
+    trackSent(url.length);
+    const response = await fetch(url);
     if (response.ok) {
-      hexDump.value = await response.text();
+      const text = await response.text();
+      trackReceived(text.length);
+      hexDump.value = text;
     } else {
       hexDump.value = 'Failed to load hex dump';
     }
