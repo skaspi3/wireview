@@ -1,10 +1,11 @@
 <script setup>
 import { computed, ref } from "vue";
-import { packets, nodeVersion, backendStatus, certInfo } from "../globals";
+import { packets, allPackets, nodeVersion, backendStatus, backendPort, certInfo, displayFilter } from "../globals";
 import GitHubIcon from "./icons/GitHubIcon.vue";
 
 const showFilterPopup = ref(false);
 const showCertPopup = ref(false);
+const showBackendPopup = ref(false);
 
 // BPF filter explanation (matches backend server.js filter)
 const bpfFilter = {
@@ -18,10 +19,28 @@ const bpfFilter = {
   ]
 };
 
+// Total packets count (from allPackets when filter is active, otherwise from packets)
+const totalPackets = computed(() => {
+  if (displayFilter.value && allPackets.value.length > 0) {
+    return allPackets.value.length;
+  }
+  return packets.value.length;
+});
+
+// Displayed packets count (filtered)
+const displayedPackets = computed(() => {
+  return packets.value.length;
+});
+
 const statsInfo = computed(() => {
-  const count = packets.value.length;
+  const count = totalPackets.value;
   if (count === 0) return 'No Packets';
-  return `${count.toLocaleString()} packets`;
+  return `Packets: ${count.toLocaleString()}`;
+});
+
+const displayedInfo = computed(() => {
+  if (!displayFilter.value) return null;
+  return `Displayed: ${displayedPackets.value.toLocaleString()}`;
 });
 
 const toggleFilterPopup = () => {
@@ -38,62 +57,75 @@ const statusTitle = computed(() => {
 </script>
 <template>
   <div class="status-bar">
-    <div class="bpf-filter-link" @click="toggleFilterPopup">
-      Current BPF filter
+    <div class="left-section">
+      <div class="bpf-filter-link" @click="toggleFilterPopup">
+        Current BPF filter
+      </div>
+
+      <!-- BPF Filter Popup -->
+      <div v-if="showFilterPopup" class="filter-popup">
+        <div class="filter-popup-header">
+          <strong>Excluded from capture:</strong>
+          <button class="close-btn" @click="showFilterPopup = false">&times;</button>
+        </div>
+        <ul class="filter-list">
+          <li v-for="item in bpfFilter.excluded" :key="item.port || item.range">
+            <template v-if="item.port">Port {{ item.port }}</template>
+            <template v-else>{{ item.range }}</template>
+            – {{ item.description }}
+          </li>
+        </ul>
+        <div class="filter-raw">
+          <code>{{ bpfFilter.raw }}</code>
+        </div>
+      </div>
     </div>
 
-    <!-- BPF Filter Popup -->
-    <div v-if="showFilterPopup" class="filter-popup">
-      <div class="filter-popup-header">
-        <strong>Excluded from capture:</strong>
-        <button class="close-btn" @click="showFilterPopup = false">&times;</button>
-      </div>
-      <ul class="filter-list">
-        <li v-for="item in bpfFilter.excluded" :key="item.port || item.range">
-          <template v-if="item.port">Port {{ item.port }}</template>
-          <template v-else>{{ item.range }}</template>
-          – {{ item.description }}
-        </li>
-      </ul>
-      <div class="filter-raw">
-        <code>{{ bpfFilter.raw }}</code>
-      </div>
+    <!-- Center section - packet counts -->
+    <div class="center-section">
+      <span class="stats-info">{{ statsInfo }}</span>
+      <span v-if="displayedInfo" class="displayed-info">{{ displayedInfo }}</span>
     </div>
 
-    <div style="flex-grow: 1"></div>
-    <div class="stats-info">
-      {{ statsInfo }}
+    <!-- Right section -->
+    <div class="right-section">
+      <span class="version-info thin-client-badge">
+        Thin Client Mode
+      </span>
+      <span class="version-info wss-info">
+        | <span
+            class="led"
+            :class="backendStatus"
+            @mouseenter="showBackendPopup = true"
+            @mouseleave="showBackendPopup = false"
+          >
+            <div v-if="showBackendPopup" class="backend-popup">
+              <div class="popup-row">Backend running on 127.0.0.1:{{ backendPort || 3000 }}</div>
+              <div class="popup-row">Node.js: {{ nodeVersion || 'unknown' }}</div>
+            </div>
+          </span>
+        | <span class="lock-icon" @mouseenter="showCertPopup = true" @mouseleave="showCertPopup = false">
+            🔒
+            <div v-if="showCertPopup" class="cert-popup">
+              <template v-if="certInfo">
+                <div class="cert-title">TLS Certificate</div>
+                <div v-if="certInfo.subject === certInfo.issuer" class="cert-self-signed">Self-Signed</div>
+              </template>
+              <template v-else>
+                <div class="cert-title">TLS Certificate</div>
+              </template>
+            </div>
+          </span>
+      </span>
+      <a
+        class="github"
+        href="https://github.com/radiantly/Wireview"
+        aria-label="Visit the Wireview project page on GitHub"
+        target="_blank"
+      >
+        <GitHubIcon />
+      </a>
     </div>
-    <div style="flex-grow: 1"></div>
-    <span class="version-info thin-client-badge">
-      Thin Client Mode
-    </span>
-    <span v-if="nodeVersion" class="version-info">
-      | Node.js {{ nodeVersion }}
-    </span>
-    <span class="version-info wss-info">
-      | <span class="led" :class="backendStatus" :title="statusTitle"></span>
-      | <span class="lock-icon" @mouseenter="showCertPopup = true" @mouseleave="showCertPopup = false">
-          🔒
-          <div v-if="showCertPopup" class="cert-popup">
-            <template v-if="certInfo">
-              <div class="cert-title">TLS Certificate</div>
-              <div v-if="certInfo.subject === certInfo.issuer" class="cert-self-signed">Self-Signed</div>
-            </template>
-            <template v-else>
-              <div class="cert-title">TLS Certificate</div>
-            </template>
-          </div>
-        </span>
-    </span>
-    <a
-      class="github"
-      href="https://github.com/radiantly/Wireview"
-      aria-label="Visit the Wireview project page on GitHub"
-      target="_blank"
-    >
-      <GitHubIcon />
-    </a>
   </div>
 </template>
 
@@ -102,6 +134,28 @@ const statusTitle = computed(() => {
   display: flex;
   padding: 2px 5px;
   position: relative;
+  align-items: center;
+}
+.left-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+.center-section {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.right-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 .bpf-filter-link {
   color: #3b82f6;
@@ -112,15 +166,10 @@ const statusTitle = computed(() => {
 .bpf-filter-link:hover {
   color: #60a5fa;
 }
-.link-separator {
-  color: #6b7280;
-  margin: 0 8px;
-  font-size: 13px;
-}
 .filter-popup {
   position: absolute;
   bottom: 100%;
-  left: 5px;
+  left: 0;
   background: #1f2937;
   border: 1px solid #374151;
   border-radius: 6px;
@@ -172,6 +221,13 @@ const statusTitle = computed(() => {
   font-family: monospace;
   font-size: 13px;
   color: #22c55e;
+  font-weight: 500;
+}
+.displayed-info {
+  font-family: monospace;
+  font-size: 13px;
+  color: #60a5fa;
+  font-weight: 500;
 }
 .github {
   display: flex;
@@ -204,6 +260,8 @@ const statusTitle = computed(() => {
   border-radius: 50%;
   display: inline-block;
   box-shadow: 0 0 3px currentColor;
+  cursor: pointer;
+  position: relative;
 }
 .led.disconnected {
   background-color: #ef4444;
@@ -221,6 +279,24 @@ const statusTitle = computed(() => {
 @keyframes pulse-led {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
+}
+.backend-popup {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 8px 12px;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  font-size: 11px;
+  color: #d1d5db;
+}
+.popup-row {
+  margin: 2px 0;
 }
 .lock-icon {
   font-size: 14px;
@@ -247,14 +323,6 @@ const statusTitle = computed(() => {
   font-weight: 600;
   color: #ffffff;
   font-size: 12px;
-}
-.cert-row {
-  margin: 4px 0;
-  word-break: break-all;
-}
-.cert-row span {
-  color: #9ca3af;
-  margin-right: 6px;
 }
 .cert-self-signed {
   color: #f59e0b;

@@ -43,7 +43,7 @@
 
 <script setup>
 import { ref, triggerRef, onUnmounted, onMounted } from 'vue';
-import { nodeVersion, backendPort, backendStatus, certInfo, packets } from '../globals';
+import { nodeVersion, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError } from '../globals';
 
 const emit = defineEmits(['clear', 'stop']);
 
@@ -91,6 +91,7 @@ const connect = () => {
     ws.value.onopen = () => {
       isConnected.value = true;
       backendStatus.value = 'connected';
+      websocket.value = ws.value; // Store in global for filter requests
     };
 
     ws.value.onmessage = (event) => {
@@ -118,7 +119,12 @@ const connect = () => {
         // Handle packet summaries from server
         if (msg.type === 'packet') {
           if (!isCapturing.value) return;
-          packets.value.push(msg.data);
+          // Always add to allPackets (unfiltered)
+          allPackets.value.push(msg.data);
+          // Only add to packets if no filter is active
+          if (!displayFilter.value) {
+            packets.value.push(msg.data);
+          }
           scheduleUpdate();
         }
 
@@ -132,6 +138,39 @@ const connect = () => {
 
         if (msg.type === 'stopped') {
           // Capture stopped by server
+        }
+
+        // Handle filter validation response
+        if (msg.type === 'filterValidation') {
+          if (window._filterValidationCallback) {
+            window._filterValidationCallback(msg.filter, msg.valid, msg.error);
+          }
+        }
+
+        // Handle filtered packets from server
+        if (msg.type === 'filteredPackets') {
+          if (msg.error) {
+            filterError.value = msg.error;
+          } else {
+            filterError.value = null;
+            displayFilter.value = msg.filter || '';
+
+            // If filter is empty, restore all packets
+            if (!msg.filter) {
+              // allPackets contains the full list, restore it
+              if (allPackets.value.length > 0) {
+                packets.value = [...allPackets.value];
+              }
+            } else {
+              // Store current packets as allPackets if not already saved
+              if (allPackets.value.length === 0 && packets.value.length > 0) {
+                allPackets.value = [...packets.value];
+              }
+              // Replace with filtered packets
+              packets.value = msg.packets;
+            }
+            triggerRef(packets);
+          }
         }
 
         if (msg.type === 'error') {
