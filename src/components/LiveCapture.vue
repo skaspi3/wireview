@@ -43,7 +43,7 @@
 
 <script setup>
 import { ref, triggerRef, onUnmounted, onMounted } from 'vue';
-import { nodeVersion, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, trackReceived, trackSent } from '../globals';
+import { nodeVersion, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent } from '../globals';
 
 const emit = defineEmits(['clear', 'stop']);
 
@@ -159,9 +159,27 @@ const connect = () => {
           }
         }
 
+        // Handle filter progress updates
+        if (msg.type === 'filterProgress') {
+          filterProgress.value = msg.count;
+        }
+
+        // Handle filter cancelled
+        if (msg.type === 'filterCancelled') {
+          filterLoading.value = false;
+          filterProgress.value = 0;
+        }
+
         // Handle filtered packets from server
         if (msg.type === 'filteredPackets') {
           filterLoading.value = false;  // Hide loading spinner
+          filterProgress.value = 0;     // Reset progress
+
+          // Handle cancelled state - just close the popup, don't change filter
+          if (msg.cancelled) {
+            return;
+          }
+
           if (msg.error) {
             filterError.value = msg.error;
           } else {

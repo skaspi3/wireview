@@ -16,6 +16,7 @@ export const activePacketDetails = shallowRef(null);
 export const displayFilter = ref('');
 export const filterError = ref(null);
 export const filterLoading = ref(false);  // True while filter is being applied
+export const filterProgress = ref(0);     // Number of matching packets found so far
 
 // WebSocket reference for sending messages
 export const websocket = ref(null);
@@ -76,10 +77,22 @@ export const applyDisplayFilter = (filter) => {
     return;
   }
   filterLoading.value = true;  // Show loading spinner
+  filterProgress.value = 0;    // Reset progress
   const msg = JSON.stringify({
     type: 'applyFilter',
     filter: filter
   });
+  trackSent(msg.length);
+  websocket.value.send(msg);
+};
+
+// Cancel filter operation
+export const cancelFilter = () => {
+  if (!websocket.value || websocket.value.readyState !== WebSocket.OPEN) {
+    filterLoading.value = false;
+    return;
+  }
+  const msg = JSON.stringify({ type: 'cancelFilter' });
   trackSent(msg.length);
   websocket.value.send(msg);
 };

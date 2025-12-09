@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue';
-import { clearPackets, filterLoading } from './globals';
+import { clearPackets, filterLoading, filterProgress, cancelFilter } from './globals';
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
 import PacketList from './components/panes/PacketList.vue';
 import PacketDetails from './components/panes/PacketDetails.vue';
@@ -26,8 +26,12 @@ const handleStop = () => {
     <!-- Filter Loading Overlay -->
     <div v-if="filterLoading" class="filter-loading-overlay">
       <div class="filter-loading-popup">
-        <div class="filter-loading-text">Applying filter, please wait...</div>
+        <div class="filter-loading-text">Applying filter...</div>
         <div class="filter-spinner"></div>
+        <div v-if="filterProgress > 0" class="filter-progress">
+          {{ filterProgress }} packets found
+        </div>
+        <button class="filter-cancel-btn" @click="cancelFilter">Cancel</button>
       </div>
     </div>
 
@@ -115,6 +119,28 @@ const handleStop = () => {
   border-top: 5px solid #3b82f6;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+}
+
+.filter-progress {
+  color: #9ca3af;
+  font-size: 14px;
+  font-family: monospace;
+}
+
+.filter-cancel-btn {
+  margin-top: 10px;
+  padding: 8px 24px;
+  background: #4b5563;
+  color: #e5e7eb;
+  border: 1px solid #6b7280;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.filter-cancel-btn:hover {
+  background: #6b7280;
 }
 
 @keyframes spin {
