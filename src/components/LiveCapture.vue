@@ -170,6 +170,14 @@ const connect = () => {
           filterProgress.value = 0;
         }
 
+        // Handle single filtered packet (real-time match during active filter)
+        if (msg.type === 'filteredPacket') {
+          if (displayFilter.value && msg.data) {
+            packets.value.push(msg.data);
+            scheduleUpdate();
+          }
+        }
+
         // Handle filtered packets from server
         if (msg.type === 'filteredPackets') {
           filterLoading.value = false;  // Hide loading spinner
