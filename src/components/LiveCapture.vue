@@ -267,6 +267,10 @@ const stopCapture = () => {
 const restartCapture = () => {
   isCapturing.value = false;
 
+  // Clear any active filter
+  displayFilter.value = '';
+  filterError.value = null;
+
   // Send stop command to backend
   if (ws.value && isConnected.value) {
     try {
