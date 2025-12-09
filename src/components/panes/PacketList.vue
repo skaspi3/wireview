@@ -70,6 +70,47 @@ const selectPacket = (index) => {
   activePacketIndex.value = index;
 };
 
+// Keyboard navigation
+const handleKeydown = (event) => {
+  if (packets.value.length === 0) return;
+
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    if (activePacketIndex.value === null) {
+      activePacketIndex.value = 0;
+    } else if (activePacketIndex.value < packets.value.length - 1) {
+      activePacketIndex.value++;
+    }
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    if (activePacketIndex.value === null) {
+      activePacketIndex.value = 0;
+    } else if (activePacketIndex.value > 0) {
+      activePacketIndex.value--;
+    }
+  } else if (event.key === 'Home') {
+    event.preventDefault();
+    activePacketIndex.value = 0;
+  } else if (event.key === 'End') {
+    event.preventDefault();
+    activePacketIndex.value = packets.value.length - 1;
+  } else if (event.key === 'PageDown') {
+    event.preventDefault();
+    if (activePacketIndex.value === null) {
+      activePacketIndex.value = 0;
+    } else {
+      activePacketIndex.value = Math.min(packets.value.length - 1, activePacketIndex.value + visibleRowCount.value);
+    }
+  } else if (event.key === 'PageUp') {
+    event.preventDefault();
+    if (activePacketIndex.value === null) {
+      activePacketIndex.value = 0;
+    } else {
+      activePacketIndex.value = Math.max(0, activePacketIndex.value - visibleRowCount.value);
+    }
+  }
+};
+
 // Auto-scroll to bottom when new packets arrive
 watch(() => packets.value.length, (newLen, oldLen) => {
   if (newLen > oldLen && scrollY.value >= oldLen - visibleRowCount.value - 1) {
@@ -121,7 +162,9 @@ const formatTime = (time) => {
   <div
     class="packet-list-scrollable"
     ref="packet-list-scrollable"
+    tabindex="0"
     @wheel="handleWheel"
+    @keydown="handleKeydown"
   >
     <div class="content">
       <table class="packet-table">
@@ -169,6 +212,12 @@ const formatTime = (time) => {
   height: 100%;
   width: 100%;
   background: #e8f4fc;
+  outline: none;
+}
+
+.packet-list-scrollable:focus {
+  outline: 2px solid #3875d7;
+  outline-offset: -2px;
 }
 
 .content {
