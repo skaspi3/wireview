@@ -12,6 +12,9 @@ export const activePacketIndex = ref(null);
 // Currently selected packet details (fetched on demand from server)
 export const activePacketDetails = shallowRef(null);
 
+// Currently selected packet hex dump (fetched together with details)
+export const activePacketHex = ref('');
+
 // Display filter state
 export const displayFilter = ref('');
 export const filterError = ref(null);

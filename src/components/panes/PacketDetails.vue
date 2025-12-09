@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch, computed } from "vue";
-import { packets, activePacketIndex, activePacketDetails, trackFetched, trackSent } from "../../globals";
+import { packets, activePacketIndex, activePacketDetails, activePacketHex, trackFetched, trackSent } from "../../globals";
 
 // Collapsed state for tree nodes
 const collapsed = ref({});
@@ -14,10 +14,11 @@ const toggleCollapse = (path) => {
 // Check if collapsed
 const isCollapsed = (path) => collapsed.value[path] !== false;
 
-// Fetch packet details when selection changes
+// Fetch packet details and hex when selection changes
 watch(activePacketIndex, async (index) => {
   if (index === null || index < 0 || index >= packets.value.length) {
     activePacketDetails.value = null;
+    activePacketHex.value = '';
     isLoading.value = false;
     return;
   }
@@ -25,15 +26,17 @@ watch(activePacketIndex, async (index) => {
   const packet = packets.value[index];
   if (!packet) {
     activePacketDetails.value = null;
+    activePacketHex.value = '';
     isLoading.value = false;
     return;
   }
 
   isLoading.value = true;
   activePacketDetails.value = null;
+  activePacketHex.value = '';
 
   try {
-    // Fetch detailed packet info from server
+    // Fetch packet data (details + hex) from server - single request
     const url = `/api/packet?frame=${packet.number}`;
     trackSent(url.length);
     const response = await fetch(url);
@@ -41,14 +44,17 @@ watch(activePacketIndex, async (index) => {
       const text = await response.text();
       trackFetched(text.length);
       const data = JSON.parse(text);
-      activePacketDetails.value = data;
+      activePacketDetails.value = data.details;
+      activePacketHex.value = data.hex || '';
       collapsed.value = {};  // Reset collapsed state for new packet
     } else {
       activePacketDetails.value = null;
+      activePacketHex.value = '';
     }
   } catch (e) {
-    console.error("Failed to fetch packet details:", e);
+    console.error("Failed to fetch packet data:", e);
     activePacketDetails.value = null;
+    activePacketHex.value = '';
   } finally {
     isLoading.value = false;
   }
