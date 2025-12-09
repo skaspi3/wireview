@@ -25,7 +25,10 @@ const handleStop = () => {
   <div class="app-layout">
     <!-- Filter Loading Overlay -->
     <div v-if="filterLoading" class="filter-loading-overlay">
-      <div class="filter-spinner"></div>
+      <div class="filter-loading-popup">
+        <div class="filter-loading-text">Applying filter, please wait...</div>
+        <div class="filter-spinner"></div>
+      </div>
     </div>
 
     <!-- Main UI -->
@@ -87,11 +90,29 @@ const handleStop = () => {
   z-index: 9999;
 }
 
+.filter-loading-popup {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  padding: 30px 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.filter-loading-text {
+  color: #e5e7eb;
+  font-size: 16px;
+  font-weight: 500;
+}
+
 .filter-spinner {
-  width: 80px;
-  height: 80px;
-  border: 6px solid transparent;
-  border-top: 6px solid #3b82f6;
+  width: 60px;
+  height: 60px;
+  border: 5px solid transparent;
+  border-top: 5px solid #3b82f6;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
