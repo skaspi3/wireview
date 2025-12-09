@@ -590,6 +590,15 @@ watch(displayFilterInput, () => {
   handleInput();
 });
 
+// Watch for external filter changes (e.g., capture restart clears filter)
+watch(displayFilter, (newFilter) => {
+  if (!newFilter && displayFilterInput.value) {
+    // Filter was cleared externally, sync the input
+    displayFilterInput.value = '';
+    validationResult.value = null;
+  }
+});
+
 // Watch for filter validation response from backend
 watch(filterError, (error) => {
   if (error) {
