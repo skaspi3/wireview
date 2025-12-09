@@ -133,11 +133,11 @@ const connect = () => {
           if (!isCapturing.value) return;
           // Always add to allPackets (unfiltered)
           allPackets.value.push(msg.data);
-          // Only add to packets if no filter is active
+          // Only add to packets and update UI if no filter is active
           if (!displayFilter.value) {
             packets.value.push(msg.data);
+            scheduleUpdate();
           }
-          scheduleUpdate();
         }
 
         // Handle packet details response
