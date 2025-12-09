@@ -131,12 +131,14 @@ const connect = () => {
         // Handle packet summaries from server
         if (msg.type === 'packet') {
           if (!isCapturing.value) return;
-          // Always add to allPackets (unfiltered)
-          allPackets.value.push(msg.data);
-          // Only add to packets and update UI if no filter is active
+          // When no filter active: add to both arrays and update UI
+          // When filter active: only add to allPackets (no UI update, wait for filteredPacket)
           if (!displayFilter.value) {
             packets.value.push(msg.data);
+            allPackets.value.push(msg.data);
             scheduleUpdate();
+          } else {
+            allPackets.value.push(msg.data);
           }
         }
 
@@ -205,8 +207,8 @@ const connect = () => {
               if (allPackets.value.length === 0 && packets.value.length > 0) {
                 allPackets.value = [...packets.value];
               }
-              // Replace with filtered packets
-              packets.value = msg.packets;
+              // Replace with filtered packets (create new array to ensure separation)
+              packets.value = [...msg.packets];
             }
             triggerRef(packets);
           }
