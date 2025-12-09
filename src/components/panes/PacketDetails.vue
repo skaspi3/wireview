@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch, computed } from "vue";
-import { packets, activePacketIndex, activePacketDetails, trackReceived, trackSent } from "../../globals";
+import { packets, activePacketIndex, activePacketDetails, trackFetched, trackSent } from "../../globals";
 
 // Collapsed state for tree nodes
 const collapsed = ref({});
@@ -39,7 +39,7 @@ watch(activePacketIndex, async (index) => {
     const response = await fetch(url);
     if (response.ok) {
       const text = await response.text();
-      trackReceived(text.length);
+      trackFetched(text.length);
       const data = JSON.parse(text);
       activePacketDetails.value = data;
       collapsed.value = {};  // Reset collapsed state for new packet

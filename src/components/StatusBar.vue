@@ -1,11 +1,12 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from "vue";
-import { packets, allPackets, nodeVersion, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesSent } from "../globals";
+import { packets, allPackets, nodeVersion, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesFetched } from "../globals";
 import GitHubIcon from "./icons/GitHubIcon.vue";
 
 const showFilterPopup = ref(false);
 const showCertPopup = ref(false);
 const showBackendPopup = ref(false);
+const showThinClientPopup = ref(false);
 
 // BPF filter explanation (matches backend server.js filter)
 const bpfFilter = {
@@ -49,6 +50,7 @@ const toggleFilterPopup = () => {
 
 // Data transfer display - updated every 5 seconds
 const dataTransferDisplay = ref('');
+const fetchedDisplay = ref('');
 let dataTransferInterval = null;
 
 const formatBytes = (bytes) => {
@@ -59,7 +61,9 @@ const formatBytes = (bytes) => {
 
 const updateDataTransfer = () => {
   const recv = formatBytes(bytesReceived.value);
-  dataTransferDisplay.value = `RCV: ${recv}`;
+  const fetched = formatBytes(bytesFetched.value);
+  dataTransferDisplay.value = `[RCV: ${recv}]`;
+  fetchedDisplay.value = `[Fetched: ${fetched}]`;
 };
 
 onMounted(() => {
@@ -114,8 +118,19 @@ const statusTitle = computed(() => {
     <!-- Right section -->
     <div class="right-section">
       <span class="data-transfer-info">{{ dataTransferDisplay }}</span>
-      <span class="version-info thin-client-badge">
+      <span class="data-separator">|</span>
+      <span class="data-transfer-info">{{ fetchedDisplay }}</span>
+      <span class="data-separator">|</span>
+      <span
+        class="version-info thin-client-badge"
+        @mouseenter="showThinClientPopup = true"
+        @mouseleave="showThinClientPopup = false"
+      >
         Thin Client Mode
+        <div v-if="showThinClientPopup" class="thin-client-popup">
+          Minimal bandwidth mode: raw packets are stored on the server<br>
+          and fetched on-demand. You only see lightweight text summaries.
+        </div>
       </span>
       <span class="version-info wss-info">
         | <span
@@ -259,7 +274,11 @@ const statusTitle = computed(() => {
   font-size: 13px;
   color: #a78bfa;
   font-weight: 500;
-  margin-right: 16px;
+}
+.data-separator {
+  color: #6b7280;
+  margin: 0 8px;
+  font-size: 13px;
 }
 .github {
   display: flex;
@@ -281,6 +300,24 @@ const statusTitle = computed(() => {
   color: #60a5fa;
   font-weight: bold;
   font-size: 13px;
+  cursor: pointer;
+  position: relative;
+}
+.thin-client-popup {
+  position: absolute;
+  bottom: 24px;
+  right: 0;
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 10px 14px;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  font-size: 12px;
+  font-weight: normal;
+  color: #d1d5db;
+  line-height: 1.5;
 }
 .wss-info {
   display: flex;

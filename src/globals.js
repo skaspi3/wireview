@@ -32,8 +32,9 @@ export const certInfo = ref(null);
 // Data transfer tracking (bytes)
 export const bytesReceived = ref(0);
 export const bytesSent = ref(0);
+export const bytesFetched = ref(0);  // On-demand fetches (packet details, hex dump)
 
-// Helper to track received data
+// Helper to track received data (streaming)
 export const trackReceived = (bytes) => {
   bytesReceived.value += bytes;
 };
@@ -41,6 +42,11 @@ export const trackReceived = (bytes) => {
 // Helper to track sent data
 export const trackSent = (bytes) => {
   bytesSent.value += bytes;
+};
+
+// Helper to track fetched data (on-demand requests)
+export const trackFetched = (bytes) => {
+  bytesFetched.value += bytes;
 };
 
 // Fetch certificate info from Vite API
@@ -59,6 +65,7 @@ export const clearPackets = () => {
   filterError.value = null;
   bytesReceived.value = 0;
   bytesSent.value = 0;
+  bytesFetched.value = 0;
 };
 
 // Apply filter by sending request to backend
