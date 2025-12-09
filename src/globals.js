@@ -15,6 +15,7 @@ export const activePacketDetails = shallowRef(null);
 // Display filter state
 export const displayFilter = ref('');
 export const filterError = ref(null);
+export const filterLoading = ref(false);  // True while filter is being applied
 
 // WebSocket reference for sending messages
 export const websocket = ref(null);
@@ -74,6 +75,7 @@ export const applyDisplayFilter = (filter) => {
     filterError.value = 'Not connected to backend';
     return;
   }
+  filterLoading.value = true;  // Show loading spinner
   const msg = JSON.stringify({
     type: 'applyFilter',
     filter: filter

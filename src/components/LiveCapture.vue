@@ -43,7 +43,7 @@
 
 <script setup>
 import { ref, triggerRef, onUnmounted, onMounted } from 'vue';
-import { nodeVersion, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, trackReceived, trackSent } from '../globals';
+import { nodeVersion, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, trackReceived, trackSent } from '../globals';
 
 const emit = defineEmits(['clear', 'stop']);
 
@@ -161,6 +161,7 @@ const connect = () => {
 
         // Handle filtered packets from server
         if (msg.type === 'filteredPackets') {
+          filterLoading.value = false;  // Hide loading spinner
           if (msg.error) {
             filterError.value = msg.error;
           } else {
