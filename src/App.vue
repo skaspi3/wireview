@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, useTemplateRef } from 'vue';
 import { clearPackets, filterLoading, filterProgress, cancelFilter } from './globals';
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
 import PacketList from './components/panes/PacketList.vue';
@@ -8,9 +8,14 @@ import PacketBytes from './components/panes/PacketBytes.vue';
 import IconRibbon from './components/IconRibbon.vue';
 import DisplayFilter from './components/DisplayFilter.vue';
 import StatusBar from './components/StatusBar.vue';
+import FileBrowser from './components/FileBrowser.vue';
 
 // Row height for packet list (used for virtual scrolling)
 const rowHeight = ref(20);
+
+// References for file browser
+const fileBrowserRef = useTemplateRef('file-browser');
+const iconRibbonRef = useTemplateRef('icon-ribbon');
 
 const handleClear = () => {
   clearPackets();
@@ -18,6 +23,14 @@ const handleClear = () => {
 
 const handleStop = () => {
   // Capture stopped
+};
+
+const handleOpenFileBrowser = () => {
+  fileBrowserRef.value?.open();
+};
+
+const handleFileSelect = (filePath) => {
+  iconRibbonRef.value?.loadPcapFile(filePath);
 };
 </script>
 
@@ -35,9 +48,12 @@ const handleStop = () => {
       </div>
     </div>
 
+    <!-- File Browser Modal -->
+    <FileBrowser ref="file-browser" @select="handleFileSelect" />
+
     <!-- Main UI -->
     <div class="main-content">
-      <IconRibbon @clear="handleClear" @stop="handleStop" />
+      <IconRibbon ref="icon-ribbon" @clear="handleClear" @stop="handleStop" @openFileBrowser="handleOpenFileBrowser" />
       <DisplayFilter />
 
       <div class="workspace">

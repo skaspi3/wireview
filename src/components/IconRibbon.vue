@@ -1,14 +1,25 @@
 <script setup>
+import { useTemplateRef } from 'vue';
 import LiveCapture from "./LiveCapture.vue";
 
-const emit = defineEmits(['clear', 'stop']);
+const emit = defineEmits(['clear', 'stop', 'openFileBrowser']);
+
+const liveCaptureRef = useTemplateRef('live-capture');
+
+const loadPcapFile = (filePath) => {
+  liveCaptureRef.value?.loadPcapFile(filePath);
+};
+
+defineExpose({ loadPcapFile });
 </script>
 
 <template>
   <div class="ribbon">
     <LiveCapture
+      ref="live-capture"
       @clear="() => emit('clear')"
       @stop="() => emit('stop')"
+      @openFileBrowser="() => emit('openFileBrowser')"
     />
   </div>
 </template>
