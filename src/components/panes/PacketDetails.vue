@@ -129,7 +129,7 @@ const parseLayerFields = (data, prefix) => {
       Select a packet to view details
     </div>
     <div v-else-if="isLoading" class="loading">
-      Fetching from server...
+      <div class="spinner"></div>
     </div>
     <div v-else-if="!activePacketDetails" class="no-selection">
       No details available
@@ -186,11 +186,32 @@ const parseLayerFields = (data, prefix) => {
   color: #ccc;
 }
 
-.no-selection,
-.loading {
+.no-selection {
   padding: 20px;
   color: #888;
   text-align: center;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 100px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid transparent;
+  border-top: 4px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .tree {
