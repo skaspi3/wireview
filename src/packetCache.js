@@ -117,9 +117,12 @@ const fetchBatch = async (startFrame, endFrame) => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      const text = await response.text();
-      trackFetched(text.length);
-      return JSON.parse(text);
+      // Track compressed bytes transferred (Content-Length header)
+      const contentLength = parseInt(response.headers.get('content-length')) || 0;
+      if (contentLength > 0) {
+        trackFetched(contentLength);
+      }
+      return response.json();
     })
     .then((data) => {
       if (data.packets) {

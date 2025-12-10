@@ -8,6 +8,25 @@ const showCertPopup = ref(false);
 const showBackendPopup = ref(false);
 const showThinClientPopup = ref(false);
 
+// Observed bytes and reduction ratio - updated periodically
+const observedBytesDisplay = ref(0);
+const reductionRatioDisplay = ref(0);
+
+const updateObservedStats = () => {
+  const pkts = allPackets.value.length > 0 ? allPackets.value : packets.value;
+  const observed = pkts.reduce((sum, pkt) => sum + (pkt.length || 0), 0);
+  observedBytesDisplay.value = observed;
+
+  if (observed === 0) {
+    reductionRatioDisplay.value = 0;
+  } else {
+    const transferred = bytesReceived.value + bytesFetched.value;
+    // Ratio = how much we saved = (observed - transferred) / observed
+    const ratio = (observed - transferred) / observed;
+    reductionRatioDisplay.value = Math.max(0, Math.min(100, ratio * 100));
+  }
+};
+
 // BPF filter explanation (matches backend server.js filter)
 const bpfFilter = {
   raw: "not port 3000 and not port 22 and not port 5173 and not port 443 and not net 169.254.0.0/16",
@@ -64,11 +83,12 @@ const updateDataTransfer = () => {
   const fetched = formatBytes(bytesFetched.value);
   dataTransferDisplay.value = `[RCV: ${recv}]`;
   fetchedDisplay.value = `[Fetched: ${fetched}]`;
+  updateObservedStats();
 };
 
 onMounted(() => {
   updateDataTransfer();
-  dataTransferInterval = setInterval(updateDataTransfer, 5000);
+  dataTransferInterval = setInterval(updateDataTransfer, 1000);
 });
 
 onUnmounted(() => {
@@ -128,8 +148,9 @@ const statusTitle = computed(() => {
       >
         Thin Client Mode
         <div v-if="showThinClientPopup" class="thin-client-popup">
-          Minimal bandwidth mode: raw packets are stored on the server<br>
-          and fetched on-demand. You only see lightweight text summaries.
+          <div class="popup-row">Observed Traffic: {{ formatBytes(observedBytesDisplay) }}</div>
+          <div class="popup-row reduction-row">Reduction Ratio: {{ reductionRatioDisplay.toFixed(1) }}%</div>
+          <div class="popup-row compression-row">Compression: Gzip</div>
         </div>
       </span>
       <span class="version-info wss-info">
@@ -318,6 +339,20 @@ const statusTitle = computed(() => {
   font-weight: normal;
   color: #d1d5db;
   line-height: 1.5;
+}
+.thin-client-popup .popup-row {
+  margin: 2px 0;
+}
+.thin-client-popup .reduction-row {
+  color: #22c55e;
+  font-weight: 500;
+}
+.thin-client-popup .compression-row {
+  color: #9ca3af;
+  font-size: 11px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #374151;
 }
 .wss-info {
   display: flex;
