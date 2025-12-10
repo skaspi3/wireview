@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch, computed } from "vue";
-import { packets, activePacketIndex, activePacketDetails, activePacketHex, trackFetched, trackSent } from "../../globals";
+import { packets, activePacketIndex, activePacketDetails, activePacketHex } from "../../globals";
+import { getPacketWithPrefetch, getCachedPacket, isFetchingBatch } from "../../packetCache";
 
 // Collapsed state for tree nodes
 const collapsed = ref({});
@@ -31,22 +32,32 @@ watch(activePacketIndex, async (index) => {
     return;
   }
 
+  const frameNumber = packet.number;
+
+  // Check cache first for instant display
+  const cached = getCachedPacket(frameNumber);
+  if (cached && cached.details) {
+    activePacketDetails.value = cached.details;
+    activePacketHex.value = cached.hex || '';
+    collapsed.value = {};
+    isLoading.value = false;
+
+    // Trigger background prefetch of adjacent packets
+    getPacketWithPrefetch(frameNumber, packets.value.length);
+    return;
+  }
+
+  // Not in cache - show loading and fetch with prefetch
   isLoading.value = true;
   activePacketDetails.value = null;
   activePacketHex.value = '';
 
   try {
-    // Fetch packet data (details + hex) from server - single request
-    const url = `/api/packet?frame=${packet.number}`;
-    trackSent(url.length);
-    const response = await fetch(url);
-    if (response.ok) {
-      const text = await response.text();
-      trackFetched(text.length);
-      const data = JSON.parse(text);
+    const data = await getPacketWithPrefetch(frameNumber, packets.value.length);
+    if (data && data.details) {
       activePacketDetails.value = data.details;
       activePacketHex.value = data.hex || '';
-      collapsed.value = {};  // Reset collapsed state for new packet
+      collapsed.value = {};
     } else {
       activePacketDetails.value = null;
       activePacketHex.value = '';

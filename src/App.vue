@@ -1,6 +1,7 @@
 <script setup>
 import { ref, useTemplateRef } from 'vue';
 import { clearPackets, filterLoading, filterProgress, cancelFilter } from './globals';
+import './packetCache';  // Initialize packet cache (registers clearer callback)
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
 import PacketList from './components/panes/PacketList.vue';
 import PacketDetails from './components/panes/PacketDetails.vue';

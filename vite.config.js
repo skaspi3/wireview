@@ -115,6 +115,10 @@ export default defineConfig(({ mode }) => {
         '/api/files': {
           target: 'http://127.0.0.1:3000',
           changeOrigin: true,
+        },
+        '/api/packets-batch': {
+          target: 'http://127.0.0.1:3000',
+          changeOrigin: true,
         }
       }
     }

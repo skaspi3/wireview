@@ -60,17 +60,28 @@ fetch('/api/cert-info')
   .then(data => { if (data) certInfo.value = data; })
   .catch(() => {});
 
+// Callback for clearing packet cache (set by packetCache.js to avoid circular import)
+let clearPacketCacheCallback = null;
+export const setPacketCacheClearer = (callback) => {
+  clearPacketCacheCallback = callback;
+};
+
 // Clear all packets
 export const clearPackets = () => {
   packets.value = [];
   allPackets.value = [];
   activePacketIndex.value = null;
   activePacketDetails.value = null;
+  activePacketHex.value = '';
   displayFilter.value = '';
   filterError.value = null;
   bytesReceived.value = 0;
   bytesSent.value = 0;
   bytesFetched.value = 0;
+  // Clear packet details cache
+  if (clearPacketCacheCallback) {
+    clearPacketCacheCallback();
+  }
 };
 
 // Apply filter by sending request to backend
