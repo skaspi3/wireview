@@ -1,11 +1,94 @@
 <script setup>
 import { computed, ref, watch, onMounted, useTemplateRef } from "vue";
 import { useResizeObserver, useScroll } from "@vueuse/core";
-import { packets, activePacketIndex } from "../../globals";
+import { packets, activePacketIndex, displayFilter, allPackets } from "../../globals";
 
 // Row height for virtual scrolling
 const rowHeight = 20;
 const headerHeight = 24;
+
+// Sorting state
+const sortColumn = ref(null);  // 'number', 'time', 'src', 'dst', 'protocol', 'length'
+const sortAscending = ref(true);
+
+// Get sorted packets - returns sorted copy only when sorting is active
+const getSortedPackets = () => {
+  if (!sortColumn.value || packets.value.length === 0) {
+    return packets.value;
+  }
+
+  const sorted = [...packets.value];
+  const col = sortColumn.value;
+  const asc = sortAscending.value;
+
+  sorted.sort((a, b) => {
+    let valA, valB;
+
+    switch (col) {
+      case 'number':
+        valA = a.number;
+        valB = b.number;
+        break;
+      case 'time':
+        valA = a.time;
+        valB = b.time;
+        break;
+      case 'src':
+        valA = a.src || '';
+        valB = b.src || '';
+        return asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      case 'dst':
+        valA = a.dst || '';
+        valB = b.dst || '';
+        return asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      case 'protocol':
+        valA = a.protocol || '';
+        valB = b.protocol || '';
+        return asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      case 'length':
+        valA = a.length;
+        valB = b.length;
+        break;
+      default:
+        return 0;
+    }
+
+    if (valA < valB) return asc ? -1 : 1;
+    if (valA > valB) return asc ? 1 : -1;
+    return 0;
+  });
+
+  return sorted;
+};
+
+// Handle column sort click
+const handleSort = (column) => {
+  // Clear display filter when sorting
+  if (displayFilter.value) {
+    displayFilter.value = '';
+    // Restore all packets
+    if (allPackets.value.length > 0) {
+      packets.value = [...allPackets.value];
+    }
+  }
+
+  if (sortColumn.value === column) {
+    // Toggle direction
+    sortAscending.value = !sortAscending.value;
+  } else {
+    // New column, start ascending
+    sortColumn.value = column;
+    sortAscending.value = true;
+  }
+};
+
+// Clear sort when packets change significantly (new capture)
+watch(() => packets.value.length, (newLen, oldLen) => {
+  if (newLen === 0 || (oldLen > 0 && newLen < oldLen / 2)) {
+    sortColumn.value = null;
+    sortAscending.value = true;
+  }
+});
 
 // State
 const clientHeight = ref(400);
@@ -22,6 +105,7 @@ const visibleRowCount = computed(() => {
 });
 
 const extraRows = computed(() => {
+  // Use packets.value.length directly to maintain reactivity with shallowRef
   return Math.max(0, packets.value.length - visibleRowCount.value);
 });
 
@@ -32,7 +116,9 @@ const firstRowIndex = computed(() => {
 const visiblePackets = computed(() => {
   const start = firstRowIndex.value;
   const end = start + visibleRowCount.value + 1;
-  return packets.value.slice(start, end);
+  // Apply sorting only when displaying
+  const displayPackets = getSortedPackets();
+  return displayPackets.slice(start, end);
 });
 
 // Resize observer
@@ -65,55 +151,85 @@ const handleWheel = (event) => {
   }
 };
 
-// Select packet
-const selectPacket = (index) => {
-  activePacketIndex.value = index;
+// Select packet - find original index in packets array
+const selectPacket = (sortedIndex) => {
+  const sorted = getSortedPackets();
+  const pkt = sorted[sortedIndex];
+  if (!pkt) return;
+
+  // Find original index in packets array
+  const originalIndex = packets.value.findIndex(p => p.number === pkt.number);
+  if (originalIndex !== -1) {
+    activePacketIndex.value = originalIndex;
+  }
+};
+
+// Helper: find current position in sorted list
+const getCurrentSortedIndex = () => {
+  if (activePacketIndex.value === null) return -1;
+  const selectedNumber = packets.value[activePacketIndex.value]?.number;
+  const sorted = getSortedPackets();
+  return sorted.findIndex(p => p.number === selectedNumber);
+};
+
+// Helper: select packet by sorted index
+const selectBySortedIndex = (sortedIdx) => {
+  const sorted = getSortedPackets();
+  if (sortedIdx < 0 || sortedIdx >= sorted.length) return;
+  const pkt = sorted[sortedIdx];
+  const originalIdx = packets.value.findIndex(p => p.number === pkt.number);
+  if (originalIdx !== -1) {
+    activePacketIndex.value = originalIdx;
+  }
 };
 
 // Keyboard navigation
 const handleKeydown = (event) => {
   if (packets.value.length === 0) return;
 
+  const currentSortedIdx = getCurrentSortedIndex();
+  const sorted = getSortedPackets();
+
   if (event.key === 'ArrowDown') {
     event.preventDefault();
-    if (activePacketIndex.value === null) {
-      activePacketIndex.value = 0;
-    } else if (activePacketIndex.value < packets.value.length - 1) {
-      activePacketIndex.value++;
+    if (currentSortedIdx === -1) {
+      selectBySortedIndex(0);
+    } else if (currentSortedIdx < sorted.length - 1) {
+      selectBySortedIndex(currentSortedIdx + 1);
     }
   } else if (event.key === 'ArrowUp') {
     event.preventDefault();
-    if (activePacketIndex.value === null) {
-      activePacketIndex.value = 0;
-    } else if (activePacketIndex.value > 0) {
-      activePacketIndex.value--;
+    if (currentSortedIdx === -1) {
+      selectBySortedIndex(0);
+    } else if (currentSortedIdx > 0) {
+      selectBySortedIndex(currentSortedIdx - 1);
     }
   } else if (event.key === 'Home') {
     event.preventDefault();
-    activePacketIndex.value = 0;
+    selectBySortedIndex(0);
   } else if (event.key === 'End') {
     event.preventDefault();
-    activePacketIndex.value = packets.value.length - 1;
+    selectBySortedIndex(sorted.length - 1);
   } else if (event.key === 'PageDown') {
     event.preventDefault();
-    if (activePacketIndex.value === null) {
-      activePacketIndex.value = 0;
+    if (currentSortedIdx === -1) {
+      selectBySortedIndex(0);
     } else {
-      activePacketIndex.value = Math.min(packets.value.length - 1, activePacketIndex.value + visibleRowCount.value);
+      selectBySortedIndex(Math.min(sorted.length - 1, currentSortedIdx + visibleRowCount.value));
     }
   } else if (event.key === 'PageUp') {
     event.preventDefault();
-    if (activePacketIndex.value === null) {
-      activePacketIndex.value = 0;
+    if (currentSortedIdx === -1) {
+      selectBySortedIndex(0);
     } else {
-      activePacketIndex.value = Math.max(0, activePacketIndex.value - visibleRowCount.value);
+      selectBySortedIndex(Math.max(0, currentSortedIdx - visibleRowCount.value));
     }
   }
 };
 
-// Auto-scroll to bottom when new packets arrive
+// Auto-scroll to bottom when new packets arrive (only if not sorting)
 watch(() => packets.value.length, (newLen, oldLen) => {
-  if (newLen > oldLen && scrollY.value >= oldLen - visibleRowCount.value - 1) {
+  if (!sortColumn.value && newLen > oldLen && scrollY.value >= oldLen - visibleRowCount.value - 1) {
     // Was at bottom, stay at bottom
     scrollY.value = Math.max(0, newLen - visibleRowCount.value);
     if (scrollableEl.value) {
@@ -122,13 +238,18 @@ watch(() => packets.value.length, (newLen, oldLen) => {
   }
 });
 
-// Ensure active packet is visible
+// Ensure active packet is visible (use sorted index when sorting)
 watch(activePacketIndex, (index) => {
   if (index === null) return;
-  if (index < firstRowIndex.value) {
-    scrollY.value = index;
-  } else if (index >= firstRowIndex.value + visibleRowCount.value) {
-    scrollY.value = index - visibleRowCount.value + 1;
+
+  // Find position in sorted list
+  const sortedIdx = getCurrentSortedIndex();
+  if (sortedIdx === -1) return;
+
+  if (sortedIdx < firstRowIndex.value) {
+    scrollY.value = sortedIdx;
+  } else if (sortedIdx >= firstRowIndex.value + visibleRowCount.value) {
+    scrollY.value = sortedIdx - visibleRowCount.value + 1;
   }
   if (scrollableEl.value) {
     scrollableEl.value.scrollTop = scrollY.value;
@@ -170,12 +291,24 @@ const formatTime = (time) => {
       <table class="packet-table">
         <thead>
           <tr>
-            <th class="col-no">No.</th>
-            <th class="col-time">Time</th>
-            <th class="col-src">Source</th>
-            <th class="col-dst">Destination</th>
-            <th class="col-proto">Protocol</th>
-            <th class="col-len">Length</th>
+            <th class="col-no sortable" @click="handleSort('number')">
+              No.<span v-if="sortColumn === 'number'" class="sort-indicator">{{ sortAscending ? '▲' : '▼' }}</span>
+            </th>
+            <th class="col-time sortable" @click="handleSort('time')">
+              Time<span v-if="sortColumn === 'time'" class="sort-indicator">{{ sortAscending ? '▲' : '▼' }}</span>
+            </th>
+            <th class="col-src sortable" @click="handleSort('src')">
+              Source<span v-if="sortColumn === 'src'" class="sort-indicator">{{ sortAscending ? '▲' : '▼' }}</span>
+            </th>
+            <th class="col-dst sortable" @click="handleSort('dst')">
+              Destination<span v-if="sortColumn === 'dst'" class="sort-indicator">{{ sortAscending ? '▲' : '▼' }}</span>
+            </th>
+            <th class="col-proto sortable" @click="handleSort('protocol')">
+              Protocol<span v-if="sortColumn === 'protocol'" class="sort-indicator">{{ sortAscending ? '▲' : '▼' }}</span>
+            </th>
+            <th class="col-len sortable" @click="handleSort('length')">
+              Length<span v-if="sortColumn === 'length'" class="sort-indicator">{{ sortAscending ? '▲' : '▼' }}</span>
+            </th>
             <th class="col-info">Info</th>
           </tr>
         </thead>
@@ -183,7 +316,7 @@ const formatTime = (time) => {
           <tr
             v-for="(pkt, i) in visiblePackets"
             :key="pkt.number"
-            :class="{ selected: activePacketIndex === firstRowIndex + i }"
+            :class="{ selected: activePacketIndex !== null && packets[activePacketIndex]?.number === pkt.number }"
             :style="{ backgroundColor: getProtocolColor(pkt.protocol) }"
             @click="selectPacket(firstRowIndex + i)"
           >
@@ -247,7 +380,24 @@ const formatTime = (time) => {
   text-align: left;
   font-weight: normal;
   white-space: nowrap;
-  color: #ccc;
+  color: #e5e5e5;
+  font-size: 13px;
+}
+
+.packet-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.packet-table th.sortable:hover {
+  background: #3d3d40;
+  color: #fff;
+}
+
+.sort-indicator {
+  margin-left: 4px;
+  font-size: 10px;
+  color: #60a5fa;
 }
 
 .packet-table td {
