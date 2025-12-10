@@ -7,8 +7,11 @@
       </div>
 
       <div class="path-bar">
-        <button class="nav-btn" @click="goUp" :disabled="!canGoUp">
+        <button class="nav-btn" @click="goUp" :disabled="!canGoUp" title="Go up">
           ↑
+        </button>
+        <button class="nav-btn" @click="refresh" title="Refresh">
+          ↻
         </button>
         <input
           type="text"
@@ -136,6 +139,10 @@ const goUp = () => {
   if (canGoUp.value) {
     loadDirectory(parentPath.value);
   }
+};
+
+const refresh = () => {
+  loadDirectory(currentPath.value);
 };
 
 const selectFile = (file) => {

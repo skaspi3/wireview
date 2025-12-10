@@ -27,8 +27,9 @@ import { activePacketIndex, activePacketHex } from "../../globals";
 
 .no-selection {
   padding: 20px;
-  color: #888;
+  color: #b0b0b0;
   text-align: center;
+  font-size: 15px;
 }
 
 .hex-display {
