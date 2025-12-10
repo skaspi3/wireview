@@ -628,13 +628,6 @@ const clearFilter = () => {
   applyDisplayFilter("");
 };
 
-// Refresh filter - re-apply current filter to catch new packets
-const refreshFilter = () => {
-  if (displayFilter.value) {
-    applyDisplayFilter(displayFilter.value);
-  }
-};
-
 // Ctrl-/ to focus filter
 const handleGlobalKeydown = (event) => {
   if (event.key === "/" && !event.shiftKey && (event.ctrlKey !== event.metaKey)) {
@@ -692,15 +685,6 @@ onBeforeUnmount(() => document.body.removeEventListener("keydown", handleGlobalK
         @click="clearFilter"
       >
         ✕
-      </button>
-      <button
-        type="button"
-        class="refresh-filter"
-        title="Refresh filter (re-apply to catch new packets)"
-        v-if="displayFilter"
-        @click="refreshFilter"
-      >
-        ↻
       </button>
       <button
         type="submit"
@@ -820,8 +804,7 @@ onBeforeUnmount(() => document.body.removeEventListener("keydown", handleGlobalK
 .apply-filter svg {
   height: 100%;
 }
-.clear-filter,
-.refresh-filter {
+.clear-filter {
   border: none;
   background: none;
   padding: 0 5px;
@@ -833,13 +816,9 @@ onBeforeUnmount(() => document.body.removeEventListener("keydown", handleGlobalK
   display: flex;
   align-items: center;
 }
-.clear-filter:hover,
-.refresh-filter:hover {
+.clear-filter:hover {
   color: var(--ws-text-color);
   background-color: var(--ws-dark-gray);
-}
-.refresh-filter {
-  font-size: 1.3em;
 }
 .filter-error {
   color: #dc2626;

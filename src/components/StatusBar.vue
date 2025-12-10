@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from "vue";
 import { packets, allPackets, nodeVersion, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesFetched } from "../globals";
+import { getCacheStats } from "../packetCache";
 import GitHubIcon from "./icons/GitHubIcon.vue";
 
 const showFilterPopup = ref(false);
@@ -8,9 +9,11 @@ const showCertPopup = ref(false);
 const showBackendPopup = ref(false);
 const showThinClientPopup = ref(false);
 
-// Observed bytes and reduction ratio - updated periodically
+// Observed bytes, reduction ratio, and cache stats - updated periodically
 const observedBytesDisplay = ref(0);
 const reductionRatioDisplay = ref(0);
+const cacheOccupied = ref(0);
+const cacheCapacity = ref(100);
 
 const updateObservedStats = () => {
   const pkts = allPackets.value.length > 0 ? allPackets.value : packets.value;
@@ -25,6 +28,11 @@ const updateObservedStats = () => {
     const ratio = (observed - transferred) / observed;
     reductionRatioDisplay.value = Math.max(0, Math.min(100, ratio * 100));
   }
+
+  // Update cache stats
+  const stats = getCacheStats();
+  cacheOccupied.value = stats.size;
+  cacheCapacity.value = stats.maxSize;
 };
 
 // BPF filter explanation (matches backend server.js filter)
@@ -150,6 +158,7 @@ const statusTitle = computed(() => {
         <div v-if="showThinClientPopup" class="thin-client-popup">
           <div class="popup-row">Observed Traffic: {{ formatBytes(observedBytesDisplay) }}</div>
           <div class="popup-row reduction-row">Reduction Ratio: {{ reductionRatioDisplay.toFixed(1) }}%</div>
+          <div class="popup-row">LRU Cache: {{ cacheOccupied }}/{{ cacheCapacity }}</div>
           <div class="popup-row compression-row">Compression: Gzip</div>
         </div>
       </span>
@@ -335,7 +344,7 @@ const statusTitle = computed(() => {
   white-space: nowrap;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   z-index: 1000;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: normal;
   color: #d1d5db;
   line-height: 1.5;
@@ -349,7 +358,7 @@ const statusTitle = computed(() => {
 }
 .thin-client-popup .compression-row {
   color: #9ca3af;
-  font-size: 11px;
+  font-size: 13px;
   margin-top: 6px;
   padding-top: 6px;
   border-top: 1px solid #374151;
