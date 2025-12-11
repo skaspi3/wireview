@@ -16,6 +16,14 @@ const talkers = ref([]);
 const timeline = ref([]);
 const flows = ref([]);
 
+// tshark analysis data
+const expert = ref(null);
+const conversations = ref([]);
+const protocolHierarchy = ref([]);
+const expertLoading = ref(false);
+const conversationsLoading = ref(false);
+const hierarchyLoading = ref(false);
+
 // Auto-refresh interval
 let refreshInterval = null;
 const autoRefresh = ref(true);
@@ -130,6 +138,93 @@ const toggleAutoRefresh = () => {
     refreshInterval = null;
   }
 };
+
+// Fetch expert analysis (on-demand, not auto-refreshed)
+const fetchExpert = async () => {
+  if (expertLoading.value) return;
+  try {
+    expertLoading.value = true;
+    const response = await fetch('/api/stats/expert');
+    const data = await response.json();
+    expert.value = data.expert;
+  } catch (e) {
+    console.error('Failed to fetch expert info:', e);
+  } finally {
+    expertLoading.value = false;
+  }
+};
+
+// Fetch conversations (on-demand)
+const fetchConversations = async () => {
+  if (conversationsLoading.value) return;
+  try {
+    conversationsLoading.value = true;
+    const response = await fetch('/api/stats/conversations');
+    const data = await response.json();
+    conversations.value = data.conversations || [];
+  } catch (e) {
+    console.error('Failed to fetch conversations:', e);
+  } finally {
+    conversationsLoading.value = false;
+  }
+};
+
+// Fetch protocol hierarchy (on-demand)
+const fetchProtocolHierarchy = async () => {
+  if (hierarchyLoading.value) return;
+  try {
+    hierarchyLoading.value = true;
+    const response = await fetch('/api/stats/protocols-hierarchy');
+    const data = await response.json();
+    protocolHierarchy.value = data.hierarchy || [];
+  } catch (e) {
+    console.error('Failed to fetch protocol hierarchy:', e);
+  } finally {
+    hierarchyLoading.value = false;
+  }
+};
+
+// Watch tab changes to load data on-demand
+watch(activeTab, (newTab) => {
+  if (newTab === 'expert' && !expert.value && !expertLoading.value) {
+    fetchExpert();
+  } else if (newTab === 'conversations' && !conversations.value.length && !conversationsLoading.value) {
+    fetchConversations();
+  } else if (newTab === 'hierarchy' && !protocolHierarchy.value.length && !hierarchyLoading.value) {
+    fetchProtocolHierarchy();
+  }
+});
+
+// Count total expert items
+const expertTotalCount = computed(() => {
+  if (!expert.value) return 0;
+  return (expert.value.errors?.length || 0) +
+         (expert.value.warnings?.length || 0) +
+         (expert.value.notes?.length || 0) +
+         (expert.value.chats?.length || 0);
+});
+
+// Get severity color for expert items
+const getSeverityColor = (severity) => {
+  switch (severity) {
+    case 'errors': return '#ef4444';
+    case 'warnings': return '#f59e0b';
+    case 'notes': return '#3b82f6';
+    case 'chats': return '#22c55e';
+    default: return '#9ca3af';
+  }
+};
+
+// Get severity label
+const getSeverityLabel = (severity) => {
+  switch (severity) {
+    case 'errors': return 'Error';
+    case 'warnings': return 'Warning';
+    case 'notes': return 'Note';
+    case 'chats': return 'Chat';
+    default: return severity;
+  }
+};
 </script>
 
 <template>
@@ -161,6 +256,18 @@ const toggleAutoRefresh = () => {
           :class="{ active: activeTab === 'summary' }"
           @click="activeTab = 'summary'"
         >Summary</button>
+        <button
+          :class="{ active: activeTab === 'expert' }"
+          @click="activeTab = 'expert'"
+        >Expert</button>
+        <button
+          :class="{ active: activeTab === 'conversations' }"
+          @click="activeTab = 'conversations'"
+        >Conversations</button>
+        <button
+          :class="{ active: activeTab === 'hierarchy' }"
+          @click="activeTab = 'hierarchy'"
+        >Hierarchy</button>
         <button
           :class="{ active: activeTab === 'protocols' }"
           @click="activeTab = 'protocols'"
@@ -227,6 +334,132 @@ const toggleAutoRefresh = () => {
             <div class="timeline-labels">
               <span>{{ formatDuration(summary?.timeRange?.start || 0) }}</span>
               <span>{{ formatDuration(summary?.timeRange?.end || 0) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Expert Tab -->
+        <div v-else-if="activeTab === 'expert'" class="tab-content expert-tab">
+          <div v-if="expertLoading" class="loading-state">
+            <div class="spinner"></div>
+            <p>Analyzing capture...</p>
+          </div>
+          <div v-else-if="!expert || expertTotalCount === 0" class="empty-state">
+            No expert info available (capture may be too short or have no issues)
+          </div>
+          <div v-else class="expert-content">
+            <!-- Errors Section -->
+            <div v-if="expert.errors?.length" class="expert-section">
+              <h3 class="expert-section-title" :style="{ color: getSeverityColor('errors') }">
+                Errors ({{ expert.errors.length }})
+              </h3>
+              <div class="expert-items">
+                <div v-for="(item, idx) in expert.errors" :key="'err-' + idx" class="expert-item">
+                  <span class="expert-freq">{{ item.frequency }}x</span>
+                  <span class="expert-protocol">{{ item.protocol }}</span>
+                  <span class="expert-summary">{{ item.summary }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Warnings Section -->
+            <div v-if="expert.warnings?.length" class="expert-section">
+              <h3 class="expert-section-title" :style="{ color: getSeverityColor('warnings') }">
+                Warnings ({{ expert.warnings.length }})
+              </h3>
+              <div class="expert-items">
+                <div v-for="(item, idx) in expert.warnings" :key="'warn-' + idx" class="expert-item">
+                  <span class="expert-freq">{{ item.frequency }}x</span>
+                  <span class="expert-protocol">{{ item.protocol }}</span>
+                  <span class="expert-summary">{{ item.summary }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Notes Section -->
+            <div v-if="expert.notes?.length" class="expert-section">
+              <h3 class="expert-section-title" :style="{ color: getSeverityColor('notes') }">
+                Notes ({{ expert.notes.length }})
+              </h3>
+              <div class="expert-items">
+                <div v-for="(item, idx) in expert.notes" :key="'note-' + idx" class="expert-item">
+                  <span class="expert-freq">{{ item.frequency }}x</span>
+                  <span class="expert-protocol">{{ item.protocol }}</span>
+                  <span class="expert-summary">{{ item.summary }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Chats Section -->
+            <div v-if="expert.chats?.length" class="expert-section">
+              <h3 class="expert-section-title" :style="{ color: getSeverityColor('chats') }">
+                Chats ({{ expert.chats.length }})
+              </h3>
+              <div class="expert-items">
+                <div v-for="(item, idx) in expert.chats" :key="'chat-' + idx" class="expert-item">
+                  <span class="expert-freq">{{ item.frequency }}x</span>
+                  <span class="expert-protocol">{{ item.protocol }}</span>
+                  <span class="expert-summary">{{ item.summary }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Conversations Tab -->
+        <div v-else-if="activeTab === 'conversations'" class="tab-content conversations-tab">
+          <div v-if="conversationsLoading" class="loading-state">
+            <div class="spinner"></div>
+            <p>Loading conversations...</p>
+          </div>
+          <div v-else-if="!conversations.length" class="empty-state">No conversation data available</div>
+          <table v-else class="conversations-table">
+            <thead>
+              <tr>
+                <th>Address A</th>
+                <th>Address B</th>
+                <th>Frames A→B</th>
+                <th>Bytes A→B</th>
+                <th>Frames B→A</th>
+                <th>Bytes B→A</th>
+                <th>Total</th>
+                <th>Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(conv, idx) in conversations" :key="idx">
+                <td class="ip-cell">{{ conv.addressA }}</td>
+                <td class="ip-cell">{{ conv.addressB }}</td>
+                <td class="num-cell">{{ conv.framesAtoB }}</td>
+                <td class="num-cell">{{ conv.bytesAtoB }}</td>
+                <td class="num-cell">{{ conv.framesBtoA }}</td>
+                <td class="num-cell">{{ conv.bytesBtoA }}</td>
+                <td class="num-cell">{{ conv.bytesTotal }}</td>
+                <td class="num-cell">{{ conv.duration.toFixed(2) }}s</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Protocol Hierarchy Tab -->
+        <div v-else-if="activeTab === 'hierarchy'" class="tab-content hierarchy-tab">
+          <div v-if="hierarchyLoading" class="loading-state">
+            <div class="spinner"></div>
+            <p>Loading protocol hierarchy...</p>
+          </div>
+          <div v-else-if="!protocolHierarchy.length" class="empty-state">No protocol hierarchy data available</div>
+          <div v-else class="hierarchy-tree">
+            <div
+              v-for="(item, idx) in protocolHierarchy"
+              :key="idx"
+              class="hierarchy-item"
+              :style="{ paddingLeft: (item.level * 20 + 12) + 'px' }"
+            >
+              <span class="hierarchy-protocol">{{ item.protocol }}</span>
+              <span class="hierarchy-stats">
+                <span class="hierarchy-frames">{{ item.frames.toLocaleString() }} frames</span>
+                <span class="hierarchy-bytes">{{ formatBytes(item.bytes) }}</span>
+              </span>
             </div>
           </div>
         </div>
@@ -619,5 +852,162 @@ const toggleAutoRefresh = () => {
 .num-cell {
   text-align: right;
   font-family: monospace;
+}
+
+/* Expert Tab */
+.expert-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.expert-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.expert-section {
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.expert-section-title {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  background: #0f172a;
+  border-bottom: 1px solid #374151;
+}
+
+.expert-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.expert-item {
+  display: grid;
+  grid-template-columns: 50px 100px 1fr;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #1f2937;
+  font-size: 13px;
+  align-items: center;
+}
+
+.expert-item:last-child {
+  border-bottom: none;
+}
+
+.expert-item:hover {
+  background: #1f2937;
+}
+
+.expert-freq {
+  font-family: monospace;
+  font-size: 12px;
+  color: #9ca3af;
+  background: #374151;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.expert-protocol {
+  font-weight: 500;
+  color: #60a5fa;
+  font-size: 12px;
+}
+
+.expert-summary {
+  color: #e5e7eb;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Conversations Tab */
+.conversations-tab {
+  overflow-x: auto;
+}
+
+.conversations-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 700px;
+}
+
+.conversations-table th {
+  background: #111827;
+  color: #9ca3af;
+  font-weight: 500;
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid #374151;
+  white-space: nowrap;
+}
+
+.conversations-table td {
+  padding: 8px 12px;
+  color: #e5e7eb;
+  border-bottom: 1px solid #1f2937;
+}
+
+.conversations-table tr:hover td {
+  background: #111827;
+}
+
+/* Protocol Hierarchy Tab */
+.hierarchy-tab {
+  display: flex;
+  flex-direction: column;
+}
+
+.hierarchy-tree {
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.hierarchy-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid #1f2937;
+  font-size: 13px;
+}
+
+.hierarchy-item:last-child {
+  border-bottom: none;
+}
+
+.hierarchy-item:hover {
+  background: #1f2937;
+}
+
+.hierarchy-protocol {
+  font-weight: 500;
+  color: #e5e7eb;
+}
+
+.hierarchy-stats {
+  display: flex;
+  gap: 16px;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.hierarchy-frames {
+  color: #9ca3af;
+}
+
+.hierarchy-bytes {
+  color: #60a5fa;
 }
 </style>

@@ -9,30 +9,32 @@ const showCertPopup = ref(false);
 const showBackendPopup = ref(false);
 const showThinClientPopup = ref(false);
 
-// Observed bytes, reduction ratio, and cache stats - updated periodically
-const observedBytesDisplay = ref(0);
-const reductionRatioDisplay = ref(0);
+// System memory stats
+const systemStats = ref(null);
+const systemStatsLoading = ref(false);
+
+// Cache stats and reduction ratio - updated periodically
 const cacheOccupied = ref(0);
 const cacheCapacity = ref(100);
+const cacheEvicted = ref(0);
+const reductionRatio = ref(0);
 
-const updateObservedStats = () => {
-  const pkts = allPackets.value.length > 0 ? allPackets.value : packets.value;
-  const observed = pkts.reduce((sum, pkt) => sum + (pkt.length || 0), 0);
-  observedBytesDisplay.value = observed;
-
-  if (observed === 0) {
-    reductionRatioDisplay.value = 0;
-  } else {
-    const transferred = bytesReceived.value + bytesFetched.value;
-    // Ratio = how much we saved = (observed - transferred) / observed
-    const ratio = (observed - transferred) / observed;
-    reductionRatioDisplay.value = Math.max(0, Math.min(100, ratio * 100));
-  }
-
-  // Update cache stats
+const updateCacheStats = () => {
   const stats = getCacheStats();
   cacheOccupied.value = stats.size;
   cacheCapacity.value = stats.maxSize;
+  cacheEvicted.value = stats.evicted || 0;
+
+  // Calculate reduction ratio
+  const pkts = allPackets.value.length > 0 ? allPackets.value : packets.value;
+  const observed = pkts.reduce((sum, pkt) => sum + (pkt.length || 0), 0);
+  if (observed === 0) {
+    reductionRatio.value = 0;
+  } else {
+    const transferred = bytesReceived.value + bytesFetched.value;
+    const ratio = (observed - transferred) / observed;
+    reductionRatio.value = Math.max(0, Math.min(100, ratio * 100));
+  }
 };
 
 // BPF filter explanation (matches backend server.js filter)
@@ -75,10 +77,8 @@ const toggleFilterPopup = () => {
   showFilterPopup.value = !showFilterPopup.value;
 };
 
-// Data transfer display - updated every 5 seconds
-const dataTransferDisplay = ref('');
-const fetchedDisplay = ref('');
-let dataTransferInterval = null;
+// Update cache stats periodically
+let cacheStatsInterval = null;
 
 const formatBytes = (bytes) => {
   if (bytes < 1024) return bytes + ' B';
@@ -86,21 +86,13 @@ const formatBytes = (bytes) => {
   return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
 };
 
-const updateDataTransfer = () => {
-  const recv = formatBytes(bytesReceived.value);
-  const fetched = formatBytes(bytesFetched.value);
-  dataTransferDisplay.value = `[RCV: ${recv}]`;
-  fetchedDisplay.value = `[Fetched: ${fetched}]`;
-  updateObservedStats();
-};
-
 onMounted(() => {
-  updateDataTransfer();
-  dataTransferInterval = setInterval(updateDataTransfer, 1000);
+  updateCacheStats();
+  cacheStatsInterval = setInterval(updateCacheStats, 1000);
 });
 
 onUnmounted(() => {
-  if (dataTransferInterval) clearInterval(dataTransferInterval);
+  if (cacheStatsInterval) clearInterval(cacheStatsInterval);
 });
 
 const statusTitle = computed(() => {
@@ -110,6 +102,39 @@ const statusTitle = computed(() => {
     default: return 'Backend disconnected';
   }
 });
+
+// Fetch system memory stats when hovering over LED
+const fetchSystemStats = async () => {
+  if (systemStatsLoading.value) return;
+  try {
+    systemStatsLoading.value = true;
+    const response = await fetch('/api/stats/system');
+    if (response.ok) {
+      systemStats.value = await response.json();
+    }
+  } catch (e) {
+    console.error('Failed to fetch system stats:', e);
+  } finally {
+    systemStatsLoading.value = false;
+  }
+};
+
+const onBackendHover = () => {
+  showBackendPopup.value = true;
+  fetchSystemStats();
+};
+
+const onBackendLeave = () => {
+  showBackendPopup.value = false;
+};
+
+// Format bytes for memory display
+const formatMemory = (bytes) => {
+  if (!bytes) return '0 B';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+};
 </script>
 <template>
   <div class="status-bar">
@@ -145,10 +170,6 @@ const statusTitle = computed(() => {
 
     <!-- Right section -->
     <div class="right-section">
-      <span class="data-transfer-info">{{ dataTransferDisplay }}</span>
-      <span class="data-separator">|</span>
-      <span class="data-transfer-info">{{ fetchedDisplay }}</span>
-      <span class="data-separator">|</span>
       <span
         class="version-info thin-client-badge"
         @mouseenter="showThinClientPopup = true"
@@ -156,9 +177,10 @@ const statusTitle = computed(() => {
       >
         Thin Client Mode
         <div v-if="showThinClientPopup" class="thin-client-popup">
-          <div class="popup-row">Observed Traffic: {{ formatBytes(observedBytesDisplay) }}</div>
-          <div class="popup-row reduction-row">Reduction Ratio: {{ reductionRatioDisplay.toFixed(1) }}%</div>
-          <div class="popup-row">LRU Cache: {{ cacheOccupied }}/{{ cacheCapacity }}</div>
+          <div class="popup-row rcv-row">RCV: {{ formatBytes(bytesReceived) }}</div>
+          <div class="popup-row fetched-row">Fetched: {{ formatBytes(bytesFetched) }}</div>
+          <div class="popup-row reduction-row">Reduction Ratio: {{ reductionRatio.toFixed(1) }}%</div>
+          <div class="popup-row">LRU Cache: {{ cacheOccupied }}/{{ cacheCapacity }}<span v-if="cacheEvicted > 0">/{{ cacheEvicted }}</span></div>
           <div class="popup-row compression-row">Compression: Gzip</div>
         </div>
       </span>
@@ -166,12 +188,18 @@ const statusTitle = computed(() => {
         | <span
             class="led"
             :class="backendStatus"
-            @mouseenter="showBackendPopup = true"
-            @mouseleave="showBackendPopup = false"
+            @mouseenter="onBackendHover"
+            @mouseleave="onBackendLeave"
           >
             <div v-if="showBackendPopup" class="backend-popup">
               <div class="popup-row">Backend running on 127.0.0.1:{{ backendPort || 3000 }}</div>
               <div class="popup-row">Node.js: {{ nodeVersion || 'unknown' }}</div>
+              <div v-if="systemStats" class="memory-section">
+                <div class="popup-row">SQLite: {{ systemStats.sqliteVersion || 'N/A' }}</div>
+                <div class="popup-row memory-row">Heap: {{ formatMemory(systemStats.heapUsed) }} / {{ formatMemory(systemStats.heapTotal) }}</div>
+                <div class="popup-row memory-row">Total Memory: {{ formatMemory(systemStats.rss) }}</div>
+              </div>
+              <div v-else-if="systemStatsLoading" class="popup-row loading-row">Loading stats...</div>
             </div>
           </span>
         | <span class="lock-icon" @mouseenter="showCertPopup = true" @mouseleave="showCertPopup = false">
@@ -299,17 +327,6 @@ const statusTitle = computed(() => {
   color: #60a5fa;
   font-weight: 500;
 }
-.data-transfer-info {
-  font-family: monospace;
-  font-size: 13px;
-  color: #a78bfa;
-  font-weight: 500;
-}
-.data-separator {
-  color: #6b7280;
-  margin: 0 8px;
-  font-size: 13px;
-}
 .github {
   display: flex;
   min-width: 0;
@@ -351,6 +368,14 @@ const statusTitle = computed(() => {
 }
 .thin-client-popup .popup-row {
   margin: 2px 0;
+}
+.thin-client-popup .rcv-row {
+  color: #a78bfa;
+  font-weight: 500;
+}
+.thin-client-popup .fetched-row {
+  color: #a78bfa;
+  font-weight: 500;
 }
 .thin-client-popup .reduction-row {
   color: #22c55e;
@@ -405,11 +430,24 @@ const statusTitle = computed(() => {
   white-space: nowrap;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   z-index: 1000;
-  font-size: 11px;
+  font-size: 13px;
   color: #d1d5db;
 }
 .popup-row {
   margin: 2px 0;
+}
+.memory-section {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #374151;
+}
+.memory-row {
+  color: #22c55e;
+  font-family: monospace;
+}
+.loading-row {
+  color: #9ca3af;
+  font-style: italic;
 }
 .lock-icon {
   font-size: 14px;
