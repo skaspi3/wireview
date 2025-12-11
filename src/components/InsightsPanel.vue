@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { packets } from '../globals';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
-import { PieChart, BarChart, LineChart } from 'echarts/charts';
+import { PieChart, BarChart, LineChart, TreeChart, SankeyChart } from 'echarts/charts';
 import {
   TitleComponent,
   TooltipComponent,
@@ -18,6 +18,8 @@ use([
   PieChart,
   BarChart,
   LineChart,
+  TreeChart,
+  SankeyChart,
   TitleComponent,
   TooltipComponent,
   LegendComponent,
@@ -423,6 +425,180 @@ const timelineLineOption = computed(() => {
     }]
   };
 });
+
+// Top 10 conversations computed
+const top10Conversations = computed(() => {
+  if (!conversations.value.length) return [];
+  // Sort by total frames and take top 10
+  return [...conversations.value]
+    .sort((a, b) => b.framesTotal - a.framesTotal)
+    .slice(0, 10);
+});
+
+// ECharts Sankey option for conversations (shows traffic flow)
+const conversationsSankeyOption = computed(() => {
+  if (!top10Conversations.value.length) return null;
+
+  // Build nodes and links for sankey
+  const nodesSet = new Set();
+  const links = [];
+
+  top10Conversations.value.forEach(conv => {
+    nodesSet.add(conv.addressA);
+    nodesSet.add(conv.addressB);
+    links.push({
+      source: conv.addressA,
+      target: conv.addressB,
+      value: conv.framesTotal
+    });
+  });
+
+  const nodes = Array.from(nodesSet).map(name => ({ name }));
+
+  return {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'item',
+      formatter: (params) => {
+        if (params.dataType === 'edge') {
+          return `${params.data.source} → ${params.data.target}<br/>Frames: ${params.data.value}`;
+        }
+        return params.name;
+      }
+    },
+    series: [{
+      type: 'sankey',
+      layout: 'none',
+      emphasis: { focus: 'adjacency' },
+      nodeAlign: 'left',
+      data: nodes,
+      links: links,
+      lineStyle: {
+        color: 'gradient',
+        curveness: 0.5
+      },
+      itemStyle: {
+        color: '#3b82f6',
+        borderColor: '#1e40af'
+      },
+      label: {
+        color: '#e5e7eb',
+        fontSize: 11
+      }
+    }]
+  };
+});
+
+// Build hierarchy tree from protocol hierarchy data
+const buildHierarchyTree = (hierarchy) => {
+  if (!hierarchy || !hierarchy.length) return null;
+
+  const root = {
+    name: 'Capture',
+    children: []
+  };
+
+  const stack = [root];
+  let lastLevel = -1;
+
+  hierarchy.forEach(item => {
+    const node = {
+      name: item.protocol,
+      value: item.frames,
+      children: []
+    };
+
+    // Adjust stack based on level
+    while (stack.length > item.level + 1) {
+      stack.pop();
+    }
+
+    // Add to parent
+    const parent = stack[stack.length - 1];
+    parent.children.push(node);
+    stack.push(node);
+    lastLevel = item.level;
+  });
+
+  // Clean up empty children arrays
+  const cleanTree = (node) => {
+    if (node.children && node.children.length === 0) {
+      delete node.children;
+    } else if (node.children) {
+      node.children.forEach(cleanTree);
+    }
+    return node;
+  };
+
+  return cleanTree(root);
+};
+
+// ECharts Tree option for protocol hierarchy
+const hierarchyTreeOption = computed(() => {
+  if (!protocolHierarchy.value.length) return null;
+
+  const treeData = buildHierarchyTree(protocolHierarchy.value);
+  if (!treeData) return null;
+
+  return {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'item',
+      formatter: (params) => {
+        if (params.data.value) {
+          return `${params.data.name}<br/>Frames: ${params.data.value}`;
+        }
+        return params.data.name;
+      }
+    },
+    series: [{
+      type: 'tree',
+      data: [treeData],
+      orient: 'LR',
+      top: '5%',
+      left: '10%',
+      bottom: '5%',
+      right: '20%',
+      symbolSize: 10,
+      symbol: 'circle',
+      initialTreeDepth: 3,
+      expandAndCollapse: true,
+      animationDuration: 550,
+      animationDurationUpdate: 750,
+      label: {
+        position: 'left',
+        verticalAlign: 'middle',
+        align: 'right',
+        fontSize: 11,
+        color: '#e5e7eb',
+        formatter: (params) => {
+          if (params.data.value) {
+            return `${params.data.name} (${params.data.value})`;
+          }
+          return params.data.name;
+        }
+      },
+      leaves: {
+        label: {
+          position: 'right',
+          verticalAlign: 'middle',
+          align: 'left'
+        }
+      },
+      lineStyle: {
+        color: '#4b5563',
+        width: 1.5
+      },
+      itemStyle: {
+        color: '#3b82f6',
+        borderColor: '#1e40af'
+      },
+      emphasis: {
+        focus: 'descendant'
+      }
+    }]
+  };
+});
 </script>
 
 <template>
@@ -466,14 +642,6 @@ const timelineLineOption = computed(() => {
           :class="{ active: activeTab === 'hierarchy' }"
           @click="activeTab = 'hierarchy'"
         >Hierarchy</button>
-        <button
-          :class="{ active: activeTab === 'protocols' }"
-          @click="activeTab = 'protocols'"
-        >Protocols</button>
-        <button
-          :class="{ active: activeTab === 'talkers' }"
-          @click="activeTab = 'talkers'"
-        >Top Talkers</button>
         <button
           :class="{ active: activeTab === 'flows' }"
           @click="activeTab = 'flows'"
@@ -628,32 +796,41 @@ const timelineLineOption = computed(() => {
             <p>Loading conversations...</p>
           </div>
           <div v-else-if="!conversations.length" class="empty-state">No conversation data available</div>
-          <table v-else class="conversations-table">
-            <thead>
-              <tr>
-                <th>Address A</th>
-                <th>Address B</th>
-                <th>Frames A→B</th>
-                <th>Bytes A→B</th>
-                <th>Frames B→A</th>
-                <th>Bytes B→A</th>
-                <th>Total</th>
-                <th>Duration</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(conv, idx) in conversations" :key="idx">
-                <td class="ip-cell">{{ conv.addressA }}</td>
-                <td class="ip-cell">{{ conv.addressB }}</td>
-                <td class="num-cell">{{ conv.framesAtoB }}</td>
-                <td class="num-cell">{{ conv.bytesAtoB }}</td>
-                <td class="num-cell">{{ conv.framesBtoA }}</td>
-                <td class="num-cell">{{ conv.bytesBtoA }}</td>
-                <td class="num-cell">{{ conv.bytesTotal }}</td>
-                <td class="num-cell">{{ conv.duration.toFixed(2) }}s</td>
-              </tr>
-            </tbody>
-          </table>
+          <div v-else class="conversations-content">
+            <!-- Sankey diagram for traffic flow -->
+            <div v-if="conversationsSankeyOption" class="sankey-container">
+              <h3>Traffic Flow (Top 10)</h3>
+              <v-chart class="sankey-chart" :option="conversationsSankeyOption" autoresize />
+            </div>
+
+            <!-- Table with top 10 -->
+            <table class="conversations-table">
+              <thead>
+                <tr>
+                  <th>Address A</th>
+                  <th>Address B</th>
+                  <th>Frames A→B</th>
+                  <th>Bytes A→B</th>
+                  <th>Frames B→A</th>
+                  <th>Bytes B→A</th>
+                  <th>Total</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(conv, idx) in top10Conversations" :key="idx">
+                  <td class="ip-cell">{{ conv.addressA }}</td>
+                  <td class="ip-cell">{{ conv.addressB }}</td>
+                  <td class="num-cell">{{ conv.framesAtoB }}</td>
+                  <td class="num-cell">{{ conv.bytesAtoB }}</td>
+                  <td class="num-cell">{{ conv.framesBtoA }}</td>
+                  <td class="num-cell">{{ conv.bytesBtoA }}</td>
+                  <td class="num-cell">{{ conv.bytesTotal }}</td>
+                  <td class="num-cell">{{ conv.duration.toFixed(2) }}s</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Protocol Hierarchy Tab -->
@@ -663,49 +840,8 @@ const timelineLineOption = computed(() => {
             <p>Loading protocol hierarchy...</p>
           </div>
           <div v-else-if="!protocolHierarchy.length" class="empty-state">No protocol hierarchy data available</div>
-          <div v-else class="hierarchy-tree">
-            <div
-              v-for="(item, idx) in protocolHierarchy"
-              :key="idx"
-              class="hierarchy-item"
-              :style="{ paddingLeft: (item.level * 20 + 12) + 'px' }"
-            >
-              <span class="hierarchy-protocol">{{ item.protocol }}</span>
-              <span class="hierarchy-stats">
-                <span class="hierarchy-frames">{{ item.frames.toLocaleString() }} frames</span>
-                <span class="hierarchy-bytes">{{ formatBytes(item.bytes) }}</span>
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Protocols Tab -->
-        <div v-else-if="activeTab === 'protocols'" class="tab-content">
-          <div v-if="!protocolChartData.length" class="empty-state">No protocol data available</div>
-          <div v-else class="chart-list">
-            <div v-for="proto in protocolChartData" :key="proto.protocol" class="chart-row">
-              <div class="chart-label">{{ proto.protocol }}</div>
-              <div class="chart-bar-container">
-                <div class="chart-bar" :style="{ width: proto.percentage + '%' }"></div>
-              </div>
-              <div class="chart-value">{{ proto.packet_count.toLocaleString() }}</div>
-              <div class="chart-bytes">{{ formatBytes(proto.total_bytes) }}</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Top Talkers Tab -->
-        <div v-else-if="activeTab === 'talkers'" class="tab-content">
-          <div v-if="!talkerChartData.length" class="empty-state">No IP data available</div>
-          <div v-else class="chart-list">
-            <div v-for="talker in talkerChartData" :key="talker.ip_address" class="chart-row">
-              <div class="chart-label ip-label">{{ talker.ip_address }}</div>
-              <div class="chart-bar-container">
-                <div class="chart-bar talker-bar" :style="{ width: talker.percentage + '%' }"></div>
-              </div>
-              <div class="chart-value">{{ formatBytes(talker.total_bytes) }}</div>
-              <div class="chart-packets">{{ talker.packets_sent + talker.packets_received }} pkts</div>
-            </div>
+          <div v-else-if="hierarchyTreeOption" class="hierarchy-tree-container">
+            <v-chart class="hierarchy-tree-chart" :option="hierarchyTreeOption" autoresize />
           </div>
         </div>
 
@@ -1282,6 +1418,30 @@ const timelineLineOption = computed(() => {
   overflow-x: auto;
 }
 
+.conversations-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sankey-container {
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.sankey-container h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #e5e7eb;
+}
+
+.sankey-chart {
+  height: 250px;
+}
+
 .conversations-table {
   width: 100%;
   border-collapse: collapse;
@@ -1313,6 +1473,17 @@ const timelineLineOption = computed(() => {
 .hierarchy-tab {
   display: flex;
   flex-direction: column;
+}
+
+.hierarchy-tree-container {
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.hierarchy-tree-chart {
+  height: 400px;
 }
 
 .hierarchy-tree {
