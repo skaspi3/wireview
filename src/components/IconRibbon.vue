@@ -2,7 +2,7 @@
 import { useTemplateRef } from 'vue';
 import LiveCapture from "./LiveCapture.vue";
 
-const emit = defineEmits(['clear', 'stop', 'openFileBrowser']);
+const emit = defineEmits(['clear', 'stop', 'openFileBrowser', 'openInsights']);
 
 const liveCaptureRef = useTemplateRef('live-capture');
 
@@ -21,6 +21,14 @@ defineExpose({ loadPcapFile });
       @stop="() => emit('stop')"
       @openFileBrowser="() => emit('openFileBrowser')"
     />
+    <div class="separator"></div>
+    <button class="insights-btn" @click="emit('openInsights')" title="Capture Insights">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 3v18h18"/>
+        <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>
+      </svg>
+      Insights
+    </button>
   </div>
 </template>
 
@@ -61,5 +69,34 @@ defineExpose({ loadPcapFile });
   height: 16px;
   background-color: var(--ws-dark-gray);
   border-right: 1px solid var(--ws-gray);
+}
+
+.insights-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.insights-btn:hover {
+  background: linear-gradient(135deg, #60a5fa, #3b82f6);
+  transform: translateY(-1px);
+}
+
+.insights-btn:active {
+  transform: translateY(0);
+}
+
+.insights-btn svg {
+  width: 16px;
+  height: 16px;
 }
 </style>

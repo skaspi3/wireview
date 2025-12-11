@@ -10,6 +10,7 @@ import IconRibbon from './components/IconRibbon.vue';
 import DisplayFilter from './components/DisplayFilter.vue';
 import StatusBar from './components/StatusBar.vue';
 import FileBrowser from './components/FileBrowser.vue';
+import InsightsPanel from './components/InsightsPanel.vue';
 
 // Row height for packet list (used for virtual scrolling)
 const rowHeight = ref(20);
@@ -17,6 +18,9 @@ const rowHeight = ref(20);
 // References for file browser
 const fileBrowserRef = useTemplateRef('file-browser');
 const iconRibbonRef = useTemplateRef('icon-ribbon');
+
+// Insights panel visibility
+const showInsights = ref(false);
 
 const handleClear = () => {
   clearPackets();
@@ -32,6 +36,10 @@ const handleOpenFileBrowser = () => {
 
 const handleFileSelect = (filePath) => {
   iconRibbonRef.value?.loadPcapFile(filePath);
+};
+
+const handleOpenInsights = () => {
+  showInsights.value = true;
 };
 </script>
 
@@ -52,9 +60,12 @@ const handleFileSelect = (filePath) => {
     <!-- File Browser Modal -->
     <FileBrowser ref="file-browser" @select="handleFileSelect" />
 
+    <!-- Insights Panel Modal -->
+    <InsightsPanel v-if="showInsights" @close="showInsights = false" />
+
     <!-- Main UI -->
     <div class="main-content">
-      <IconRibbon ref="icon-ribbon" @clear="handleClear" @stop="handleStop" @openFileBrowser="handleOpenFileBrowser" />
+      <IconRibbon ref="icon-ribbon" @clear="handleClear" @stop="handleStop" @openFileBrowser="handleOpenFileBrowser" @openInsights="handleOpenInsights" />
       <DisplayFilter />
 
       <div class="workspace">
