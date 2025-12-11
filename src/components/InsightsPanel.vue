@@ -1,6 +1,28 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { packets } from '../globals';
+import { use } from 'echarts/core';
+import { CanvasRenderer } from 'echarts/renderers';
+import { PieChart, BarChart, LineChart } from 'echarts/charts';
+import {
+  TitleComponent,
+  TooltipComponent,
+  LegendComponent,
+  GridComponent
+} from 'echarts/components';
+import VChart from 'vue-echarts';
+
+// Register ECharts components
+use([
+  CanvasRenderer,
+  PieChart,
+  BarChart,
+  LineChart,
+  TitleComponent,
+  TooltipComponent,
+  LegendComponent,
+  GridComponent
+]);
 
 const emit = defineEmits(['close']);
 
@@ -20,9 +42,13 @@ const flows = ref([]);
 const expert = ref(null);
 const conversations = ref([]);
 const protocolHierarchy = ref([]);
+const tcpStreams = ref([]);
+const httpStats = ref(null);
 const expertLoading = ref(false);
 const conversationsLoading = ref(false);
 const hierarchyLoading = ref(false);
+const tcpStreamsLoading = ref(false);
+const httpStatsLoading = ref(false);
 
 // Auto-refresh interval
 let refreshInterval = null;
@@ -184,6 +210,36 @@ const fetchProtocolHierarchy = async () => {
   }
 };
 
+// Fetch TCP streams (on-demand)
+const fetchTcpStreams = async () => {
+  if (tcpStreamsLoading.value) return;
+  try {
+    tcpStreamsLoading.value = true;
+    const response = await fetch('/api/stats/tcp-streams');
+    const data = await response.json();
+    tcpStreams.value = data.streams || [];
+  } catch (e) {
+    console.error('Failed to fetch TCP streams:', e);
+  } finally {
+    tcpStreamsLoading.value = false;
+  }
+};
+
+// Fetch HTTP stats (on-demand)
+const fetchHttpStats = async () => {
+  if (httpStatsLoading.value) return;
+  try {
+    httpStatsLoading.value = true;
+    const response = await fetch('/api/stats/http');
+    const data = await response.json();
+    httpStats.value = data.http || null;
+  } catch (e) {
+    console.error('Failed to fetch HTTP stats:', e);
+  } finally {
+    httpStatsLoading.value = false;
+  }
+};
+
 // Watch tab changes to load data on-demand
 watch(activeTab, (newTab) => {
   if (newTab === 'expert' && !expert.value && !expertLoading.value) {
@@ -192,6 +248,10 @@ watch(activeTab, (newTab) => {
     fetchConversations();
   } else if (newTab === 'hierarchy' && !protocolHierarchy.value.length && !hierarchyLoading.value) {
     fetchProtocolHierarchy();
+  } else if (newTab === 'tcp-streams' && !tcpStreams.value.length && !tcpStreamsLoading.value) {
+    fetchTcpStreams();
+  } else if (newTab === 'http' && !httpStats.value && !httpStatsLoading.value) {
+    fetchHttpStats();
   }
 });
 
@@ -225,6 +285,144 @@ const getSeverityLabel = (severity) => {
     default: return severity;
   }
 };
+
+// Get HTTP status code class for coloring
+const getStatusClass = (code) => {
+  const codeNum = parseInt(code);
+  if (codeNum >= 200 && codeNum < 300) return 'status-2xx';
+  if (codeNum >= 300 && codeNum < 400) return 'status-3xx';
+  if (codeNum >= 400 && codeNum < 500) return 'status-4xx';
+  if (codeNum >= 500) return 'status-5xx';
+  return '';
+};
+
+// ECharts options for protocol pie chart
+const protocolPieOption = computed(() => {
+  if (!protocols.value.length) return null;
+  return {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'item',
+      formatter: '{b}: {c} ({d}%)'
+    },
+    series: [{
+      type: 'pie',
+      radius: ['40%', '70%'],
+      avoidLabelOverlap: true,
+      itemStyle: {
+        borderRadius: 4,
+        borderColor: '#1f2937',
+        borderWidth: 2
+      },
+      label: {
+        color: '#e5e7eb',
+        fontSize: 11
+      },
+      data: protocols.value.slice(0, 8).map(p => ({
+        name: p.protocol,
+        value: p.packet_count
+      }))
+    }]
+  };
+});
+
+// ECharts options for top talkers bar chart
+const talkersBarOption = computed(() => {
+  if (!talkers.value.length) return null;
+  const top10 = talkers.value.slice(0, 10);
+  return {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' }
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      top: '10%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'value',
+      axisLabel: {
+        color: '#9ca3af',
+        formatter: (val) => {
+          if (val >= 1024 * 1024) return (val / 1024 / 1024).toFixed(1) + 'M';
+          if (val >= 1024) return (val / 1024).toFixed(0) + 'K';
+          return val;
+        }
+      },
+      splitLine: { lineStyle: { color: '#374151' } }
+    },
+    yAxis: {
+      type: 'category',
+      data: top10.map(t => t.ip_address).reverse(),
+      axisLabel: { color: '#9ca3af', fontSize: 10 }
+    },
+    series: [{
+      type: 'bar',
+      data: top10.map(t => t.total_bytes).reverse(),
+      itemStyle: {
+        color: {
+          type: 'linear',
+          x: 0, y: 0, x2: 1, y2: 0,
+          colorStops: [
+            { offset: 0, color: '#3b82f6' },
+            { offset: 1, color: '#60a5fa' }
+          ]
+        },
+        borderRadius: [0, 4, 4, 0]
+      }
+    }]
+  };
+});
+
+// ECharts options for timeline line chart
+const timelineLineOption = computed(() => {
+  if (!timeline.value.length) return null;
+  return {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis'
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      top: '10%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      data: timeline.value.map(t => t.bucket + 's'),
+      axisLabel: { color: '#9ca3af', fontSize: 10 },
+      axisLine: { lineStyle: { color: '#374151' } }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#9ca3af' },
+      splitLine: { lineStyle: { color: '#374151' } }
+    },
+    series: [{
+      type: 'line',
+      data: timeline.value.map(t => t.packet_count),
+      smooth: true,
+      symbol: 'none',
+      lineStyle: { color: '#3b82f6', width: 2 },
+      areaStyle: {
+        color: {
+          type: 'linear',
+          x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: 'rgba(59, 130, 246, 0.3)' },
+            { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
+          ]
+        }
+      }
+    }]
+  };
+});
 </script>
 
 <template>
@@ -280,6 +478,14 @@ const getSeverityLabel = (severity) => {
           :class="{ active: activeTab === 'flows' }"
           @click="activeTab = 'flows'"
         >Flows</button>
+        <button
+          :class="{ active: activeTab === 'tcp-streams' }"
+          @click="activeTab = 'tcp-streams'"
+        >TCP Streams</button>
+        <button
+          :class="{ active: activeTab === 'http' }"
+          @click="activeTab = 'http'"
+        >HTTP</button>
       </div>
 
       <!-- Content -->
@@ -325,16 +531,25 @@ const getSeverityLabel = (severity) => {
             </div>
           </div>
 
-          <!-- Timeline Sparkline -->
-          <div v-if="timeline.length > 1" class="timeline-section">
-            <h3>Traffic Timeline</h3>
-            <svg class="sparkline" viewBox="0 0 100 30" preserveAspectRatio="none">
-              <path :d="timelineSparkline" fill="none" stroke="#3b82f6" stroke-width="1.5" />
-            </svg>
-            <div class="timeline-labels">
-              <span>{{ formatDuration(summary?.timeRange?.start || 0) }}</span>
-              <span>{{ formatDuration(summary?.timeRange?.end || 0) }}</span>
+          <!-- Charts Row -->
+          <div class="charts-row">
+            <!-- Protocol Distribution Pie Chart -->
+            <div v-if="protocolPieOption" class="chart-container">
+              <h3>Protocol Distribution</h3>
+              <v-chart class="chart" :option="protocolPieOption" autoresize />
             </div>
+
+            <!-- Top Talkers Bar Chart -->
+            <div v-if="talkersBarOption" class="chart-container">
+              <h3>Top Talkers (Bytes)</h3>
+              <v-chart class="chart" :option="talkersBarOption" autoresize />
+            </div>
+          </div>
+
+          <!-- Timeline Chart -->
+          <div v-if="timelineLineOption" class="timeline-chart-container">
+            <h3>Traffic Timeline (Packets/sec)</h3>
+            <v-chart class="timeline-chart" :option="timelineLineOption" autoresize />
           </div>
         </div>
 
@@ -519,6 +734,95 @@ const getSeverityLabel = (severity) => {
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- TCP Streams Tab -->
+        <div v-else-if="activeTab === 'tcp-streams'" class="tab-content tcp-streams-tab">
+          <div v-if="tcpStreamsLoading" class="loading-state">
+            <div class="spinner"></div>
+            <p>Loading TCP streams...</p>
+          </div>
+          <div v-else-if="!tcpStreams.length" class="empty-state">No TCP stream data available</div>
+          <table v-else class="streams-table">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Destination</th>
+                <th>Frames A→B</th>
+                <th>Bytes A→B</th>
+                <th>Frames B→A</th>
+                <th>Bytes B→A</th>
+                <th>Total</th>
+                <th>Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(stream, idx) in tcpStreams" :key="idx">
+                <td class="ip-cell">{{ stream.srcIp }}:{{ stream.srcPort }}</td>
+                <td class="ip-cell">{{ stream.dstIp }}:{{ stream.dstPort }}</td>
+                <td class="num-cell">{{ stream.framesAtoB }}</td>
+                <td class="num-cell">{{ stream.bytesAtoB }}</td>
+                <td class="num-cell">{{ stream.framesBtoA }}</td>
+                <td class="num-cell">{{ stream.bytesBtoA }}</td>
+                <td class="num-cell">{{ stream.bytesTotal }}</td>
+                <td class="num-cell">{{ stream.duration.toFixed(2) }}s</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- HTTP Stats Tab -->
+        <div v-else-if="activeTab === 'http'" class="tab-content http-tab">
+          <div v-if="httpStatsLoading" class="loading-state">
+            <div class="spinner"></div>
+            <p>Loading HTTP statistics...</p>
+          </div>
+          <div v-else-if="!httpStats" class="empty-state">No HTTP traffic detected</div>
+          <div v-else class="http-content">
+            <!-- HTTP Methods -->
+            <div v-if="Object.keys(httpStats.methods).length" class="http-section">
+              <h3 class="http-section-title">Request Methods</h3>
+              <div class="http-items">
+                <div v-for="(count, method) in httpStats.methods" :key="method" class="http-item">
+                  <span class="http-method">{{ method }}</span>
+                  <span class="http-count">{{ count }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- HTTP Status Codes -->
+            <div v-if="Object.keys(httpStats.statusCodes).length" class="http-section">
+              <h3 class="http-section-title">Response Status Codes</h3>
+              <div class="http-items">
+                <div v-for="(count, code) in httpStats.statusCodes" :key="code" class="http-item">
+                  <span class="http-status" :class="getStatusClass(code)">{{ code }}</span>
+                  <span class="http-count">{{ count }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- HTTP Content Types -->
+            <div v-if="Object.keys(httpStats.contentTypes).length" class="http-section">
+              <h3 class="http-section-title">Content Types</h3>
+              <div class="http-items">
+                <div v-for="(count, type) in httpStats.contentTypes" :key="type" class="http-item">
+                  <span class="http-content-type">{{ type }}</span>
+                  <span class="http-count">{{ count }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- HTTP Hosts -->
+            <div v-if="httpStats.requests.length" class="http-section">
+              <h3 class="http-section-title">Requests by Host</h3>
+              <div class="http-items">
+                <div v-for="(req, idx) in httpStats.requests" :key="idx" class="http-item" :style="{ paddingLeft: (req.level * 16 + 12) + 'px' }">
+                  <span class="http-host">{{ req.host }}</span>
+                  <span class="http-count">{{ req.count }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -746,6 +1050,50 @@ const getSeverityLabel = (severity) => {
   font-size: 11px;
   color: #6b7280;
   margin-top: 6px;
+}
+
+/* ECharts containers */
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.chart-container {
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.chart-container h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #e5e7eb;
+}
+
+.chart {
+  height: 200px;
+}
+
+.timeline-chart-container {
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.timeline-chart-container h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #e5e7eb;
+}
+
+.timeline-chart {
+  height: 150px;
 }
 
 /* Chart List (Protocols & Talkers) */
@@ -1009,5 +1357,134 @@ const getSeverityLabel = (severity) => {
 
 .hierarchy-bytes {
   color: #60a5fa;
+}
+
+/* TCP Streams Tab */
+.tcp-streams-tab {
+  overflow-x: auto;
+}
+
+.streams-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 800px;
+}
+
+.streams-table th {
+  background: #111827;
+  color: #9ca3af;
+  font-weight: 500;
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid #374151;
+  white-space: nowrap;
+}
+
+.streams-table td {
+  padding: 8px 12px;
+  color: #e5e7eb;
+  border-bottom: 1px solid #1f2937;
+}
+
+.streams-table tr:hover td {
+  background: #111827;
+}
+
+/* HTTP Stats Tab */
+.http-tab {
+  display: flex;
+  flex-direction: column;
+}
+
+.http-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.http-section {
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.http-section-title {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e5e7eb;
+  background: #0f172a;
+  border-bottom: 1px solid #374151;
+}
+
+.http-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.http-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid #1f2937;
+  font-size: 13px;
+}
+
+.http-item:last-child {
+  border-bottom: none;
+}
+
+.http-item:hover {
+  background: #1f2937;
+}
+
+.http-method {
+  font-weight: 600;
+  color: #60a5fa;
+  font-family: monospace;
+}
+
+.http-status {
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.http-status.status-2xx {
+  color: #22c55e;
+}
+
+.http-status.status-3xx {
+  color: #f59e0b;
+}
+
+.http-status.status-4xx {
+  color: #ef4444;
+}
+
+.http-status.status-5xx {
+  color: #dc2626;
+}
+
+.http-content-type {
+  color: #e5e7eb;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.http-host {
+  color: #e5e7eb;
+}
+
+.http-count {
+  font-family: monospace;
+  font-size: 12px;
+  color: #9ca3af;
+  background: #374151;
+  padding: 2px 8px;
+  border-radius: 4px;
 }
 </style>
