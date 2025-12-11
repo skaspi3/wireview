@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { packets } from '../globals';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
-import { PieChart, BarChart, LineChart, TreeChart, SankeyChart } from 'echarts/charts';
+import { PieChart, BarChart, LineChart, TreeChart, GraphChart } from 'echarts/charts';
 import {
   TitleComponent,
   TooltipComponent,
@@ -19,7 +19,7 @@ use([
   BarChart,
   LineChart,
   TreeChart,
-  SankeyChart,
+  GraphChart,
   TitleComponent,
   TooltipComponent,
   LegendComponent,
@@ -385,25 +385,51 @@ const top10Conversations = computed(() => {
     .slice(0, 10);
 });
 
-// ECharts Sankey option for conversations (shows traffic flow)
-const conversationsSankeyOption = computed(() => {
+// ECharts circular graph (chord-like) option for conversations
+const conversationsChordOption = computed(() => {
   if (!top10Conversations.value.length) return null;
 
-  // Build nodes and links for sankey
-  const nodesSet = new Set();
+  // Build nodes with traffic volume for sizing
+  const nodeTraffic = new Map();
   const links = [];
 
+  // Calculate total traffic per node and create bidirectional links
   top10Conversations.value.forEach(conv => {
-    nodesSet.add(conv.addressA);
-    nodesSet.add(conv.addressB);
-    links.push({
-      source: conv.addressA,
-      target: conv.addressB,
-      value: conv.framesTotal
-    });
+    // Accumulate traffic for node sizing
+    const trafficA = nodeTraffic.get(conv.addressA) || 0;
+    const trafficB = nodeTraffic.get(conv.addressB) || 0;
+    nodeTraffic.set(conv.addressA, trafficA + conv.framesTotal);
+    nodeTraffic.set(conv.addressB, trafficB + conv.framesTotal);
+
+    // Create bidirectional links (A→B and B→A)
+    if (conv.framesAtoB > 0) {
+      links.push({
+        source: conv.addressA,
+        target: conv.addressB,
+        value: conv.framesAtoB,
+        lineStyle: { width: Math.max(1, Math.log2(conv.framesAtoB + 1)) }
+      });
+    }
+    if (conv.framesBtoA > 0) {
+      links.push({
+        source: conv.addressB,
+        target: conv.addressA,
+        value: conv.framesBtoA,
+        lineStyle: { width: Math.max(1, Math.log2(conv.framesBtoA + 1)) }
+      });
+    }
   });
 
-  const nodes = Array.from(nodesSet).map(name => ({ name }));
+  // Create nodes with sizes based on traffic volume
+  const maxTraffic = Math.max(...nodeTraffic.values());
+  const nodes = Array.from(nodeTraffic.entries()).map(([name, traffic], index) => ({
+    name,
+    value: traffic,
+    symbolSize: 20 + (traffic / maxTraffic) * 40,  // Size 20-60 based on traffic
+    itemStyle: {
+      color: `hsl(${(index * 360 / nodeTraffic.size)}, 70%, 55%)`  // Distinct colors
+    }
+  }));
 
   return {
     backgroundColor: 'transparent',
@@ -411,29 +437,45 @@ const conversationsSankeyOption = computed(() => {
       trigger: 'item',
       formatter: (params) => {
         if (params.dataType === 'edge') {
-          return `${params.data.source} → ${params.data.target}<br/>Frames: ${params.data.value}`;
+          return `${params.data.source} → ${params.data.target}<br/>Frames: ${params.data.value.toLocaleString()}`;
         }
-        return params.name;
+        return `${params.data.name}<br/>Total Frames: ${params.data.value.toLocaleString()}`;
       }
     },
+    animationDuration: 500,
+    animationEasingUpdate: 'quinticInOut',
     series: [{
-      type: 'sankey',
-      layout: 'none',
-      emphasis: { focus: 'adjacency' },
-      nodeAlign: 'left',
+      type: 'graph',
+      layout: 'circular',
+      circular: {
+        rotateLabel: true
+      },
+      roam: true,
+      draggable: true,
       data: nodes,
       links: links,
-      lineStyle: {
-        color: 'gradient',
-        curveness: 0.5
-      },
-      itemStyle: {
-        color: '#3b82f6',
-        borderColor: '#1e40af'
-      },
       label: {
+        show: true,
+        position: 'outside',
         color: '#e5e7eb',
-        fontSize: 11
+        fontSize: 11,
+        formatter: '{b}'
+      },
+      lineStyle: {
+        color: 'source',
+        curveness: 0.3,
+        opacity: 0.7
+      },
+      emphasis: {
+        focus: 'adjacency',
+        lineStyle: {
+          opacity: 1,
+          width: 3
+        },
+        label: {
+          fontSize: 13,
+          fontWeight: 'bold'
+        }
       }
     }]
   };
@@ -735,10 +777,10 @@ const hierarchyTreeOption = computed(() => {
           </div>
           <div v-else-if="!conversations.length" class="empty-state">No conversation data available</div>
           <div v-else class="conversations-content">
-            <!-- Sankey diagram for traffic flow -->
-            <div v-if="conversationsSankeyOption" class="sankey-container">
+            <!-- Circular graph (chord-like) for traffic flow -->
+            <div v-if="conversationsChordOption" class="chord-container">
               <h3>Traffic Flow (Top 10)</h3>
-              <v-chart class="sankey-chart" :option="conversationsSankeyOption" autoresize />
+              <v-chart class="chord-chart" :option="conversationsChordOption" autoresize />
             </div>
 
             <!-- Table with top 10 -->
@@ -1216,22 +1258,22 @@ const hierarchyTreeOption = computed(() => {
   gap: 20px;
 }
 
-.sankey-container {
+.chord-container {
   background: #111827;
   border: 1px solid #374151;
   border-radius: 8px;
   padding: 16px;
 }
 
-.sankey-container h3 {
+.chord-container h3 {
   margin: 0 0 12px 0;
   font-size: 14px;
   font-weight: 500;
   color: #e5e7eb;
 }
 
-.sankey-chart {
-  height: 250px;
+.chord-chart {
+  height: 350px;
 }
 
 .conversations-table {
