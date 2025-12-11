@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { packets } from '../globals';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
-import { PieChart, BarChart, LineChart, TreeChart, GraphChart } from 'echarts/charts';
+import { PieChart, BarChart, LineChart, TreeChart, ChordChart } from 'echarts/charts';
 import {
   TitleComponent,
   TooltipComponent,
@@ -19,7 +19,7 @@ use([
   BarChart,
   LineChart,
   TreeChart,
-  GraphChart,
+  ChordChart,
   TitleComponent,
   TooltipComponent,
   LegendComponent,
@@ -385,49 +385,35 @@ const top10Conversations = computed(() => {
     .slice(0, 10);
 });
 
-// ECharts circular graph (chord-like) option for conversations
+// ECharts chord diagram option for conversations (ECharts 6.0 series-chord)
 const conversationsChordOption = computed(() => {
   if (!top10Conversations.value.length) return null;
 
-  // Build nodes with traffic volume for sizing
-  const nodeTraffic = new Map();
-  const links = [];
-
-  // Calculate total traffic per node and create bidirectional links
+  // Build unique list of IPs (nodes)
+  const ipSet = new Set();
   top10Conversations.value.forEach(conv => {
-    // Accumulate traffic for node sizing
-    const trafficA = nodeTraffic.get(conv.addressA) || 0;
-    const trafficB = nodeTraffic.get(conv.addressB) || 0;
-    nodeTraffic.set(conv.addressA, trafficA + conv.framesTotal);
-    nodeTraffic.set(conv.addressB, trafficB + conv.framesTotal);
+    ipSet.add(conv.addressA);
+    ipSet.add(conv.addressB);
+  });
+  const ips = Array.from(ipSet);
+  const ipIndex = new Map(ips.map((ip, i) => [ip, i]));
 
-    // Create bidirectional links (A→B and B→A)
-    if (conv.framesAtoB > 0) {
-      links.push({
-        source: conv.addressA,
-        target: conv.addressB,
-        value: conv.framesAtoB,
-        lineStyle: { width: Math.max(1, Math.log2(conv.framesAtoB + 1)) }
-      });
-    }
-    if (conv.framesBtoA > 0) {
-      links.push({
-        source: conv.addressB,
-        target: conv.addressA,
-        value: conv.framesBtoA,
-        lineStyle: { width: Math.max(1, Math.log2(conv.framesBtoA + 1)) }
-      });
-    }
+  // Build matrix (n x n) where matrix[i][j] = traffic from i to j
+  const n = ips.length;
+  const matrix = Array.from({ length: n }, () => Array(n).fill(0));
+
+  top10Conversations.value.forEach(conv => {
+    const i = ipIndex.get(conv.addressA);
+    const j = ipIndex.get(conv.addressB);
+    matrix[i][j] = conv.framesAtoB;
+    matrix[j][i] = conv.framesBtoA;
   });
 
-  // Create nodes with sizes based on traffic volume
-  const maxTraffic = Math.max(...nodeTraffic.values());
-  const nodes = Array.from(nodeTraffic.entries()).map(([name, traffic], index) => ({
-    name,
-    value: traffic,
-    symbolSize: 20 + (traffic / maxTraffic) * 40,  // Size 20-60 based on traffic
+  // Create data array with distinct colors
+  const data = ips.map((ip, index) => ({
+    name: ip,
     itemStyle: {
-      color: `hsl(${(index * 360 / nodeTraffic.size)}, 70%, 55%)`  // Distinct colors
+      color: `hsl(${(index * 360 / n)}, 70%, 55%)`
     }
   }));
 
@@ -437,45 +423,30 @@ const conversationsChordOption = computed(() => {
       trigger: 'item',
       formatter: (params) => {
         if (params.dataType === 'edge') {
-          return `${params.data.source} → ${params.data.target}<br/>Frames: ${params.data.value.toLocaleString()}`;
+          return `${params.data.source} → ${params.data.target}<br/>Frames: ${params.value.toLocaleString()}`;
         }
-        return `${params.data.name}<br/>Total Frames: ${params.data.value.toLocaleString()}`;
+        return params.name;
       }
     },
-    animationDuration: 500,
-    animationEasingUpdate: 'quinticInOut',
     series: [{
-      type: 'graph',
-      layout: 'circular',
-      circular: {
-        rotateLabel: true
-      },
-      roam: true,
-      draggable: true,
-      data: nodes,
-      links: links,
+      type: 'chord',
+      data: data,
+      matrix: matrix,
       label: {
         show: true,
-        position: 'outside',
         color: '#e5e7eb',
-        fontSize: 11,
-        formatter: '{b}'
-      },
-      lineStyle: {
-        color: 'source',
-        curveness: 0.3,
-        opacity: 0.7
+        fontSize: 11
       },
       emphasis: {
         focus: 'adjacency',
-        lineStyle: {
-          opacity: 1,
-          width: 3
-        },
-        label: {
-          fontSize: 13,
-          fontWeight: 'bold'
+        itemStyle: {
+          shadowBlur: 10,
+          shadowColor: 'rgba(0, 0, 0, 0.3)'
         }
+      },
+      lineStyle: {
+        color: 'source',
+        opacity: 0.6
       }
     }]
   };
