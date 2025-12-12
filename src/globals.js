@@ -28,6 +28,9 @@ export const websocket = ref(null);
 export const nodeVersion = ref('');
 export const backendPort = ref(null);
 
+// Host IP (the IP of the capture interface)
+export const hostIP = ref(null);
+
 // Backend connection status: 'disconnected' | 'connecting' | 'connected'
 export const backendStatus = ref('disconnected');
 

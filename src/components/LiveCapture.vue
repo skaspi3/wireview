@@ -69,7 +69,7 @@
 
 <script setup>
 import { ref, triggerRef, onUnmounted, onMounted, computed } from 'vue';
-import { nodeVersion, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex } from '../globals';
+import { nodeVersion, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP } from '../globals';
 
 const emit = defineEmits(['clear', 'stop', 'openFileBrowser']);
 
@@ -162,6 +162,9 @@ const connect = () => {
           }
           if (msg.certInfo) {
             certInfo.value = msg.certInfo;
+          }
+          if (msg.hostIP) {
+            hostIP.value = msg.hostIP;
           }
         }
 

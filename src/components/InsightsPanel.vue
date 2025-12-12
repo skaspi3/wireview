@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { packets } from '../globals';
+import { packets, hostIP } from '../globals';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { PieChart, BarChart, LineChart, TreeChart, ChordChart } from 'echarts/charts';
@@ -376,11 +376,20 @@ const timelineLineOption = computed(() => {
   };
 });
 
-// Top 10 conversations computed
+// Top 10 conversations computed (filtered to only show host IP flows)
 const top10Conversations = computed(() => {
   if (!conversations.value.length) return [];
+
+  // Filter to only show conversations involving the host IP
+  let filtered = conversations.value;
+  if (hostIP.value) {
+    filtered = conversations.value.filter(conv =>
+      conv.addressA === hostIP.value || conv.addressB === hostIP.value
+    );
+  }
+
   // Sort by total frames and take top 10
-  return [...conversations.value]
+  return [...filtered]
     .sort((a, b) => b.framesTotal - a.framesTotal)
     .slice(0, 10);
 });
@@ -762,7 +771,7 @@ const hierarchyTreeOption = computed(() => {
           <div v-else class="conversations-content">
             <!-- Circular graph (chord-like) for traffic flow -->
             <div v-if="conversationsChordOption" class="chord-container">
-              <h3>Traffic Flow (Top 10)</h3>
+              <h3>Traffic Flow <span v-if="hostIP">({{ hostIP }})</span> - Top 10</h3>
               <v-chart class="chord-chart" :option="conversationsChordOption" autoresize />
             </div>
 
