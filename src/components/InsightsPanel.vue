@@ -396,26 +396,36 @@ const conversationsChordOption = computed(() => {
     ipSet.add(conv.addressB);
   });
   const ips = Array.from(ipSet);
-  const ipIndex = new Map(ips.map((ip, i) => [ip, i]));
-
-  // Build matrix (n x n) where matrix[i][j] = traffic from i to j
   const n = ips.length;
-  const matrix = Array.from({ length: n }, () => Array(n).fill(0));
 
-  top10Conversations.value.forEach(conv => {
-    const i = ipIndex.get(conv.addressA);
-    const j = ipIndex.get(conv.addressB);
-    matrix[i][j] = conv.framesAtoB;
-    matrix[j][i] = conv.framesBtoA;
-  });
-
-  // Create data array with distinct colors
-  const data = ips.map((ip, index) => ({
+  // Create nodes with distinct colors
+  const nodes = ips.map((ip, index) => ({
     name: ip,
     itemStyle: {
       color: `hsl(${(index * 360 / n)}, 70%, 55%)`
     }
   }));
+
+  // Create links (edges) for bidirectional traffic
+  const links = [];
+  top10Conversations.value.forEach(conv => {
+    // A → B traffic
+    if (conv.framesAtoB > 0) {
+      links.push({
+        source: conv.addressA,
+        target: conv.addressB,
+        value: conv.framesAtoB
+      });
+    }
+    // B → A traffic
+    if (conv.framesBtoA > 0) {
+      links.push({
+        source: conv.addressB,
+        target: conv.addressA,
+        value: conv.framesBtoA
+      });
+    }
+  });
 
   return {
     backgroundColor: 'transparent',
@@ -430,12 +440,13 @@ const conversationsChordOption = computed(() => {
     },
     series: [{
       type: 'chord',
-      data: data,
-      matrix: matrix,
+      data: nodes,
+      links: links,
       label: {
         show: true,
         color: '#e5e7eb',
-        fontSize: 11
+        fontSize: 11,
+        rotate: true
       },
       emphasis: {
         focus: 'adjacency',
