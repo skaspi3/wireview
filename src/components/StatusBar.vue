@@ -1,7 +1,6 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from "vue";
 import { packets, allPackets, nodeVersion, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesFetched } from "../globals";
-import { getCacheStats } from "../packetCache";
 import GitHubIcon from "./icons/GitHubIcon.vue";
 
 const showFilterPopup = ref(false);
@@ -13,18 +12,10 @@ const showThinClientPopup = ref(false);
 const systemStats = ref(null);
 const systemStatsLoading = ref(false);
 
-// Cache stats and reduction ratio - updated periodically
-const cacheOccupied = ref(0);
-const cacheCapacity = ref(100);
-const cacheEvicted = ref(0);
+// Reduction ratio - updated periodically
 const reductionRatio = ref(0);
 
-const updateCacheStats = () => {
-  const stats = getCacheStats();
-  cacheOccupied.value = stats.size;
-  cacheCapacity.value = stats.maxSize;
-  cacheEvicted.value = stats.evicted || 0;
-
+const updateReductionRatio = () => {
   // Calculate reduction ratio
   const pkts = allPackets.value.length > 0 ? allPackets.value : packets.value;
   const observed = pkts.reduce((sum, pkt) => sum + (pkt.length || 0), 0);
@@ -77,8 +68,8 @@ const toggleFilterPopup = () => {
   showFilterPopup.value = !showFilterPopup.value;
 };
 
-// Update cache stats periodically
-let cacheStatsInterval = null;
+// Update reduction ratio periodically
+let reductionRatioInterval = null;
 
 const formatBytes = (bytes) => {
   if (bytes < 1024) return bytes + ' B';
@@ -87,12 +78,12 @@ const formatBytes = (bytes) => {
 };
 
 onMounted(() => {
-  updateCacheStats();
-  cacheStatsInterval = setInterval(updateCacheStats, 1000);
+  updateReductionRatio();
+  reductionRatioInterval = setInterval(updateReductionRatio, 1000);
 });
 
 onUnmounted(() => {
-  if (cacheStatsInterval) clearInterval(cacheStatsInterval);
+  if (reductionRatioInterval) clearInterval(reductionRatioInterval);
 });
 
 const statusTitle = computed(() => {
@@ -180,7 +171,6 @@ const formatMemory = (bytes) => {
           <div class="popup-row rcv-row">RCV: {{ formatBytes(bytesReceived) }}</div>
           <div class="popup-row fetched-row">Fetched: {{ formatBytes(bytesFetched) }}</div>
           <div class="popup-row reduction-row">Reduction Ratio: {{ reductionRatio.toFixed(1) }}%</div>
-          <div class="popup-row">LRU Cache: {{ cacheOccupied }}/{{ cacheCapacity }}<span v-if="cacheEvicted > 0">/{{ cacheEvicted }}</span></div>
           <div class="popup-row compression-row">Compression: Gzip</div>
         </div>
       </span>

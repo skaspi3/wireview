@@ -11,9 +11,6 @@ const MAX_CACHE_SIZE = 100;   // Maximum packets to cache (LRU eviction)
 // Cache storage: Map<frameNumber, { details, hex, accessTime }>
 const cache = new Map();
 
-// Track total evictions
-let totalEvicted = 0;
-
 // Loading state for UI feedback
 export const isFetchingBatch = ref(false);
 
@@ -58,18 +55,14 @@ const evictOldest = (count) => {
   const entries = Array.from(cache.entries());
   entries.sort((a, b) => a[1].accessTime - b[1].accessTime);
 
-  let evictedCount = 0;
   for (let i = 0; i < count && i < entries.length; i++) {
     cache.delete(entries[i][0]);
-    evictedCount++;
   }
-  totalEvicted += evictedCount;
 };
 
 // Clear cache (call when capture restarts or pcap file changes)
 export const clearPacketCache = () => {
   cache.clear();
-  totalEvicted = 0;
   pendingFetch = null;
   pendingFetchRange = null;
 };
@@ -212,16 +205,6 @@ const triggerPrefetchIfNeeded = (frameNumber, totalPackets) => {
       fetchBatch(uncached[0], uncached[uncached.length - 1]).catch(() => {});
     }
   }
-};
-
-// Get cache stats (for debugging/status)
-export const getCacheStats = () => {
-  return {
-    size: cache.size,
-    maxSize: MAX_CACHE_SIZE,
-    windowSize: WINDOW_SIZE,
-    evicted: totalEvicted
-  };
 };
 
 // Register cache clearer with globals (called when clearPackets is invoked)
