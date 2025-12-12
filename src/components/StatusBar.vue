@@ -153,11 +153,6 @@ const formatMemory = (bytes) => {
       </div>
     </div>
 
-    <!-- Center section - packet counts -->
-    <div class="center-section">
-      <span class="stats-info">{{ statsInfo }}</span>
-      <span v-if="displayedInfo" class="displayed-info">{{ displayedInfo }}</span>
-    </div>
 
     <!-- Right section -->
     <div class="right-section">
@@ -171,7 +166,6 @@ const formatMemory = (bytes) => {
           <div class="popup-row rcv-row">RCV: {{ formatBytes(bytesReceived) }}</div>
           <div class="popup-row fetched-row">Fetched: {{ formatBytes(bytesFetched) }}</div>
           <div class="popup-row reduction-row">Reduction Ratio: {{ reductionRatio.toFixed(1) }}%</div>
-          <div class="popup-row compression-row">Compression: Gzip</div>
         </div>
       </span>
       <span class="version-info wss-info">
@@ -182,7 +176,6 @@ const formatMemory = (bytes) => {
             @mouseleave="onBackendLeave"
           >
             <div v-if="showBackendPopup" class="backend-popup">
-              <div class="popup-row">Backend running on 127.0.0.1:{{ backendPort || 3000 }}</div>
               <div class="popup-row">Node.js: {{ nodeVersion || 'unknown' }}</div>
               <div v-if="systemStats" class="memory-section">
                 <div class="popup-row">SQLite: {{ systemStats.sqliteVersion || 'N/A' }}</div>
