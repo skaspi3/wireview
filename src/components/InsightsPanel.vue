@@ -312,7 +312,7 @@ const talkersBarOption = computed(() => {
       right: '4%',
       bottom: '3%',
       top: '10%',
-      containLabel: true
+      outerBounds: 'containLabel'
     },
     xAxis: {
       type: 'value',
@@ -362,7 +362,7 @@ const timelineLineOption = computed(() => {
       right: '4%',
       bottom: '3%',
       top: '10%',
-      containLabel: true
+      outerBounds: 'containLabel'
     },
     xAxis: {
       type: 'category',
