@@ -594,8 +594,9 @@ const hierarchyTreeOption = computed(() => {
           @click="activeTab = 'summary'"
         >Summary</button>
         <button
-          :class="{ active: activeTab === 'expert' }"
-          @click="activeTab = 'expert'"
+          class="disabled"
+          disabled
+          title="Expert analysis temporarily disabled"
         >Expert</button>
         <button
           :class="{ active: activeTab === 'conversations' }"
@@ -923,6 +924,17 @@ const hierarchyTreeOption = computed(() => {
 .tab-nav button.active {
   background: #3b82f6;
   color: #fff;
+}
+
+.tab-nav button.disabled {
+  color: #4b5563;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.tab-nav button.disabled:hover {
+  background: transparent;
+  color: #4b5563;
 }
 
 .panel-content {
