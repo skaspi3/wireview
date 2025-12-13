@@ -127,10 +127,6 @@ export default defineConfig(({ mode }) => {
         '/api/heuristic-decodes': {
           target: 'http://127.0.0.1:3000',
           changeOrigin: true,
-        },
-        '/api/follow-stream': {
-          target: 'http://127.0.0.1:3000',
-          changeOrigin: true,
         }
       }
     }

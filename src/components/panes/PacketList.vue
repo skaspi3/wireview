@@ -1,78 +1,7 @@
 <script setup>
-import { computed, ref, watch, onMounted, onUnmounted, useTemplateRef } from "vue";
+import { computed, ref, watch, onMounted, useTemplateRef } from "vue";
 import { useResizeObserver, useScroll } from "@vueuse/core";
-import { packets, activePacketIndex, displayFilter, allPackets, activeStream } from "../../globals";
-
-// Context menu state
-const contextMenu = ref({
-  show: false,
-  x: 0,
-  y: 0,
-  packet: null
-});
-
-// Handle right-click on packet row
-const handleContextMenu = (event, pkt) => {
-  event.preventDefault();
-  contextMenu.value = {
-    show: true,
-    x: event.clientX,
-    y: event.clientY,
-    packet: pkt
-  };
-};
-
-// Close context menu
-const closeContextMenu = () => {
-  contextMenu.value.show = false;
-};
-
-// Follow UDP stream
-const followStream = () => {
-  const pkt = contextMenu.value.packet;
-  if (!pkt) return;
-
-  // Parse ports from info field (e.g., "2077 → 2088" or "Src: 2077, Dst: 2088")
-  let srcPort = null;
-  let dstPort = null;
-
-  // Try to parse "srcPort → dstPort" format
-  const arrowMatch = pkt.info?.match(/(\d+)\s*[→>]\s*(\d+)/);
-  if (arrowMatch) {
-    srcPort = arrowMatch[1];
-    dstPort = arrowMatch[2];
-  }
-
-  activeStream.value = {
-    srcIp: pkt.src,
-    dstIp: pkt.dst,
-    srcPort,
-    dstPort,
-    protocol: pkt.protocol
-  };
-
-  closeContextMenu();
-};
-
-// Check if packet is UDP-based (can follow stream)
-const canFollowStream = (pkt) => {
-  return pkt && (pkt.protocol === 'UDP' || pkt.protocol === 'ZIXI' || pkt.protocol === 'DNS');
-};
-
-// Close context menu when clicking outside
-const handleGlobalClick = () => {
-  if (contextMenu.value.show) {
-    closeContextMenu();
-  }
-};
-
-onMounted(() => {
-  document.addEventListener('click', handleGlobalClick);
-});
-
-onUnmounted(() => {
-  document.removeEventListener('click', handleGlobalClick);
-});
+import { packets, activePacketIndex, displayFilter, allPackets } from "../../globals";
 
 // Row height for virtual scrolling
 const rowHeight = 20;
@@ -390,7 +319,6 @@ const formatTime = (time) => {
             :class="{ selected: activePacketIndex !== null && packets[activePacketIndex]?.number === pkt.number }"
             :style="{ backgroundColor: getProtocolColor(pkt.protocol) }"
             @click="selectPacket(firstRowIndex + i)"
-            @contextmenu="handleContextMenu($event, pkt)"
           >
             <td class="col-no">{{ pkt.number }}</td>
             <td class="col-time">{{ formatTime(pkt.time) }}</td>
@@ -406,27 +334,6 @@ const formatTime = (time) => {
     <!-- Spacer for scrolling -->
     <div :style="{ height: extraRows + 'px' }"></div>
   </div>
-
-  <!-- Context Menu -->
-  <Teleport to="body">
-    <div
-      v-if="contextMenu.show"
-      class="context-menu"
-      :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
-      @click.stop
-    >
-      <div
-        v-if="canFollowStream(contextMenu.packet)"
-        class="context-menu-item"
-        @click="followStream"
-      >
-        Follow UDP Stream
-      </div>
-      <div v-else class="context-menu-item disabled">
-        Follow UDP Stream
-      </div>
-    </div>
-  </Teleport>
 </template>
 
 <style scoped>
@@ -523,39 +430,4 @@ const formatTime = (time) => {
 .col-proto { width: 70px; }
 .col-len { width: 60px; text-align: right; }
 .col-info { flex: 1; }
-
-/* Context Menu */
-.context-menu {
-  position: fixed;
-  background: #2d2d30;
-  border: 1px solid #3e3e42;
-  border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  min-width: 160px;
-  z-index: 10000;
-  padding: 4px 0;
-}
-
-.context-menu-item {
-  padding: 8px 16px;
-  color: #e5e5e5;
-  font-size: 13px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.context-menu-item:hover {
-  background: #3875d7;
-  color: #fff;
-}
-
-.context-menu-item.disabled {
-  color: #6b6b6b;
-  cursor: not-allowed;
-}
-
-.context-menu-item.disabled:hover {
-  background: transparent;
-  color: #6b6b6b;
-}
 </style>
