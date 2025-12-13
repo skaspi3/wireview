@@ -1,6 +1,6 @@
 <script setup>
 import { ref, useTemplateRef } from 'vue';
-import { clearPackets, filterLoading, filterProgress, cancelFilter } from './globals';
+import { clearPackets, filterLoading, filterProgress, cancelFilter, activeStream } from './globals';
 import './packetCache';  // Initialize packet cache (registers clearer callback)
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
 import PacketList from './components/panes/PacketList.vue';
@@ -11,6 +11,7 @@ import DisplayFilter from './components/DisplayFilter.vue';
 import StatusBar from './components/StatusBar.vue';
 import FileBrowser from './components/FileBrowser.vue';
 import InsightsPanel from './components/InsightsPanel.vue';
+import StreamViewer from './components/StreamViewer.vue';
 
 // Row height for packet list (used for virtual scrolling)
 const rowHeight = ref(20);
@@ -62,6 +63,9 @@ const handleOpenInsights = () => {
 
     <!-- Insights Panel Modal -->
     <InsightsPanel v-if="showInsights" @close="showInsights = false" />
+
+    <!-- Stream Viewer Modal -->
+    <StreamViewer v-if="activeStream" @close="activeStream = null" />
 
     <!-- Main UI -->
     <div class="main-content">

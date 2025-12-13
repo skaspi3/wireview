@@ -21,6 +21,9 @@ export const filterError = ref(null);
 export const filterLoading = ref(false);  // True while filter is being applied
 export const filterProgress = ref(0);     // Number of matching packets found so far
 
+// Stream viewer state (for Follow UDP Stream feature)
+export const activeStream = ref(null);  // { srcIp, dstIp, srcPort, dstPort, protocol }
+
 // WebSocket reference for sending messages
 export const websocket = ref(null);
 
