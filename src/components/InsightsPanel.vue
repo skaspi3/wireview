@@ -43,11 +43,9 @@ const timeline = ref([]);
 const expert = ref(null);
 const conversations = ref([]);
 const protocolHierarchy = ref([]);
-const heuristicDecodes = ref([]);
 const expertLoading = ref(false);
 const conversationsLoading = ref(false);
 const hierarchyLoading = ref(false);
-const heuristicLoading = ref(false);
 
 // Auto-refresh interval
 let refreshInterval = null;
@@ -208,21 +206,6 @@ const fetchProtocolHierarchy = async () => {
   }
 };
 
-// Fetch heuristic decodes (on-demand, static data)
-const fetchHeuristicDecodes = async () => {
-  if (heuristicLoading.value || heuristicDecodes.value.length > 0) return;
-  try {
-    heuristicLoading.value = true;
-    const response = await fetch('/api/heuristic-decodes');
-    const data = await response.json();
-    heuristicDecodes.value = data.decodes || [];
-  } catch (e) {
-    console.error('Failed to fetch heuristic decodes:', e);
-  } finally {
-    heuristicLoading.value = false;
-  }
-};
-
 // Watch tab changes to load data on-demand
 watch(activeTab, (newTab) => {
   if (newTab === 'expert' && !expert.value && !expertLoading.value) {
@@ -231,8 +214,6 @@ watch(activeTab, (newTab) => {
     fetchConversations();
   } else if (newTab === 'hierarchy' && !protocolHierarchy.value.length && !hierarchyLoading.value) {
     fetchProtocolHierarchy();
-  } else if (newTab === 'heuristic' && !heuristicDecodes.value.length && !heuristicLoading.value) {
-    fetchHeuristicDecodes();
   }
 });
 
@@ -645,10 +626,6 @@ const hierarchyTreeOption = computed(() => {
           :class="{ active: activeTab === 'hierarchy' }"
           @click="activeTab = 'hierarchy'"
         >Hierarchy</button>
-        <button
-          :class="{ active: activeTab === 'heuristic' }"
-          @click="activeTab = 'heuristic'"
-        >Heuristic</button>
       </div>
 
       <!-- Content -->
@@ -837,53 +814,6 @@ const hierarchyTreeOption = computed(() => {
           <div v-else-if="!protocolHierarchy.length" class="empty-state">No protocol hierarchy data available</div>
           <div v-else-if="hierarchyTreeOption" class="hierarchy-tree-container">
             <v-chart class="hierarchy-tree-chart" :option="hierarchyTreeOption" autoresize />
-          </div>
-        </div>
-
-        <!-- Heuristic Tab -->
-        <div v-else-if="activeTab === 'heuristic'" class="tab-content heuristic-tab">
-          <div v-if="heuristicLoading" class="loading-state">
-            <div class="spinner"></div>
-            <p>Loading heuristic decodes...</p>
-          </div>
-          <div v-else-if="!heuristicDecodes.length" class="empty-state">No heuristic decode data available</div>
-          <div v-else class="heuristic-content">
-            <div class="heuristic-header">
-              <h3>tshark Heuristic Dissectors</h3>
-              <span class="heuristic-count">{{ heuristicDecodes.length }} dissectors</span>
-            </div>
-            <div class="heuristic-table-wrapper">
-              <table class="heuristic-table">
-                <thead>
-                  <tr>
-                    <th>Parent</th>
-                    <th>Child</th>
-                    <th>Default</th>
-                    <th>Enabled</th>
-                    <th>Name</th>
-                    <th>Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(decode, idx) in heuristicDecodes" :key="idx">
-                    <td class="protocol-cell">{{ decode.parent }}</td>
-                    <td class="protocol-cell">{{ decode.child }}</td>
-                    <td class="status-cell">
-                      <span :class="decode.defaultEnabled ? 'enabled' : 'disabled'">
-                        {{ decode.defaultEnabled ? 'Y' : 'N' }}
-                      </span>
-                    </td>
-                    <td class="status-cell">
-                      <span :class="decode.enabled ? 'enabled' : 'disabled'">
-                        {{ decode.enabled ? 'Y' : 'N' }}
-                      </span>
-                    </td>
-                    <td class="name-cell">{{ decode.name }}</td>
-                    <td class="desc-cell">{{ decode.description }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
           </div>
         </div>
       </div>
@@ -1435,93 +1365,6 @@ const hierarchyTreeOption = computed(() => {
 
 .hierarchy-bytes {
   color: #60a5fa;
-}
-
-/* Heuristic Tab */
-.heuristic-content {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.heuristic-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.heuristic-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 500;
-  color: #e5e7eb;
-}
-
-.heuristic-count {
-  color: #9ca3af;
-  font-size: 13px;
-}
-
-.heuristic-table-wrapper {
-  overflow-x: auto;
-  background: #111827;
-  border: 1px solid #374151;
-  border-radius: 8px;
-}
-
-.heuristic-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-  min-width: 800px;
-}
-
-.heuristic-table th,
-.heuristic-table td {
-  padding: 8px 12px;
-  text-align: left;
-  border-bottom: 1px solid #374151;
-}
-
-.heuristic-table th {
-  background: #1f2937;
-  color: #9ca3af;
-  font-weight: 500;
-  font-size: 11px;
-  text-transform: uppercase;
-  position: sticky;
-  top: 0;
-}
-
-.heuristic-table tbody tr:hover {
-  background: #1f2937;
-}
-
-.heuristic-table .protocol-cell {
-  color: #60a5fa;
-  font-family: monospace;
-}
-
-.heuristic-table .name-cell {
-  color: #a78bfa;
-  font-family: monospace;
-}
-
-.heuristic-table .desc-cell {
-  color: #e5e7eb;
-}
-
-.heuristic-table .status-cell {
-  text-align: center;
-}
-
-.heuristic-table .status-cell .enabled {
-  color: #10b981;
-  font-weight: 600;
-}
-
-.heuristic-table .status-cell .disabled {
-  color: #6b7280;
 }
 
 </style>
