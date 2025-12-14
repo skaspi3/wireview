@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from "vue";
-import { packets, allPackets, nodeVersion, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesFetched } from "../globals";
+import { packets, allPackets, nodeVersion, tsharkLuaVersion, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesFetched } from "../globals";
 import GitHubIcon from "./icons/GitHubIcon.vue";
 
 const showFilterPopup = ref(false);
@@ -175,6 +175,7 @@ const formatMemory = (bytes) => {
           >
             <div v-if="showBackendPopup" class="backend-popup">
               <div class="popup-row">Node.js: {{ nodeVersion || 'unknown' }}</div>
+              <div class="popup-row">tshark Lua: {{ tsharkLuaVersion || 'N/A' }}</div>
               <div v-if="systemStats" class="memory-section">
                 <div class="popup-row">SQLite: {{ systemStats.sqliteVersion || 'N/A' }}</div>
                 <div class="popup-row memory-row">Heap: {{ formatMemory(systemStats.heapUsed) }} / {{ formatMemory(systemStats.heapTotal) }}</div>

@@ -26,6 +26,7 @@ export const websocket = ref(null);
 
 // Version info
 export const nodeVersion = ref('');
+export const tsharkLuaVersion = ref('');
 export const backendPort = ref(null);
 
 // Host IP (the IP of the capture interface)
