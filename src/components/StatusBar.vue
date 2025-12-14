@@ -163,8 +163,6 @@ const formatMemory = (bytes) => {
       >
         Thin Client Mode
         <div v-if="showThinClientPopup" class="thin-client-popup">
-          <div class="popup-row rcv-row">RCV: {{ formatBytes(bytesReceived) }}</div>
-          <div class="popup-row fetched-row">Fetched: {{ formatBytes(bytesFetched) }}</div>
           <div class="popup-row reduction-row">Reduction Ratio: {{ reductionRatio.toFixed(1) }}%</div>
         </div>
       </span>
@@ -351,14 +349,6 @@ const formatMemory = (bytes) => {
 }
 .thin-client-popup .popup-row {
   margin: 2px 0;
-}
-.thin-client-popup .rcv-row {
-  color: #a78bfa;
-  font-weight: 500;
-}
-.thin-client-popup .fetched-row {
-  color: #a78bfa;
-  font-weight: 500;
 }
 .thin-client-popup .reduction-row {
   color: #22c55e;
