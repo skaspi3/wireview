@@ -51,7 +51,7 @@
       <span class="recording-indicator">● Capture</span>
       <span class="interface-tag">on {{ selectedInterface }}</span>
 
-      <button @click="restartCapture" class="btn btn-warning" title="Restart Capture">
+      <button @click="confirmRestartCapture" class="btn btn-warning" title="Restart Capture">
         ↺
       </button>
       <button @click="stopCapture" class="btn btn-danger">
@@ -64,12 +64,29 @@
       {{ error }}
       <button @click="error = null">×</button>
     </div>
+
+    <!-- Save Confirmation Dialog -->
+    <ConfirmDialog
+      ref="saveConfirmDialog"
+      title="Save Capture"
+      message="Do you want to save the current capture before restarting?"
+      yesText="Save"
+      noText="Don't Save"
+      @yes="onSaveConfirmYes"
+      @no="onSaveConfirmNo"
+    />
+
+    <!-- Save Success Toast -->
+    <div v-if="saveToast" class="save-toast">
+      {{ saveToast }}
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, triggerRef, onUnmounted, onMounted, computed } from 'vue';
 import { nodeVersion, tsharkLuaVersion, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP } from '../globals';
+import ConfirmDialog from './ConfirmDialog.vue';
 
 const emit = defineEmits(['clear', 'stop', 'openFileBrowser']);
 
@@ -92,6 +109,10 @@ const loadedPcapFilename = computed(() => {
   const parts = loadedPcapFile.value.split('/');
   return parts[parts.length - 1];
 });
+
+// Save dialogs refs
+const saveConfirmDialog = ref(null);
+const saveToast = ref(null);
 
 // Batched update for performance
 let pendingUpdate = false;
@@ -272,12 +293,20 @@ const connect = () => {
           loadPcapProgress.value = msg.count;
         }
 
+        // Handle incremental packet batches during loading
+        if (msg.type === 'loadPcapBatch') {
+          // Append batch to packets array
+          packets.value.push(...msg.packets);
+          allPackets.value.push(...msg.packets);
+          loadPcapProgress.value = msg.total;
+          triggerRef(packets);
+        }
+
         if (msg.type === 'loadPcapComplete') {
           isLoadingPcap.value = false;
           loadPcapProgress.value = 0;
           loadedPcapFile.value = msg.path;
-          packets.value = [...msg.packets];
-          allPackets.value = [...msg.packets];
+          // Packets already loaded via batches, just trigger final update
           triggerRef(packets);
         }
 
@@ -366,6 +395,62 @@ const restartCapture = () => {
       isCapturing.value = true;
     }
   }, 200);
+};
+
+// Save confirmation flow for restart
+const confirmRestartCapture = () => {
+  // Only ask to save if there are packets captured
+  if (packets.value.length > 0) {
+    saveConfirmDialog.value?.open();
+  } else {
+    // No packets to save, just restart
+    restartCapture();
+  }
+};
+
+const generateDefaultFilename = () => {
+  const now = new Date();
+  const timestamp = now.toISOString()
+    .replace(/[:.]/g, '-')
+    .replace('T', '_')
+    .slice(0, 19);
+  return `${timestamp}_webcap.pcapng.gz`;
+};
+
+const onSaveConfirmYes = async () => {
+  // Auto-save to /tmp with default filename
+  const filename = generateDefaultFilename();
+  const savePath = `/tmp/${filename}`;
+
+  try {
+    const response = await fetch('/api/save-pcap', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: savePath })
+    });
+
+    const text = await response.text();
+    if (text) {
+      const data = JSON.parse(text);
+      if (data.success) {
+        // Show toast notification
+        saveToast.value = `Capture saved: ${filename} under /tmp folder`;
+        setTimeout(() => {
+          saveToast.value = null;
+        }, 2000);
+      }
+    }
+  } catch (e) {
+    // Silently fail - proceed with restart anyway
+  }
+
+  // Proceed with restart
+  restartCapture();
+};
+
+const onSaveConfirmNo = () => {
+  // User doesn't want to save - proceed with restart
+  restartCapture();
 };
 
 // Open file browser
@@ -552,5 +637,28 @@ onUnmounted(() => {
   margin-left: 8px;
   padding: 4px 10px;
   font-size: 0.85em;
+}
+
+.save-toast {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #065f46;
+  color: #d1fae5;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 2000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  animation: fadeInOut 2s ease-in-out;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  15% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  85% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
 }
 </style>

@@ -123,6 +123,14 @@ export default defineConfig(({ mode }) => {
         '/api/stats': {
           target: 'http://127.0.0.1:3000',
           changeOrigin: true,
+        },
+        '/api/files-save': {
+          target: 'http://127.0.0.1:3000',
+          changeOrigin: true,
+        },
+        '/api/save-pcap': {
+          target: 'http://127.0.0.1:3000',
+          changeOrigin: true,
         }
       }
     }
