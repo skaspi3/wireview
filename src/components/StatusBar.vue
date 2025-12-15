@@ -126,6 +126,49 @@ const formatMemory = (bytes) => {
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 };
+
+// Parse certificate subject/issuer into readable key-value pairs
+const parseCertField = (field) => {
+  if (!field) return [];
+  // Format: "CN = example.com, O = Org, C = US" or similar
+  const parts = field.split(/,\s*(?=[A-Z]+\s*=)/);
+  return parts.map(part => {
+    const match = part.match(/^\s*([A-Za-z]+)\s*=\s*(.+?)\s*$/);
+    if (match) {
+      const labels = {
+        'CN': 'Common Name',
+        'O': 'Organization',
+        'OU': 'Org Unit',
+        'C': 'Country',
+        'ST': 'State',
+        'L': 'Locality',
+        'emailAddress': 'Email'
+      };
+      return { key: labels[match[1]] || match[1], value: match[2] };
+    }
+    return null;
+  }).filter(Boolean);
+};
+
+const certSubject = computed(() => parseCertField(certInfo.value?.subject));
+const certIssuer = computed(() => parseCertField(certInfo.value?.issuer));
+
+// Format date for display
+const formatCertDate = (dateStr) => {
+  if (!dateStr) return '';
+  try {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return dateStr;
+  }
+};
+
+// Check if certificate is self-signed
+const isSelfSigned = computed(() => {
+  if (!certInfo.value) return false;
+  return certInfo.value.subject === certInfo.value.issuer;
+});
 </script>
 <template>
   <div class="status-bar">
@@ -187,12 +230,43 @@ const formatMemory = (bytes) => {
         | <span class="lock-icon" @mouseenter="showCertPopup = true" @mouseleave="showCertPopup = false">
             🔒
             <div v-if="showCertPopup" class="cert-popup">
+              <div class="cert-header">
+                <span class="cert-title">TLS Certificate</span>
+                <span v-if="isSelfSigned" class="cert-self-signed">Self-Signed</span>
+              </div>
               <template v-if="certInfo">
-                <div class="cert-title">TLS Certificate</div>
-                <div v-if="certInfo.subject === certInfo.issuer" class="cert-self-signed">Self-Signed</div>
+                <div class="cert-section">
+                  <div class="cert-section-title">Subject</div>
+                  <div v-for="item in certSubject" :key="'s-'+item.key" class="cert-row">
+                    <span class="cert-label">{{ item.key }}:</span>
+                    <span class="cert-value">{{ item.value }}</span>
+                  </div>
+                </div>
+                <div v-if="!isSelfSigned" class="cert-section">
+                  <div class="cert-section-title">Issuer</div>
+                  <div v-for="item in certIssuer" :key="'i-'+item.key" class="cert-row">
+                    <span class="cert-label">{{ item.key }}:</span>
+                    <span class="cert-value">{{ item.value }}</span>
+                  </div>
+                </div>
+                <div class="cert-section">
+                  <div class="cert-section-title">Validity</div>
+                  <div class="cert-row">
+                    <span class="cert-label">From:</span>
+                    <span class="cert-value">{{ formatCertDate(certInfo.validFrom) }}</span>
+                  </div>
+                  <div class="cert-row">
+                    <span class="cert-label">To:</span>
+                    <span class="cert-value">{{ formatCertDate(certInfo.validTo) }}</span>
+                  </div>
+                </div>
+                <div v-if="certInfo.fingerprint" class="cert-section">
+                  <div class="cert-section-title">SHA-256 Fingerprint</div>
+                  <div class="cert-fingerprint">{{ certInfo.fingerprint }}</div>
+                </div>
               </template>
               <template v-else>
-                <div class="cert-title">TLS Certificate</div>
+                <div class="cert-no-info">Certificate info not available</div>
               </template>
             </div>
           </span>
@@ -437,21 +511,69 @@ const formatMemory = (bytes) => {
   background: #1f2937;
   border: 1px solid #374151;
   border-radius: 6px;
-  padding: 8px 12px;
-  white-space: nowrap;
+  padding: 10px 14px;
+  min-width: 280px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   z-index: 1000;
-  font-size: 11px;
+  font-size: 12px;
   color: #d1d5db;
+}
+.cert-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #374151;
 }
 .cert-title {
   font-weight: 600;
   color: #ffffff;
-  font-size: 12px;
+  font-size: 13px;
 }
 .cert-self-signed {
   color: #f59e0b;
+  font-size: 10px;
+  background: rgba(245, 158, 11, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.cert-section {
+  margin-bottom: 10px;
+}
+.cert-section:last-child {
+  margin-bottom: 0;
+}
+.cert-section-title {
+  font-size: 10px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.cert-row {
+  display: flex;
   font-size: 11px;
-  margin-top: 4px;
+  margin: 2px 0;
+  white-space: nowrap;
+}
+.cert-label {
+  color: #9ca3af;
+  min-width: 90px;
+}
+.cert-value {
+  color: #e5e7eb;
+}
+.cert-fingerprint {
+  font-family: monospace;
+  font-size: 9px;
+  color: #9ca3af;
+  word-break: break-all;
+  line-height: 1.4;
+  white-space: normal;
+}
+.cert-no-info {
+  color: #6b7280;
+  font-style: italic;
 }
 </style>
