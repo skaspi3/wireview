@@ -1,6 +1,6 @@
 <script setup>
-import { ref, useTemplateRef } from 'vue';
-import { clearPackets, filterLoading, filterProgress, cancelFilter } from './globals';
+import { ref, useTemplateRef, computed } from 'vue';
+import { clearPackets, filterLoading, filterProgress, cancelFilter, packets } from './globals';
 import './packetCache';  // Initialize packet cache (registers clearer callback)
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
 import PacketList from './components/panes/PacketList.vue';
@@ -11,6 +11,9 @@ import DisplayFilter from './components/DisplayFilter.vue';
 import StatusBar from './components/StatusBar.vue';
 import FileBrowser from './components/FileBrowser.vue';
 import InsightsPanel from './components/InsightsPanel.vue';
+
+// Show landing page when no packets and not actively using the app
+const showLandingPage = computed(() => packets.value.length === 0);
 
 // Row height for packet list (used for virtual scrolling)
 const rowHeight = ref(20);
@@ -65,10 +68,17 @@ const handleOpenInsights = () => {
 
     <!-- Main UI -->
     <div class="main-content">
-      <IconRibbon ref="icon-ribbon" @clear="handleClear" @stop="handleStop" @openFileBrowser="handleOpenFileBrowser" @openInsights="handleOpenInsights" />
+      <IconRibbon ref="icon-ribbon" :hide-insights="showLandingPage" @clear="handleClear" @stop="handleStop" @openFileBrowser="handleOpenFileBrowser" @openInsights="handleOpenInsights" />
       <DisplayFilter />
 
-      <div class="workspace">
+      <!-- Landing Page with Interface Selector (teleport target) -->
+      <!-- Always render container for Teleport, use v-show to hide -->
+      <div class="landing-page" :class="{ 'landing-hidden': !showLandingPage }">
+        <div id="interface-selector-container"></div>
+      </div>
+
+      <!-- Workspace (shown when packets available or hidden when landing page) -->
+      <div class="workspace" :class="{ 'workspace-hidden': showLandingPage }">
         <DefaultLayout
           :style="{
             '--ws-row-height': rowHeight + 'px',
@@ -107,6 +117,25 @@ const handleOpenInsights = () => {
   flex-direction: column;
   min-height: 0;
   background-color: var(--ws-almost-white);
+}
+
+.workspace-hidden {
+  display: none;
+}
+
+.landing-page {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #e8f4fc 0%, #d4e9f7 50%, #c5e0f5 100%);
+  min-height: 0;
+  overflow: auto;
+}
+
+.landing-hidden {
+  display: none;
 }
 
 .filter-loading-overlay {

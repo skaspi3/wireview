@@ -2,6 +2,13 @@
 import { useTemplateRef } from 'vue';
 import LiveCapture from "./LiveCapture.vue";
 
+const props = defineProps({
+  hideInsights: {
+    type: Boolean,
+    default: false
+  }
+});
+
 const emit = defineEmits(['clear', 'stop', 'openFileBrowser', 'openInsights']);
 
 const liveCaptureRef = useTemplateRef('live-capture');
@@ -21,14 +28,16 @@ defineExpose({ loadPcapFile });
       @stop="() => emit('stop')"
       @openFileBrowser="() => emit('openFileBrowser')"
     />
-    <div class="separator"></div>
-    <button class="insights-btn" @click="emit('openInsights')" title="Capture Insights">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 3v18h18"/>
-        <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>
-      </svg>
-      Insights
-    </button>
+    <template v-if="!hideInsights">
+      <div class="separator"></div>
+      <button class="insights-btn" @click="emit('openInsights')" title="Capture Insights">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 3v18h18"/>
+          <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>
+        </svg>
+        Insights
+      </button>
+    </template>
   </div>
 </template>
 

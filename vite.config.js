@@ -131,6 +131,10 @@ export default defineConfig(({ mode }) => {
         '/api/save-pcap': {
           target: 'http://127.0.0.1:3000',
           changeOrigin: true,
+        },
+        '/api/interfaces': {
+          target: 'http://127.0.0.1:3000',
+          changeOrigin: true,
         }
       }
     }

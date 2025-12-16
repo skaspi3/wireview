@@ -1,7 +1,7 @@
 <template>
-  <div class="live-capture-wrapper">
-    <!-- Connecting / Interface Selection State -->
-    <div v-if="!isCapturing && !isLoadingPcap && !loadedPcapFile" class="controls">
+  <div class="live-capture-wrapper" :class="{ 'show-selector': showInterfaceSelector }">
+    <!-- Connecting State (in header bar) -->
+    <div v-if="!isCapturing && !isLoadingPcap && !loadedPcapFile && !showInterfaceSelector" class="controls">
       <div v-if="!isConnected">
         <button @click="connect" class="btn btn-secondary">
           Connect to Backend
@@ -22,6 +22,24 @@
         </button>
       </div>
     </div>
+
+    <!-- Interface Selector (Landing Page) - shown in main content area -->
+    <Teleport to="#interface-selector-container" v-if="showInterfaceSelector">
+      <div class="interface-selector-wrapper">
+        <InterfaceSelector
+          :ws-connection="ws"
+          :default-interface="selectedInterface"
+          @select="onInterfaceSelect"
+          @start-capture="onSelectorStartCapture"
+        />
+        <div class="open-file-section">
+          <span class="or-text">or</span>
+          <button @click="openFileBrowser" class="btn btn-file-large" title="Open capture file">
+            📂 Open Capture File
+          </button>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- Loading Pcap State -->
     <div v-if="isLoadingPcap" class="status-bar loading-pcap">
@@ -87,6 +105,7 @@
 import { ref, triggerRef, onUnmounted, onMounted, computed } from 'vue';
 import { nodeVersion, tsharkLuaVersion, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP } from '../globals';
 import ConfirmDialog from './ConfirmDialog.vue';
+import InterfaceSelector from './InterfaceSelector.vue';
 
 const emit = defineEmits(['clear', 'stop', 'openFileBrowser']);
 
@@ -109,6 +128,22 @@ const loadedPcapFilename = computed(() => {
   const parts = loadedPcapFile.value.split('/');
   return parts[parts.length - 1];
 });
+
+// Show interface selector when connected but not capturing/loading
+const showInterfaceSelector = computed(() => {
+  return isConnected.value && !isCapturing.value && !isLoadingPcap.value && !loadedPcapFile.value;
+});
+
+// Handle interface selection from selector
+const onInterfaceSelect = (iface) => {
+  selectedInterface.value = iface.name;
+};
+
+// Handle start capture from selector
+const onSelectorStartCapture = (ifaceName) => {
+  selectedInterface.value = ifaceName;
+  startCapture();
+};
 
 // Save dialogs refs
 const saveConfirmDialog = ref(null);
@@ -660,5 +695,41 @@ onUnmounted(() => {
   15% { opacity: 1; transform: translateX(-50%) translateY(0); }
   85% { opacity: 1; transform: translateX(-50%) translateY(0); }
   100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+}
+
+/* Interface Selector Landing Page Styles */
+.interface-selector-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 40px 20px;
+}
+
+.open-file-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.or-text {
+  color: #555;
+  font-size: 15px;
+}
+
+.btn-file-large {
+  background: #6366f1;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  transition: background 0.15s ease;
+}
+
+.btn-file-large:hover {
+  background: #818cf8;
 }
 </style>
