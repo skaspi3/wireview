@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+*.wasm
+
+# WASM files (not needed in thin-client mode)
+*.wasm
+wiregasm.*
+
+# Capture files
+*.pcap
+*.pcapng
+*.pcap.gz
+*.pcapng.gz
