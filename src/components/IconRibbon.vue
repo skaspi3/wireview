@@ -1,5 +1,6 @@
 <script setup>
-import { useTemplateRef } from 'vue';
+import { ref, useTemplateRef } from 'vue';
+import { displayFilter, packets } from '../globals';
 import LiveCapture from "./LiveCapture.vue";
 
 const props = defineProps({
@@ -9,12 +10,80 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['clear', 'stop', 'openFileBrowser', 'openInsights']);
+const emit = defineEmits(['clear', 'stop', 'openFileBrowser', 'openInsights', 'saveFiltered']);
 
 const liveCaptureRef = useTemplateRef('live-capture');
 
+// Save filtered dialog
+const showSaveFilteredDialog = ref(false);
+const saveFilteredFilename = ref('');
+const saveFilteredError = ref(null);
+const saveFilteredSaving = ref(false);
+
 const loadPcapFile = (filePath) => {
   liveCaptureRef.value?.loadPcapFile(filePath);
+};
+
+const openSaveFilteredDialog = () => {
+  // Generate default filename with timestamp
+  const now = new Date();
+  const timestamp = now.toISOString()
+    .replace(/[:.]/g, '-')
+    .replace('T', '_')
+    .slice(0, 19);
+  saveFilteredFilename.value = `filtered_${timestamp}`;
+  saveFilteredError.value = null;
+  showSaveFilteredDialog.value = true;
+};
+
+const closeSaveFilteredDialog = () => {
+  showSaveFilteredDialog.value = false;
+  saveFilteredError.value = null;
+};
+
+const saveFilteredPackets = async () => {
+  if (!saveFilteredFilename.value.trim()) {
+    saveFilteredError.value = 'Please enter a filename';
+    return;
+  }
+
+  // Get frame numbers from filtered packets
+  const frameNumbers = packets.value.map(pkt => pkt.number).filter(n => n > 0);
+  if (frameNumbers.length === 0) {
+    saveFilteredError.value = 'No packets to save';
+    return;
+  }
+
+  let filename = saveFilteredFilename.value.trim();
+
+  // Handle extension logic
+  if (!filename.endsWith('.pcap') && !filename.endsWith('.pcapng')) {
+    filename += '.pcapng';
+  }
+
+  saveFilteredSaving.value = true;
+  saveFilteredError.value = null;
+
+  try {
+    const response = await fetch('/api/save-filtered', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename, frameNumbers })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      closeSaveFilteredDialog();
+      emit('saveFiltered', data.path);
+    } else {
+      saveFilteredError.value = data.error || 'Failed to save file';
+    }
+  } catch (e) {
+    saveFilteredError.value = e.message || 'Failed to save file';
+  } finally {
+    saveFilteredSaving.value = false;
+  }
 };
 
 defineExpose({ loadPcapFile });
@@ -37,7 +106,41 @@ defineExpose({ loadPcapFile });
         </svg>
         Insights
       </button>
+      <!-- Save Selected button - shown when filter is active -->
+      <button v-if="displayFilter" class="save-selected-btn" @click="openSaveFilteredDialog" title="Save filtered packets">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+          <polyline points="17 21 17 13 7 13 7 21"/>
+          <polyline points="7 3 7 8 15 8"/>
+        </svg>
+        Save Selected
+      </button>
     </template>
+
+    <!-- Save Filtered Dialog -->
+    <div v-if="showSaveFilteredDialog" class="save-dialog-overlay" @click.self="closeSaveFilteredDialog">
+      <div class="save-dialog">
+        <h3>Save Filtered Packets</h3>
+        <p>Enter filename for the filtered capture:</p>
+        <div class="save-input-container">
+          <input
+            type="text"
+            v-model="saveFilteredFilename"
+            class="save-filename-input"
+            placeholder="filename"
+            @keyup.enter="saveFilteredPackets"
+          />
+          <span class="extension-hint">.pcapng</span>
+        </div>
+        <div v-if="saveFilteredError" class="save-error">{{ saveFilteredError }}</div>
+        <div class="save-actions">
+          <button @click="saveFilteredPackets" class="btn btn-save" :disabled="saveFilteredSaving">
+            {{ saveFilteredSaving ? 'Saving...' : 'Save' }}
+          </button>
+          <button @click="closeSaveFilteredDialog" class="btn btn-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -107,5 +210,142 @@ defineExpose({ loadPcapFile });
 .insights-btn svg {
   width: 16px;
   height: 16px;
+}
+
+.save-selected-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  margin-left: 6px;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.save-selected-btn:hover {
+  background: linear-gradient(135deg, #4ade80, #22c55e);
+  transform: translateY(-1px);
+}
+
+.save-selected-btn:active {
+  transform: translateY(0);
+}
+
+.save-selected-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Save Dialog */
+.save-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+}
+
+.save-dialog {
+  background: #1f2937;
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 400px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.save-dialog h3 {
+  margin: 0 0 12px 0;
+  color: #f9fafb;
+  font-size: 1.2em;
+}
+
+.save-dialog p {
+  color: #9ca3af;
+  margin: 0 0 16px 0;
+  font-size: 0.95em;
+}
+
+.save-input-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.save-filename-input {
+  flex: 1;
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: #e5e7eb;
+  font-family: monospace;
+  font-size: 14px;
+}
+
+.save-filename-input:focus {
+  outline: none;
+  border-color: #22c55e;
+}
+
+.extension-hint {
+  color: #6b7280;
+  font-family: monospace;
+  font-size: 14px;
+}
+
+.save-error {
+  color: #ef4444;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.save-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.save-dialog .btn {
+  padding: 8px 20px;
+  border-radius: 6px;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-save {
+  background: #22c55e;
+  color: white;
+}
+
+.btn-save:hover:not(:disabled) {
+  background: #16a34a;
+}
+
+.btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-cancel {
+  background: #4b5563;
+  color: #e5e7eb;
+}
+
+.btn-cancel:hover {
+  background: #6b7280;
 }
 </style>
