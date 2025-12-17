@@ -101,7 +101,6 @@ export default defineConfig(({ mode }) => {
           target: 'ws://127.0.0.1:3000',
           ws: true,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/ws/, '')
         },
         // Thin-client API endpoints
         '/api/packet': {
