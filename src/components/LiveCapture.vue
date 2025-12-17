@@ -77,7 +77,7 @@
         </button>
       </span>
 
-      <button @click="confirmRestartCapture" class="btn btn-warning" title="Restart Capture">
+      <button v-if="isSessionOwner || !sessionId" @click="confirmRestartCapture" class="btn btn-warning" title="Restart Capture">
         ↺
       </button>
       <button v-if="isSessionOwner || !sessionId" @click="stopCapture" class="btn btn-danger">
