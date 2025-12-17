@@ -123,6 +123,11 @@
     <div v-if="saveToast" class="save-toast">
       {{ saveToast }}
     </div>
+
+    <!-- Session Notification Toast -->
+    <div v-if="sessionNotification" class="session-notification">
+      {{ sessionNotification }}
+    </div>
   </div>
 </template>
 
@@ -148,6 +153,16 @@ const isSessionOwner = ref(false);
 const sessionClientCount = ref(0);
 const pendingSessionJoin = ref(null);  // Session ID from URL to join after connect
 const showShareDialog = ref(false);
+const sessionNotification = ref(null);  // Toast notification for session events
+const myViewerId = ref(null);  // This client's viewer ID
+
+// Show session notification toast
+const showSessionNotification = (message, duration = 3000) => {
+  sessionNotification.value = message;
+  setTimeout(() => {
+    sessionNotification.value = null;
+  }, duration);
+};
 
 // Pcap file loading state
 const isLoadingPcap = ref(false);
@@ -270,6 +285,7 @@ const connect = () => {
           sessionId.value = msg.sessionId;
           isSessionOwner.value = true;
           sessionClientCount.value = 1;
+          myViewerId.value = 'Owner';
           selectedInterface.value = msg.interface;
           isCapturing.value = true;
           emit('clear');
@@ -279,6 +295,7 @@ const connect = () => {
         if (msg.type === 'sessionJoined') {
           sessionId.value = msg.sessionId;
           isSessionOwner.value = false;
+          myViewerId.value = msg.viewerId;
           selectedInterface.value = msg.interface;
           isCapturing.value = msg.isCapturing;
           emit('clear');
@@ -296,15 +313,41 @@ const connect = () => {
         // Session client count update
         if (msg.type === 'sessionClientUpdate') {
           sessionClientCount.value = msg.clientCount;
-          if (msg.ownerLeft) {
-            // Owner left, we might want to notify user
-            error.value = 'Session owner disconnected';
+
+          // Show notification based on action
+          if (msg.action === 'joined' && msg.viewerId !== myViewerId.value) {
+            showSessionNotification(`${msg.viewerId} joined the session`);
+          } else if (msg.action === 'left' && msg.viewerId !== myViewerId.value) {
+            showSessionNotification(`${msg.viewerId} left the session`);
+          } else if (msg.action === 'ownerLeft') {
+            showSessionNotification('Session owner disconnected', 5000);
+          }
+        }
+
+        // Session restarting - owner is restarting capture
+        if (msg.type === 'sessionRestarting') {
+          if (!isSessionOwner.value) {
+            showSessionNotification('Owner is restarting capture...', 2000);
+          }
+          // Clear packets for all clients
+          emit('clear');
+        }
+
+        // Session restarted - capture restarted
+        if (msg.type === 'sessionRestarted') {
+          selectedInterface.value = msg.interface;
+          isCapturing.value = true;
+          if (!isSessionOwner.value) {
+            showSessionNotification('Capture restarted');
           }
         }
 
         // Session stopped
         if (msg.type === 'sessionStopped') {
           isCapturing.value = false;
+          if (!isSessionOwner.value) {
+            showSessionNotification('Session owner stopped the capture', 5000);
+          }
           emit('stop');
         }
 
@@ -321,6 +364,7 @@ const connect = () => {
           sessionId.value = null;
           isSessionOwner.value = false;
           sessionClientCount.value = 0;
+          myViewerId.value = null;
         }
 
         // Handle packet summaries from server
@@ -524,31 +568,35 @@ const copyShareUrl = () => {
 };
 
 const restartCapture = () => {
-  isCapturing.value = false;
-
   // Clear any active filter
   displayFilter.value = '';
   filterError.value = null;
 
-  // Send stop command to backend
   if (ws.value && isConnected.value) {
-    try {
-      sendMessage({ type: 'stop' });
-    } catch (e) {}
-  }
+    if (sessionId.value && isSessionOwner.value) {
+      // Use session restart - backend handles everything
+      sendMessage({ type: 'restartSession' });
+    } else {
+      // Non-session restart (legacy)
+      isCapturing.value = false;
+      try {
+        sendMessage({ type: 'stop' });
+      } catch (e) {}
 
-  emit('clear');
+      emit('clear');
 
-  // Wait for backend to stop/reset, then start again
-  setTimeout(() => {
-    if (ws.value && isConnected.value) {
-      sendMessage({
-        type: 'start',
-        interface: selectedInterface.value
-      });
-      isCapturing.value = true;
+      // Wait for backend to stop/reset, then start again
+      setTimeout(() => {
+        if (ws.value && isConnected.value) {
+          sendMessage({
+            type: 'start',
+            interface: selectedInterface.value
+          });
+          isCapturing.value = true;
+        }
+      }, 200);
     }
-  }, 200);
+  }
 };
 
 // Save confirmation flow for restart
@@ -964,5 +1012,33 @@ onUnmounted(() => {
 .share-dialog .btn-secondary {
   width: 100%;
   justify-content: center;
+}
+
+/* Session notification toast */
+.session-notification {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e40af;
+  color: #dbeafe;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 2000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 </style>
