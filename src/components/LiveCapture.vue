@@ -72,7 +72,7 @@
       <!-- Session info -->
       <span v-if="sessionId" class="session-info" :title="'Session: ' + sessionId">
         <span class="session-badge">{{ sessionClientCount }} viewer{{ sessionClientCount !== 1 ? 's' : '' }}</span>
-        <button @click="showShareDialog = true" class="btn btn-share" title="Share capture session">
+        <button v-if="isSessionOwner" @click="showShareDialog = true" class="btn btn-share" title="Share capture session">
           🔗 Share
         </button>
       </span>
