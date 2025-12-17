@@ -1,5 +1,42 @@
 <template>
   <div class="interface-selector">
+    <!-- Active Sessions Section -->
+    <div v-if="activeSessions.length > 0" class="active-sessions">
+      <div class="section-header">
+        <h3>Active Sessions</h3>
+      </div>
+      <div class="session-list">
+        <div v-for="session in activeSessions" :key="session.id" class="session-row">
+          <div class="session-info">
+            <div class="session-interface">
+              <span class="recording-dot">●</span>
+              <span class="name">{{ session.interface }}</span>
+            </div>
+            <div class="session-details">
+              <span class="packets">{{ session.packetCount.toLocaleString() }} packets</span>
+              <span class="viewers">{{ session.clientCount }} viewer{{ session.clientCount !== 1 ? 's' : '' }}</span>
+            </div>
+          </div>
+          <div class="session-actions">
+            <button
+              v-if="!pendingJoinRequest"
+              class="join-btn"
+              @click="requestJoin(session.id)"
+            >
+              Request to Join
+            </button>
+            <span v-else-if="pendingJoinRequest === session.id" class="pending-status">
+              Waiting for approval...
+              <button class="cancel-btn" @click="cancelJoinRequest">Cancel</button>
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="divider">
+        <span>or start your own capture</span>
+      </div>
+    </div>
+
     <div class="header">
       <h3>Network Interfaces</h3>
       <button class="refresh-btn" @click="fetchInterfaces" :disabled="loading">
@@ -76,12 +113,16 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['select', 'start-capture'])
+const emit = defineEmits(['select', 'start-capture', 'join-approved'])
 
 const interfaces = ref([])
 const selectedInterface = ref('')
 const loading = ref(false)
 const error = ref(null)
+
+// Active sessions
+const activeSessions = ref([])
+const pendingJoinRequest = ref(null)  // sessionId if we have a pending request
 
 // Store activity history for each interface (last 60 samples)
 const activityHistory = reactive({})  // { ifaceName: [{ rx, tx }, ...] }
@@ -189,7 +230,33 @@ const startCapture = () => {
   }
 }
 
-// Handle WebSocket messages for interface stats
+// Fetch active sessions
+const fetchSessions = () => {
+  if (props.wsConnection && props.wsConnection.readyState === WebSocket.OPEN) {
+    props.wsConnection.send(JSON.stringify({ type: 'listSessions' }))
+  }
+}
+
+// Request to join a session
+const requestJoin = (sessionId) => {
+  if (props.wsConnection && props.wsConnection.readyState === WebSocket.OPEN) {
+    props.wsConnection.send(JSON.stringify({
+      type: 'requestJoinSession',
+      sessionId: sessionId
+    }))
+    pendingJoinRequest.value = sessionId
+  }
+}
+
+// Cancel join request
+const cancelJoinRequest = () => {
+  if (props.wsConnection && props.wsConnection.readyState === WebSocket.OPEN) {
+    props.wsConnection.send(JSON.stringify({ type: 'cancelJoinRequest' }))
+  }
+  pendingJoinRequest.value = null
+}
+
+// Handle WebSocket messages for interface stats and sessions
 const handleWsMessage = (event) => {
   try {
     const data = JSON.parse(event.data)
@@ -197,6 +264,29 @@ const handleWsMessage = (event) => {
       for (const stat of data.stats) {
         addToHistory(stat.name, stat.rxBytesPerSec, stat.txBytesPerSec)
       }
+    }
+    // Session list response
+    if (data.type === 'sessionList') {
+      activeSessions.value = data.sessions || []
+    }
+    // Join request sent confirmation
+    if (data.type === 'joinRequestSent') {
+      pendingJoinRequest.value = data.sessionId
+    }
+    // Join request approved
+    if (data.type === 'joinRequestApproved') {
+      pendingJoinRequest.value = null
+      emit('join-approved', data)
+    }
+    // Join request rejected
+    if (data.type === 'joinRequestRejected') {
+      pendingJoinRequest.value = null
+      error.value = 'Join request was rejected by session owner'
+      setTimeout(() => { error.value = null }, 3000)
+    }
+    // Join request cancelled
+    if (data.type === 'joinRequestCancelled') {
+      pendingJoinRequest.value = null
     }
   } catch (e) {
     // Ignore parse errors
@@ -216,13 +306,25 @@ const cleanupWsListener = () => {
   }
 }
 
+// Session polling interval
+let sessionPollInterval = null
+
 onMounted(() => {
   fetchInterfaces()
   setupWsListener()
+  // Fetch sessions after a short delay to ensure WS is ready
+  setTimeout(() => {
+    fetchSessions()
+  }, 500)
+  // Poll for session updates every 5 seconds
+  sessionPollInterval = setInterval(fetchSessions, 5000)
 })
 
 onUnmounted(() => {
   cleanupWsListener()
+  if (sessionPollInterval) {
+    clearInterval(sessionPollInterval)
+  }
 })
 
 // Watch for wsConnection changes
@@ -233,6 +335,8 @@ watch(() => props.wsConnection, (newWs, oldWs) => {
   }
   if (newWs) {
     newWs.addEventListener('message', handleWsMessage)
+    // Fetch sessions when connection is established
+    setTimeout(fetchSessions, 100)
   }
 })
 
@@ -425,5 +529,142 @@ defineExpose({ fetchInterfaces })
 
 .start-capture-btn:hover {
   background: #81d4fa;
+}
+
+/* Active Sessions Styles */
+.active-sessions {
+  margin-bottom: 16px;
+}
+
+.section-header {
+  margin-bottom: 8px;
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: #e0e0e0;
+}
+
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.session-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: #2a1a1a;
+  border: 1px solid #4a2a2a;
+  border-radius: 4px;
+}
+
+.session-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.session-interface {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recording-dot {
+  color: #ef4444;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+.session-interface .name {
+  font-weight: 500;
+  color: #e0e0e0;
+  font-size: 14px;
+}
+
+.session-details {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.session-details .packets {
+  color: #81c784;
+}
+
+.session-details .viewers {
+  color: #64b5f6;
+}
+
+.session-actions {
+  display: flex;
+  align-items: center;
+}
+
+.join-btn {
+  background: #8b5cf6;
+  color: white;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.15s ease;
+}
+
+.join-btn:hover {
+  background: #a78bfa;
+}
+
+.pending-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #fbbf24;
+  font-size: 13px;
+}
+
+.cancel-btn {
+  background: #4b5563;
+  color: #d1d5db;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.cancel-btn:hover {
+  background: #6b7280;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 16px 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #374151;
+}
+
+.divider span {
+  padding: 0 12px;
 }
 </style>

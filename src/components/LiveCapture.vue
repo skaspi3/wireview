@@ -31,6 +31,7 @@
           :default-interface="selectedInterface"
           @select="onInterfaceSelect"
           @start-capture="onSelectorStartCapture"
+          @join-approved="onJoinApproved"
         />
         <div class="open-file-section">
           <span class="or-text">or</span>
@@ -102,6 +103,17 @@
       </div>
     </div>
 
+    <!-- Join Request Popup (for owner) -->
+    <div v-if="pendingJoinRequests.length > 0" class="join-request-popup">
+      <div v-for="req in pendingJoinRequests" :key="req.requestId" class="join-request-item">
+        <span class="request-text">Someone wants to join your session</span>
+        <div class="request-actions">
+          <button @click="approveJoinRequest(req.requestId)" class="btn btn-approve">Approve</button>
+          <button @click="rejectJoinRequest(req.requestId)" class="btn btn-reject">Reject</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Error Message -->
     <div v-if="error" class="error-toast">
       {{ error }}
@@ -155,6 +167,7 @@ const pendingSessionJoin = ref(null);  // Session ID from URL to join after conn
 const showShareDialog = ref(false);
 const sessionNotification = ref(null);  // Toast notification for session events
 const myViewerId = ref(null);  // This client's viewer ID
+const pendingJoinRequests = ref([]);  // Array of { requestId, sessionId } for owner
 
 // Show session notification toast
 const showSessionNotification = (message, duration = 3000) => {
@@ -162,6 +175,30 @@ const showSessionNotification = (message, duration = 3000) => {
   setTimeout(() => {
     sessionNotification.value = null;
   }, duration);
+};
+
+// Approve join request (owner only)
+const approveJoinRequest = (requestId) => {
+  if (!ws.value || !isConnected.value) return;
+  sendMessage({ type: 'approveJoinRequest', requestId });
+  pendingJoinRequests.value = pendingJoinRequests.value.filter(r => r.requestId !== requestId);
+};
+
+// Reject join request (owner only)
+const rejectJoinRequest = (requestId) => {
+  if (!ws.value || !isConnected.value) return;
+  sendMessage({ type: 'rejectJoinRequest', requestId });
+  pendingJoinRequests.value = pendingJoinRequests.value.filter(r => r.requestId !== requestId);
+};
+
+// Handle join approved (when user's request was approved)
+const onJoinApproved = (data) => {
+  sessionId.value = data.sessionId;
+  isSessionOwner.value = false;
+  myViewerId.value = data.viewerId;
+  selectedInterface.value = data.interface;
+  isCapturing.value = data.isCapturing;
+  emit('clear');
 };
 
 // Pcap file loading state
@@ -365,6 +402,15 @@ const connect = () => {
           isSessionOwner.value = false;
           sessionClientCount.value = 0;
           myViewerId.value = null;
+          pendingJoinRequests.value = [];
+        }
+
+        // Join request from someone wanting to join (owner only)
+        if (msg.type === 'joinRequest') {
+          pendingJoinRequests.value.push({
+            requestId: msg.requestId,
+            sessionId: msg.sessionId
+          });
         }
 
         // Handle packet summaries from server
@@ -1040,5 +1086,70 @@ onUnmounted(() => {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
   }
+}
+
+/* Join request popup */
+.join-request-popup {
+  position: fixed;
+  top: 70px;
+  right: 20px;
+  z-index: 2500;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.join-request-item {
+  background: #1f2937;
+  border: 1px solid #8b5cf6;
+  border-radius: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.request-text {
+  display: block;
+  color: #e5e7eb;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.request-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-approve {
+  background: #22c55e;
+  color: white;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+.btn-approve:hover {
+  background: #16a34a;
+}
+
+.btn-reject {
+  background: #ef4444;
+  color: white;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+.btn-reject:hover {
+  background: #dc2626;
 }
 </style>
