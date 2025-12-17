@@ -261,7 +261,10 @@ const getProtocolColor = (protocol) => {
   const colors = {
     'TCP': '#e7e6ff',
     'UDP': '#daeeff',
+    'MDNS': '#daeeff',    // mDNS - light blue (same as UDP)
     'DNS': '#daffe7',
+    'DHCP': '#daffe7',
+    'DHCPv6': '#daffe7',  // DHCPv6 - light green (same as DNS/DHCP)
     'HTTP': '#a0ffa0',
     'TLS': '#e7e6ff',
     'ICMP': '#fce0ff',

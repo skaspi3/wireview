@@ -69,12 +69,37 @@
       <span class="recording-indicator">● Capture</span>
       <span class="interface-tag">on {{ selectedInterface }}</span>
 
+      <!-- Session info -->
+      <span v-if="sessionId" class="session-info" :title="'Session: ' + sessionId">
+        <span class="session-badge">{{ sessionClientCount }} viewer{{ sessionClientCount !== 1 ? 's' : '' }}</span>
+        <button @click="showShareDialog = true" class="btn btn-share" title="Share capture session">
+          🔗 Share
+        </button>
+      </span>
+
       <button @click="confirmRestartCapture" class="btn btn-warning" title="Restart Capture">
         ↺
       </button>
-      <button @click="stopCapture" class="btn btn-danger">
+      <button v-if="isSessionOwner || !sessionId" @click="stopCapture" class="btn btn-danger">
         Stop
       </button>
+      <button v-else @click="stopCapture" class="btn btn-secondary">
+        Leave
+      </button>
+    </div>
+
+    <!-- Share Dialog -->
+    <div v-if="showShareDialog" class="share-dialog-overlay" @click.self="showShareDialog = false">
+      <div class="share-dialog">
+        <h3>Share Capture Session</h3>
+        <p>Others can view this live capture by opening this link:</p>
+        <div class="share-url-container">
+          <input type="text" :value="getShareUrl()" readonly class="share-url-input" />
+          <button @click="copyShareUrl" class="btn btn-primary">Copy</button>
+        </div>
+        <p class="share-note">Session ID: <code>{{ sessionId }}</code></p>
+        <button @click="showShareDialog = false" class="btn btn-secondary">Close</button>
+      </div>
     </div>
 
     <!-- Error Message -->
@@ -116,6 +141,13 @@ const interfaces = ref([]);
 const selectedInterface = ref('');
 
 const error = ref(null);
+
+// Session sharing state
+const sessionId = ref(null);
+const isSessionOwner = ref(false);
+const sessionClientCount = ref(0);
+const pendingSessionJoin = ref(null);  // Session ID from URL to join after connect
+const showShareDialog = ref(false);
 
 // Pcap file loading state
 const isLoadingPcap = ref(false);
@@ -225,6 +257,70 @@ const connect = () => {
           if (msg.hostIP) {
             hostIP.value = msg.hostIP;
           }
+
+          // If we have a pending session to join from URL, do it now
+          if (pendingSessionJoin.value) {
+            sendMessage({ type: 'joinSession', sessionId: pendingSessionJoin.value });
+            pendingSessionJoin.value = null;
+          }
+        }
+
+        // Session created - we are the owner
+        if (msg.type === 'sessionCreated') {
+          sessionId.value = msg.sessionId;
+          isSessionOwner.value = true;
+          sessionClientCount.value = 1;
+          selectedInterface.value = msg.interface;
+          isCapturing.value = true;
+          emit('clear');
+        }
+
+        // Session joined - we are a viewer
+        if (msg.type === 'sessionJoined') {
+          sessionId.value = msg.sessionId;
+          isSessionOwner.value = false;
+          selectedInterface.value = msg.interface;
+          isCapturing.value = msg.isCapturing;
+          emit('clear');
+          // Clear URL parameter
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+
+        // Session catch-up packets (when joining existing session)
+        if (msg.type === 'sessionCatchUp') {
+          packets.value.push(...msg.packets);
+          allPackets.value.push(...msg.packets);
+          scheduleUpdate();
+        }
+
+        // Session client count update
+        if (msg.type === 'sessionClientUpdate') {
+          sessionClientCount.value = msg.clientCount;
+          if (msg.ownerLeft) {
+            // Owner left, we might want to notify user
+            error.value = 'Session owner disconnected';
+          }
+        }
+
+        // Session stopped
+        if (msg.type === 'sessionStopped') {
+          isCapturing.value = false;
+          emit('stop');
+        }
+
+        // Session error
+        if (msg.type === 'sessionError') {
+          error.value = msg.error;
+          pendingSessionJoin.value = null;
+          // Clear URL parameter
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+
+        // Session left
+        if (msg.type === 'sessionLeft') {
+          sessionId.value = null;
+          isSessionOwner.value = false;
+          sessionClientCount.value = 0;
         }
 
         // Handle packet summaries from server
@@ -383,25 +479,48 @@ const connect = () => {
 const startCapture = () => {
   if (!ws.value || !isConnected.value) return;
 
-  // Send start command
+  // Always create a shared session for captures
   sendMessage({
-    type: 'start',
+    type: 'createSession',
     interface: selectedInterface.value
   });
 
-  isCapturing.value = true;
-  emit('clear');
+  // State will be updated when sessionCreated message is received
 };
 
 const stopCapture = () => {
   if (ws.value && isConnected.value) {
     try {
-      sendMessage({ type: 'stop' });
+      if (sessionId.value) {
+        // Stop session capture
+        sendMessage({ type: 'stopSession' });
+        sendMessage({ type: 'leaveSession' });
+      } else {
+        sendMessage({ type: 'stop' });
+      }
     } catch (e) {}
   }
 
   isCapturing.value = false;
+  sessionId.value = null;
+  isSessionOwner.value = false;
+  sessionClientCount.value = 0;
   emit('stop');
+};
+
+// Get shareable URL for current session
+const getShareUrl = () => {
+  if (!sessionId.value) return '';
+  return `${window.location.origin}${window.location.pathname}?session=${sessionId.value}`;
+};
+
+// Copy share URL to clipboard
+const copyShareUrl = () => {
+  const url = getShareUrl();
+  navigator.clipboard.writeText(url).then(() => {
+    // Show brief feedback
+    showShareDialog.value = false;
+  });
 };
 
 const restartCapture = () => {
@@ -525,6 +644,13 @@ defineExpose({ getWebSocket, loadPcapFile });
 
 // Auto-connect on mount
 onMounted(() => {
+  // Check URL for session parameter to join
+  const urlParams = new URLSearchParams(window.location.search);
+  const joinSession = urlParams.get('session');
+  if (joinSession) {
+    pendingSessionJoin.value = joinSession;
+  }
+
   connect();
 });
 
@@ -731,5 +857,112 @@ onUnmounted(() => {
 
 .btn-file-large:hover {
   background: #818cf8;
+}
+
+/* Session sharing styles */
+.session-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 12px;
+  padding-left: 12px;
+  border-left: 1px solid #4b5563;
+}
+
+.session-badge {
+  background: #065f46;
+  color: #d1fae5;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  font-weight: 500;
+}
+
+.btn-share {
+  background: #8b5cf6;
+  color: white;
+  padding: 4px 10px;
+  font-size: 0.85em;
+}
+
+.btn-share:hover {
+  background: #a78bfa;
+}
+
+.share-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+}
+
+.share-dialog {
+  background: #1f2937;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.share-dialog h3 {
+  margin: 0 0 16px 0;
+  color: #f9fafb;
+  font-size: 1.2em;
+}
+
+.share-dialog p {
+  color: #9ca3af;
+  margin: 0 0 12px 0;
+  font-size: 0.95em;
+}
+
+.share-url-container {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.share-url-input {
+  flex: 1;
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: #e5e7eb;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.share-url-input:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+.share-note {
+  color: #6b7280;
+  font-size: 0.85em;
+}
+
+.share-note code {
+  background: #374151;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #a5b4fc;
+}
+
+.share-dialog .btn {
+  margin-top: 8px;
+}
+
+.share-dialog .btn-secondary {
+  width: 100%;
+  justify-content: center;
 }
 </style>
