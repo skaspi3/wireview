@@ -145,7 +145,7 @@
 
 <script setup>
 import { ref, triggerRef, onUnmounted, onMounted, computed } from 'vue';
-import { nodeVersion, tsharkLuaVersion, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP } from '../globals';
+import { nodeVersion, tsharkLuaVersion, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture } from '../globals';
 import ConfirmDialog from './ConfirmDialog.vue';
 import InterfaceSelector from './InterfaceSelector.vue';
 
@@ -325,6 +325,8 @@ const connect = () => {
           myViewerId.value = 'Owner';
           selectedInterface.value = msg.interface;
           isCapturing.value = true;
+          captureActive.value = true;
+          stoppedCapture.value = false;
           emit('clear');
         }
 
@@ -335,6 +337,8 @@ const connect = () => {
           myViewerId.value = msg.viewerId;
           selectedInterface.value = msg.interface;
           isCapturing.value = msg.isCapturing;
+          captureActive.value = msg.isCapturing;
+          stoppedCapture.value = false;
           emit('clear');
           // Clear URL parameter
           window.history.replaceState({}, '', window.location.pathname);
@@ -374,6 +378,8 @@ const connect = () => {
         if (msg.type === 'sessionRestarted') {
           selectedInterface.value = msg.interface;
           isCapturing.value = true;
+          captureActive.value = true;
+          stoppedCapture.value = false;
           if (!isSessionOwner.value) {
             showSessionNotification('Capture restarted');
           }
@@ -382,6 +388,8 @@ const connect = () => {
         // Session stopped
         if (msg.type === 'sessionStopped') {
           isCapturing.value = false;
+          captureActive.value = false;
+          stoppedCapture.value = true;
           if (!isSessionOwner.value) {
             showSessionNotification('Session owner stopped the capture', 5000);
           }
@@ -527,6 +535,7 @@ const connect = () => {
           isLoadingPcap.value = false;
           loadPcapProgress.value = 0;
           loadedPcapFile.value = msg.path;
+          captureActive.value = true;
           // Packets already loaded via batches, just trigger final update
           triggerRef(packets);
         }
@@ -592,6 +601,8 @@ const stopCapture = () => {
   }
 
   isCapturing.value = false;
+  captureActive.value = false;
+  stoppedCapture.value = true;
   sessionId.value = null;
   isSessionOwner.value = false;
   sessionClientCount.value = 0;
@@ -712,6 +723,7 @@ const loadPcapFile = (filePath) => {
 
   // Clear current state
   loadedPcapFile.value = null;
+  captureActive.value = false;
   displayFilter.value = '';
   filterError.value = null;
 
@@ -726,6 +738,7 @@ const loadPcapFile = (filePath) => {
 // Close loaded pcap file
 const closePcapFile = () => {
   loadedPcapFile.value = null;
+  captureActive.value = false;
   packets.value = [];
   allPackets.value = [];
   displayFilter.value = '';
@@ -734,7 +747,22 @@ const closePcapFile = () => {
   emit('clear');
 };
 
-defineExpose({ getWebSocket, loadPcapFile });
+// Go back to interface list (clears current capture state)
+const goBackToInterfaces = () => {
+  loadedPcapFile.value = null;
+  isCapturing.value = false;
+  captureActive.value = false;
+  stoppedCapture.value = false;
+  packets.value = [];
+  allPackets.value = [];
+  displayFilter.value = '';
+  filterError.value = null;
+  activePacketIndex.value = null;
+  triggerRef(packets);
+  emit('clear');
+};
+
+defineExpose({ getWebSocket, loadPcapFile, goBackToInterfaces });
 
 // Auto-connect on mount
 onMounted(() => {

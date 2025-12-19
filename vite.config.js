@@ -132,6 +132,10 @@ export default defineConfig(({ mode }) => {
           target: 'http://127.0.0.1:3000',
           changeOrigin: true,
         },
+        '/api/save-filtered': {
+          target: 'http://127.0.0.1:3000',
+          changeOrigin: true,
+        },
         '/api/interfaces': {
           target: 'http://127.0.0.1:3000',
           changeOrigin: true,

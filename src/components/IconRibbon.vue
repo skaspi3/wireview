@@ -1,6 +1,6 @@
 <script setup>
-import { ref, useTemplateRef } from 'vue';
-import { displayFilter, packets } from '../globals';
+import { ref, useTemplateRef, computed } from 'vue';
+import { displayFilter, packets, stoppedCapture, allPackets } from '../globals';
 import LiveCapture from "./LiveCapture.vue";
 
 const props = defineProps({
@@ -14,55 +14,93 @@ const emit = defineEmits(['clear', 'stop', 'openFileBrowser', 'openInsights', 's
 
 const liveCaptureRef = useTemplateRef('live-capture');
 
-// Save filtered dialog
-const showSaveFilteredDialog = ref(false);
-const saveFilteredFilename = ref('');
-const saveFilteredError = ref(null);
-const saveFilteredSaving = ref(false);
+// Save dialog state
+const showSaveDialog = ref(false);
+const saveDialogMode = ref('all'); // 'all' or 'filtered'
+const saveFilename = ref('');
+const saveError = ref(null);
+const saveSaving = ref(false);
+
+// Show save button when user clicked Stop and has packets (and no filter active)
+const showSaveButton = computed(() => {
+  return stoppedCapture.value && packets.value.length > 0 && !displayFilter.value;
+});
+
+// Show back button when user clicked Stop
+const showBackButton = computed(() => {
+  return stoppedCapture.value && packets.value.length > 0;
+});
 
 const loadPcapFile = (filePath) => {
   liveCaptureRef.value?.loadPcapFile(filePath);
 };
 
-const openSaveFilteredDialog = () => {
-  // Generate default filename with timestamp
+const goBack = () => {
+  liveCaptureRef.value?.goBackToInterfaces();
+};
+
+// Open save dialog for all packets
+const openSaveAllDialog = () => {
   const now = new Date();
   const timestamp = now.toISOString()
     .replace(/[:.]/g, '-')
     .replace('T', '_')
     .slice(0, 19);
-  saveFilteredFilename.value = `filtered_${timestamp}`;
-  saveFilteredError.value = null;
-  showSaveFilteredDialog.value = true;
+  saveFilename.value = `capture_${timestamp}`;
+  saveError.value = null;
+  saveDialogMode.value = 'all';
+  showSaveDialog.value = true;
 };
 
-const closeSaveFilteredDialog = () => {
-  showSaveFilteredDialog.value = false;
-  saveFilteredError.value = null;
+// Open save dialog for filtered packets
+const openSaveFilteredDialog = () => {
+  const now = new Date();
+  const timestamp = now.toISOString()
+    .replace(/[:.]/g, '-')
+    .replace('T', '_')
+    .slice(0, 19);
+  saveFilename.value = `filtered_${timestamp}`;
+  saveError.value = null;
+  saveDialogMode.value = 'filtered';
+  showSaveDialog.value = true;
 };
 
-const saveFilteredPackets = async () => {
-  if (!saveFilteredFilename.value.trim()) {
-    saveFilteredError.value = 'Please enter a filename';
+const closeSaveDialog = () => {
+  showSaveDialog.value = false;
+  saveError.value = null;
+};
+
+const savePackets = async () => {
+  if (!saveFilename.value.trim()) {
+    saveError.value = 'Please enter a filename';
     return;
   }
 
-  // Get frame numbers from filtered packets
-  const frameNumbers = packets.value.map(pkt => pkt.number).filter(n => n > 0);
+  // Get frame numbers based on mode
+  let frameNumbers;
+  if (saveDialogMode.value === 'filtered') {
+    // Filtered mode: save currently visible (filtered) packets
+    frameNumbers = packets.value.map(pkt => pkt.number).filter(n => n > 0);
+  } else {
+    // All mode: save all packets (use allPackets if available, else packets)
+    const pkts = allPackets.value.length > 0 ? allPackets.value : packets.value;
+    frameNumbers = pkts.map(pkt => pkt.number).filter(n => n > 0);
+  }
+
   if (frameNumbers.length === 0) {
-    saveFilteredError.value = 'No packets to save';
+    saveError.value = 'No packets to save';
     return;
   }
 
-  let filename = saveFilteredFilename.value.trim();
+  let filename = saveFilename.value.trim();
 
   // Handle extension logic
   if (!filename.endsWith('.pcap') && !filename.endsWith('.pcapng')) {
     filename += '.pcapng';
   }
 
-  saveFilteredSaving.value = true;
-  saveFilteredError.value = null;
+  saveSaving.value = true;
+  saveError.value = null;
 
   try {
     const response = await fetch('/api/save-filtered', {
@@ -74,15 +112,15 @@ const saveFilteredPackets = async () => {
     const data = await response.json();
 
     if (data.success) {
-      closeSaveFilteredDialog();
+      closeSaveDialog();
       emit('saveFiltered', data.path);
     } else {
-      saveFilteredError.value = data.error || 'Failed to save file';
+      saveError.value = data.error || 'Failed to save file';
     }
   } catch (e) {
-    saveFilteredError.value = e.message || 'Failed to save file';
+    saveError.value = e.message || 'Failed to save file';
   } finally {
-    saveFilteredSaving.value = false;
+    saveSaving.value = false;
   }
 };
 
@@ -106,6 +144,15 @@ defineExpose({ loadPcapFile });
         </svg>
         Insights
       </button>
+      <!-- Save button - shown when capture stopped and has packets -->
+      <button v-if="showSaveButton" class="save-btn" @click="openSaveAllDialog" title="Save capture">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+          <polyline points="17 21 17 13 7 13 7 21"/>
+          <polyline points="7 3 7 8 15 8"/>
+        </svg>
+        Save
+      </button>
       <!-- Save Selected button - shown when filter is active -->
       <button v-if="displayFilter" class="save-selected-btn" @click="openSaveFilteredDialog" title="Save filtered packets">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -115,29 +162,37 @@ defineExpose({ loadPcapFile });
         </svg>
         Save Selected
       </button>
+      <!-- Back button - shown when capture stopped -->
+      <button v-if="showBackButton" class="back-btn" @click="goBack" title="Back to interface list">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5"/>
+          <polyline points="12 19 5 12 12 5"/>
+        </svg>
+        Back
+      </button>
     </template>
 
-    <!-- Save Filtered Dialog -->
-    <div v-if="showSaveFilteredDialog" class="save-dialog-overlay" @click.self="closeSaveFilteredDialog">
+    <!-- Save Dialog -->
+    <div v-if="showSaveDialog" class="save-dialog-overlay" @click.self="closeSaveDialog">
       <div class="save-dialog">
-        <h3>Save Filtered Packets</h3>
-        <p>Enter filename for the filtered capture:</p>
+        <h3>{{ saveDialogMode === 'filtered' ? 'Save Filtered Packets' : 'Save Capture' }}</h3>
+        <p>Enter filename for the capture:</p>
         <div class="save-input-container">
           <input
             type="text"
-            v-model="saveFilteredFilename"
+            v-model="saveFilename"
             class="save-filename-input"
             placeholder="filename"
-            @keyup.enter="saveFilteredPackets"
+            @keyup.enter="savePackets"
           />
           <span class="extension-hint">.pcapng</span>
         </div>
-        <div v-if="saveFilteredError" class="save-error">{{ saveFilteredError }}</div>
+        <div v-if="saveError" class="save-error">{{ saveError }}</div>
         <div class="save-actions">
-          <button @click="saveFilteredPackets" class="btn btn-save" :disabled="saveFilteredSaving">
-            {{ saveFilteredSaving ? 'Saving...' : 'Save' }}
+          <button @click="savePackets" class="btn btn-save" :disabled="saveSaving">
+            {{ saveSaving ? 'Saving...' : 'Save' }}
           </button>
-          <button @click="closeSaveFilteredDialog" class="btn btn-cancel">Cancel</button>
+          <button @click="closeSaveDialog" class="btn btn-cancel">Cancel</button>
         </div>
       </div>
     </div>
@@ -238,6 +293,66 @@ defineExpose({ loadPcapFile });
 }
 
 .save-selected-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.save-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  margin-left: 6px;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.save-btn:hover {
+  background: linear-gradient(135deg, #4ade80, #22c55e);
+  transform: translateY(-1px);
+}
+
+.save-btn:active {
+  transform: translateY(0);
+}
+
+.save-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  margin-left: 6px;
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.back-btn:hover {
+  background: linear-gradient(135deg, #9ca3af, #6b7280);
+  transform: translateY(-1px);
+}
+
+.back-btn:active {
+  transform: translateY(0);
+}
+
+.back-btn svg {
   width: 16px;
   height: 16px;
 }

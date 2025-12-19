@@ -35,6 +35,12 @@ export const hostIP = ref(null);
 // Backend connection status: 'disconnected' | 'connecting' | 'connected'
 export const backendStatus = ref('disconnected');
 
+// Capture state: true when live capture or file is actively being loaded/viewed
+export const captureActive = ref(false);
+
+// True when user explicitly stopped a live capture (not when loading/closing files)
+export const stoppedCapture = ref(false);
+
 // TLS certificate info
 export const certInfo = ref(null);
 
@@ -79,6 +85,8 @@ export const clearPackets = () => {
   activePacketHex.value = '';
   displayFilter.value = '';
   filterError.value = null;
+  captureActive.value = false;
+  stoppedCapture.value = false;
   bytesReceived.value = 0;
   bytesSent.value = 0;
   bytesFetched.value = 0;
