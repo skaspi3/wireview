@@ -15,6 +15,12 @@ export const activePacketDetails = shallowRef(null);
 // Currently selected packet hex dump (fetched together with details)
 export const activePacketHex = ref('');
 
+// Raw hex bytes for the active packet (unparsed hex string)
+export const activePacketRawHex = ref('');
+
+// Highlighted byte range in hex dump {start: number, end: number} or null
+export const highlightedByteRange = ref(null);
+
 // Display filter state
 export const displayFilter = ref('');
 export const filterError = ref(null);

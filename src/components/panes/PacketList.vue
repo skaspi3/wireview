@@ -8,7 +8,7 @@ const rowHeight = 20;
 const headerHeight = 24;
 
 // Sorting state
-const sortColumn = ref(null);  // 'number', 'time', 'src', 'dst', 'protocol', 'length'
+const sortColumn = ref(null);  // 'number', 'time', 'src', 'srcPort', 'dst', 'dstPort', 'protocol', 'length'
 const sortAscending = ref(true);
 
 // Get sorted packets - returns sorted copy only when sorting is active
@@ -37,10 +37,18 @@ const getSortedPackets = () => {
         valA = a.src || '';
         valB = b.src || '';
         return asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      case 'srcPort':
+        valA = parseInt(a.srcPort) || 0;
+        valB = parseInt(b.srcPort) || 0;
+        break;
       case 'dst':
         valA = a.dst || '';
         valB = b.dst || '';
         return asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      case 'dstPort':
+        valA = parseInt(a.dstPort) || 0;
+        valB = parseInt(b.dstPort) || 0;
+        break;
       case 'protocol':
         valA = a.protocol || '';
         valB = b.protocol || '';
@@ -310,8 +318,14 @@ const formatTime = (time) => {
             <th class="col-src sortable" @click="handleSort('src')">
               Source<span v-if="sortColumn === 'src'" class="sort-indicator">{{ sortAscending ? '▲' : '▼' }}</span>
             </th>
+            <th class="col-sport sortable" @click="handleSort('srcPort')">
+              Src Port<span v-if="sortColumn === 'srcPort'" class="sort-indicator">{{ sortAscending ? '▲' : '▼' }}</span>
+            </th>
             <th class="col-dst sortable" @click="handleSort('dst')">
               Destination<span v-if="sortColumn === 'dst'" class="sort-indicator">{{ sortAscending ? '▲' : '▼' }}</span>
+            </th>
+            <th class="col-dport sortable" @click="handleSort('dstPort')">
+              Dst Port<span v-if="sortColumn === 'dstPort'" class="sort-indicator">{{ sortAscending ? '▲' : '▼' }}</span>
             </th>
             <th class="col-proto sortable" @click="handleSort('protocol')">
               Protocol<span v-if="sortColumn === 'protocol'" class="sort-indicator">{{ sortAscending ? '▲' : '▼' }}</span>
@@ -333,7 +347,9 @@ const formatTime = (time) => {
             <td class="col-no">{{ pkt.number }}</td>
             <td class="col-time">{{ formatTime(pkt.time) }}</td>
             <td class="col-src">{{ pkt.src }}</td>
+            <td class="col-sport">{{ pkt.srcPort }}</td>
             <td class="col-dst">{{ pkt.dst }}</td>
+            <td class="col-dport">{{ pkt.dstPort }}</td>
             <td class="col-proto">{{ pkt.protocol }}</td>
             <td class="col-len">{{ pkt.length }}</td>
             <td class="col-info">{{ pkt.info }}</td>
@@ -435,8 +451,10 @@ const formatTime = (time) => {
 
 .col-no { width: 60px; text-align: right; }
 .col-time { width: 100px; }
-.col-src { width: 150px; }
-.col-dst { width: 150px; }
+.col-src { width: 140px; }
+.col-sport { width: 65px; text-align: right; }
+.col-dst { width: 140px; }
+.col-dport { width: 65px; text-align: right; }
 .col-proto { width: 70px; }
 .col-len { width: 60px; text-align: right; }
 .col-info { flex: 1; }

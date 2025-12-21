@@ -129,6 +129,7 @@
       noText="Don't Save"
       @yes="onSaveConfirmYes"
       @no="onSaveConfirmNo"
+      @cancel="onSaveConfirmCancel"
     />
 
     <!-- Save Success Toast -->
@@ -710,6 +711,10 @@ const onSaveConfirmYes = async () => {
 const onSaveConfirmNo = () => {
   // User doesn't want to save - proceed with restart
   restartCapture();
+};
+
+const onSaveConfirmCancel = () => {
+  // User cancelled - don't do anything, just close dialog
 };
 
 // Open file browser

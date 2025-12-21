@@ -1,13 +1,15 @@
 <template>
-  <div v-if="isOpen" class="modal-overlay" @click.self="handleNo">
+  <div v-if="isOpen" class="modal-overlay" @click.self="handleCancel">
     <div class="confirm-dialog">
       <div class="confirm-header">
         <h3>{{ title }}</h3>
+        <button class="close-btn" @click="handleCancel" title="Cancel">&times;</button>
       </div>
       <div class="confirm-body">
         <p>{{ message }}</p>
       </div>
       <div class="confirm-footer">
+        <button class="btn btn-cancel" @click="handleCancel">Cancel</button>
         <button class="btn btn-secondary" @click="handleNo">{{ noText }}</button>
         <button class="btn btn-primary" @click="handleYes">{{ yesText }}</button>
       </div>
@@ -25,7 +27,7 @@ const props = defineProps({
   noText: { type: String, default: 'No' }
 });
 
-const emit = defineEmits(['yes', 'no', 'close']);
+const emit = defineEmits(['yes', 'no', 'cancel', 'close']);
 
 const isOpen = ref(false);
 
@@ -46,6 +48,11 @@ const handleYes = () => {
 const handleNo = () => {
   isOpen.value = false;
   emit('no');
+};
+
+const handleCancel = () => {
+  isOpen.value = false;
+  emit('cancel');
 };
 
 defineExpose({ open, close });
@@ -77,11 +84,35 @@ defineExpose({ open, close });
 .confirm-header {
   padding: 12px 16px;
   border-bottom: 1px solid #3e3e42;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .confirm-header h3 {
   margin: 0;
   font-size: 16px;
+  color: #fff;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.close-btn:hover {
+  background: #3e3e42;
   color: #fff;
 }
 
@@ -128,5 +159,16 @@ defineExpose({ open, close });
 
 .btn-secondary:hover {
   background: #6b7280;
+}
+
+.btn-cancel {
+  background: transparent;
+  color: #9ca3af;
+  border: 1px solid #4b5563;
+}
+
+.btn-cancel:hover {
+  background: #374151;
+  color: #fff;
 }
 </style>

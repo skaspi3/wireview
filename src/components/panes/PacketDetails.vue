@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch, computed } from "vue";
-import { packets, activePacketIndex, activePacketDetails, activePacketHex } from "../../globals";
+import { packets, activePacketIndex, activePacketDetails, activePacketHex, activePacketRawHex, highlightedByteRange } from "../../globals";
 import { getPacketWithPrefetch, getCachedPacket, isFetchingBatch } from "../../packetCache";
 
 // Collapsed state for tree nodes
@@ -438,6 +438,8 @@ const fieldNames = {
   'udp.checksum': 'Checksum',
   'udp.checksum.status': 'Checksum Status',
   'udp.stream': 'Stream index',
+  'udp.pdu.size': 'PDU Size',
+  'udp.pnum': 'Packet Number',
   'udp.payload': 'UDP payload',
   'udp.time_relative': 'Time since first frame',
   'udp.time_delta': 'Time since previous frame',
@@ -640,35 +642,89 @@ const fieldNames = {
   'quic.stream.data': 'Stream Data',
 };
 
+// Metadata field patterns - fields that are observations/analysis, not RFC protocol data
+const isMetadataField = (path) => {
+  const lowerPath = path.toLowerCase();
+
+  // Stream indices
+  if (lowerPath.endsWith('.stream')) return true;
+
+  // Checksum status (validation result, not the checksum itself)
+  if (lowerPath.endsWith('.checksum.status')) return true;
+
+  // Time analysis fields
+  if (lowerPath.endsWith('.time_relative') || lowerPath.endsWith('.time_delta')) return true;
+  if (lowerPath.includes('.time_relative') || lowerPath.includes('.time_delta')) return true;
+
+  // TCP/UDP analysis
+  if (lowerPath.includes('.analysis')) return true;
+
+  // Frame metadata
+  if (lowerPath.includes('frame.time_epoch')) return true;
+  if (lowerPath.includes('frame.marked') || lowerPath.includes('frame.ignored')) return true;
+  if (lowerPath.includes('frame.protocols')) return true;
+
+  // Response tracking
+  if (lowerPath.endsWith('.resp_in') || lowerPath.endsWith('.resp_to')) return true;
+  if (lowerPath.endsWith('.resptime')) return true;
+
+  // Calculated/derived values
+  if (lowerPath.includes('.completeness')) return true;
+  if (lowerPath.includes('window_size_scalefactor') || lowerPath.includes('window_size_value')) return true;
+  if (lowerPath.includes('.iface')) return true;
+  if (lowerPath.includes('.encap_type')) return true;
+
+  // Initial RTT and other measurements
+  if (lowerPath.includes('.initial_rtt') || lowerPath.includes('.ack_rtt')) return true;
+  if (lowerPath.includes('.bytes_in_flight') || lowerPath.includes('.push_bytes_sent')) return true;
+  if (lowerPath.includes('.acks_frame')) return true;
+
+  // PDU/packet tracking
+  if (lowerPath.endsWith('.pnum') || lowerPath.includes('.pdu.')) return true;
+
+  return false;
+};
+
 // Get human-readable field name
 const getFieldName = (fullPath) => {
+  let name;
+
   // Try exact match first
   if (fieldNames[fullPath]) {
-    return fieldNames[fullPath];
-  }
+    name = fieldNames[fullPath];
+  } else {
+    // Try without layer prefix duplication (e.g., "tcp.tcp.srcport" -> "tcp.srcport")
+    const parts = fullPath.split('.');
+    if (parts.length >= 3 && parts[0] === parts[1]) {
+      const simplified = parts.slice(1).join('.');
+      if (fieldNames[simplified]) {
+        name = fieldNames[simplified];
+      }
+    }
 
-  // Try without layer prefix duplication (e.g., "tcp.tcp.srcport" -> "tcp.srcport")
-  const parts = fullPath.split('.');
-  if (parts.length >= 3 && parts[0] === parts[1]) {
-    const simplified = parts.slice(1).join('.');
-    if (fieldNames[simplified]) {
-      return fieldNames[simplified];
+    // Try last two parts (e.g., "frame.frame.time" -> "frame.time")
+    if (!name && parts.length >= 2) {
+      const lastTwo = parts.slice(-2).join('.');
+      if (fieldNames[lastTwo]) {
+        name = fieldNames[lastTwo];
+      }
+    }
+
+    // Fallback: clean up the last part
+    if (!name) {
+      const lastPart = parts[parts.length - 1];
+      name = lastPart
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
     }
   }
 
-  // Try last two parts (e.g., "frame.frame.time" -> "frame.time")
-  if (parts.length >= 2) {
-    const lastTwo = parts.slice(-2).join('.');
-    if (fieldNames[lastTwo]) {
-      return fieldNames[lastTwo];
-    }
+  // Wrap metadata fields in brackets
+  if (isMetadataField(fullPath)) {
+    return `[${name}]`;
   }
 
-  // Fallback: clean up the last part
-  const lastPart = parts[parts.length - 1];
-  return lastPart
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase());
+  return name;
 };
 
 // Get layer summary for header display
@@ -810,9 +866,13 @@ const flattenLayerData = (data, prefix = '', result = {}) => {
 
 // Fetch packet details and hex when selection changes
 watch(activePacketIndex, async (index) => {
+  // Clear highlight when packet changes
+  highlightedByteRange.value = null;
+
   if (index === null || index < 0 || index >= packets.value.length) {
     activePacketDetails.value = null;
     activePacketHex.value = '';
+    activePacketRawHex.value = '';
     isLoading.value = false;
     return;
   }
@@ -821,6 +881,7 @@ watch(activePacketIndex, async (index) => {
   if (!packet) {
     activePacketDetails.value = null;
     activePacketHex.value = '';
+    activePacketRawHex.value = '';
     isLoading.value = false;
     return;
   }
@@ -832,7 +893,8 @@ watch(activePacketIndex, async (index) => {
   if (cached && cached.details) {
     activePacketDetails.value = cached.details;
     activePacketHex.value = cached.hex || '';
-    collapsed.value = {};
+    activePacketRawHex.value = cached.rawHex || '';
+    // Keep collapsed state - don't reset to preserve user's expanded headers
     isLoading.value = false;
 
     // Trigger background prefetch of adjacent packets
@@ -844,21 +906,25 @@ watch(activePacketIndex, async (index) => {
   isLoading.value = true;
   activePacketDetails.value = null;
   activePacketHex.value = '';
+  activePacketRawHex.value = '';
 
   try {
     const data = await getPacketWithPrefetch(frameNumber, packets.value.length);
     if (data && data.details) {
       activePacketDetails.value = data.details;
       activePacketHex.value = data.hex || '';
-      collapsed.value = {};
+      activePacketRawHex.value = data.rawHex || '';
+      // Keep collapsed state - don't reset to preserve user's expanded headers
     } else {
       activePacketDetails.value = null;
       activePacketHex.value = '';
+      activePacketRawHex.value = '';
     }
   } catch (e) {
     console.error("Failed to fetch packet data:", e);
     activePacketDetails.value = null;
     activePacketHex.value = '';
+    activePacketRawHex.value = '';
   } finally {
     isLoading.value = false;
   }
@@ -871,12 +937,80 @@ const detailsTree = computed(() => {
   const details = activePacketDetails.value;
   const layers = details._source?.layers || details.layers || {};
 
-  const tree = [];
+  // First pass: collect all layers with their full byte ranges
+  const layerList = [];
   for (const [layerName, layerData] of Object.entries(layers)) {
     if (typeof layerData !== 'object' || layerData === null) continue;
-
-    // Skip _raw layers (frame_raw, eth_raw, ip_raw, udp_raw, zixi_raw, etc.)
     if (layerName.endsWith('_raw')) continue;
+
+    const layerRaw = layers[`${layerName}_raw`];
+    let fullRange = null;
+    if (Array.isArray(layerRaw) && layerRaw.length >= 3) {
+      const offset = parseInt(layerRaw[1]);
+      const length = parseInt(layerRaw[2]);
+      if (!isNaN(offset) && !isNaN(length)) {
+        fullRange = { start: offset, end: offset + length };
+      }
+    }
+
+    layerList.push({ layerName, layerData, fullRange });
+  }
+
+  // Known protocol header sizes (in bytes)
+  const getKnownHeaderSize = (layerName, layerData) => {
+    switch (layerName) {
+      case 'frame': return 0; // Frame is meta-layer, no actual bytes
+      case 'eth': return 14;  // Ethernet II header
+      case 'ip': {
+        // IP header length is in 32-bit words, field 'ip.hdr_len'
+        const hdrLen = layerData['ip.hdr_len'];
+        return hdrLen ? parseInt(hdrLen) * 4 : 20; // Default 20 bytes
+      }
+      case 'ipv6': return 40; // IPv6 fixed header
+      case 'udp': return 8;   // UDP header is always 8 bytes
+      case 'tcp': {
+        // TCP header length is in 32-bit words
+        const hdrLen = layerData['tcp.hdr_len'];
+        return hdrLen ? parseInt(hdrLen) * 4 : 20; // Default 20 bytes
+      }
+      case 'icmp': return 8;  // ICMP header
+      case 'arp': return 28;  // ARP for IPv4/Ethernet
+      default: return null;   // Unknown - use full range
+    }
+  };
+
+  // Protocols that should ALWAYS show header-only (never include payload in header highlight)
+  const headerOnlyProtocols = ['frame', 'eth', 'ip', 'ipv6', 'udp', 'tcp', 'icmp', 'arp'];
+
+  // Second pass: calculate header-only ranges
+  const tree = [];
+  for (let i = 0; i < layerList.length; i++) {
+    const { layerName, layerData, fullRange } = layerList[i];
+    const isLastLayer = i === layerList.length - 1;
+
+    let byteRange = fullRange;
+
+    // For transport/network protocols, always use header-only size
+    // These protocols carry payload that belongs to upper layers
+    if (fullRange && headerOnlyProtocols.includes(layerName)) {
+      const headerSize = getKnownHeaderSize(layerName, layerData);
+      if (headerSize !== null) {
+        byteRange = {
+          start: fullRange.start,
+          end: fullRange.start + headerSize
+        };
+      }
+    } else if (!isLastLayer && fullRange) {
+      // For other non-last layers, try to use next layer's start position
+      const nextLayer = layerList[i + 1];
+      if (nextLayer && nextLayer.fullRange) {
+        byteRange = {
+          start: fullRange.start,
+          end: nextLayer.fullRange.start
+        };
+      }
+    }
+    // Last layer (application data) keeps its fullRange
 
     const summary = getLayerSummary(layerName, layerData);
     const node = {
@@ -885,6 +1019,7 @@ const detailsTree = computed(() => {
       path: layerName,
       isLayer: true,
       children: parseLayerFields(layerData, layerName),
+      byteRange,
     };
     tree.push(node);
   }
@@ -921,25 +1056,62 @@ const shouldFilterField = (key) => {
   if (key.endsWith('_tree')) return true;
   // Filter duplicate address/host fields that are redundant
   if (key === 'ip.addr' || key === 'ip.host') return true;
+  if (key === 'ip.src_host' || key === 'ip.dst_host') return true;
+  if (key === 'src_host' || key === 'dst_host') return true;
   if (key === 'ipv6.addr' || key === 'ipv6.host') return true;
+  if (key === 'ipv6.src_host' || key === 'ipv6.dst_host') return true;
   if (key === 'tcp.port' || key === 'udp.port') return true;
   if (key === 'eth.addr') return true;
   return false;
 };
 
+// Get byte range from _raw field
+// tshark _raw fields are arrays: [hex_value, byte_offset, byte_length]
+const getByteRange = (rawData, key) => {
+  if (!rawData) return null;
+  const rawKey = `${key}_raw`;
+  const raw = rawData[rawKey];
+  if (Array.isArray(raw) && raw.length >= 3) {
+    const offset = parseInt(raw[1]);
+    const length = parseInt(raw[2]);
+    if (!isNaN(offset) && !isNaN(length)) {
+      return { start: offset, end: offset + length };
+    }
+  }
+  return null;
+};
+
+// Handle field hover - set highlighted byte range
+const onFieldHover = (byteRange) => {
+  if (byteRange) {
+    highlightedByteRange.value = byteRange;
+  }
+};
+
+// Handle mouse leave from tree - clear highlight
+const onTreeLeave = () => {
+  highlightedByteRange.value = null;
+};
+
 // Parse layer fields into tree nodes (recursive for arbitrary depth)
-const parseLayerFields = (data, prefix) => {
+// parentData is the containing object that has _raw fields alongside regular fields
+const parseLayerFields = (data, prefix, parentData = null) => {
   const fields = [];
+  // Use data itself as parent for top-level, since _raw fields are at same level
+  const rawLookup = parentData || data;
+
   for (const [key, value] of Object.entries(data)) {
     // Skip _raw and other filtered fields
     if (shouldFilterField(key)) continue;
 
     const path = `${prefix}.${key}`;
     const displayName = getFieldName(path);
+    // Look up byte range from _raw field
+    const byteRange = getByteRange(rawLookup, key);
 
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      // Nested object - recurse
-      const children = parseLayerFields(value, path);
+      // Nested object - recurse, passing data as parent for child lookups
+      const children = parseLayerFields(value, path, data);
       // Only add if there are visible children
       if (children.length > 0) {
         fields.push({
@@ -947,6 +1119,7 @@ const parseLayerFields = (data, prefix) => {
           path,
           children,
           hasChildren: true,
+          byteRange,
         });
       }
     } else if (Array.isArray(value)) {
@@ -956,7 +1129,7 @@ const parseLayerFields = (data, prefix) => {
         const children = value.map((item, idx) => ({
           name: `[${idx}]`,
           path: `${path}[${idx}]`,
-          children: typeof item === 'object' ? parseLayerFields(item, `${path}[${idx}]`) : [],
+          children: typeof item === 'object' ? parseLayerFields(item, `${path}[${idx}]`, value) : [],
           value: typeof item !== 'object' ? String(item) : undefined,
         })).filter(child => child.children.length > 0 || child.value);
         if (children.length > 0) {
@@ -965,6 +1138,7 @@ const parseLayerFields = (data, prefix) => {
             path,
             children,
             hasChildren: true,
+            byteRange,
           });
         }
       } else {
@@ -973,6 +1147,7 @@ const parseLayerFields = (data, prefix) => {
           name: displayName,
           value: value.join(', '),
           path,
+          byteRange,
         });
       }
     } else {
@@ -982,6 +1157,7 @@ const parseLayerFields = (data, prefix) => {
         name: displayName,
         value: formattedValue,
         path,
+        byteRange,
       });
     }
   }
@@ -1079,13 +1255,14 @@ const formatValue = (key, path, value) => {
     <div v-else-if="!activePacketDetails" class="no-selection">
       No details available
     </div>
-    <div v-else class="tree">
+    <div v-else class="tree" @mouseleave="onTreeLeave">
       <!-- Layer headers with summaries -->
       <template v-for="layer in detailsTree" :key="layer.path">
         <div
           class="layer-header"
           :class="{ collapsed: isCollapsed(layer.path) }"
           @click="toggleCollapse(layer.path)"
+          @mouseenter="onFieldHover(layer.byteRange)"
         >
           <span class="toggle">{{ isCollapsed(layer.path) ? '▶' : '▼' }}</span>
           <span class="layer-name">{{ layer.name }}</span>
@@ -1100,6 +1277,7 @@ const formatValue = (key, path, value) => {
                   class="field-header"
                   :class="{ collapsed: isCollapsed(field.path) }"
                   @click="toggleCollapse(field.path)"
+                  @mouseenter="onFieldHover(field.byteRange)"
                 >
                   <span class="toggle">{{ isCollapsed(field.path) ? '▶' : '▼' }}</span>
                   <span class="field-name-expandable">{{ field.name }}</span>
@@ -1113,6 +1291,7 @@ const formatValue = (key, path, value) => {
                           class="field-header"
                           :class="{ collapsed: isCollapsed(child2.path) }"
                           @click="toggleCollapse(child2.path)"
+                          @mouseenter="onFieldHover(child2.byteRange)"
                         >
                           <span class="toggle">{{ isCollapsed(child2.path) ? '▶' : '▼' }}</span>
                           <span class="field-name-expandable">{{ child2.name }}</span>
@@ -1126,6 +1305,7 @@ const formatValue = (key, path, value) => {
                                   class="field-header"
                                   :class="{ collapsed: isCollapsed(child3.path) }"
                                   @click="toggleCollapse(child3.path)"
+                                  @mouseenter="onFieldHover(child3.byteRange)"
                                 >
                                   <span class="toggle">{{ isCollapsed(child3.path) ? '▶' : '▼' }}</span>
                                   <span class="field-name-expandable">{{ child3.name }}</span>
@@ -1139,19 +1319,20 @@ const formatValue = (key, path, value) => {
                                           class="field-header"
                                           :class="{ collapsed: isCollapsed(child4.path) }"
                                           @click="toggleCollapse(child4.path)"
+                                          @mouseenter="onFieldHover(child4.byteRange)"
                                         >
                                           <span class="toggle">{{ isCollapsed(child4.path) ? '▶' : '▼' }}</span>
                                           <span class="field-name-expandable">{{ child4.name }}</span>
                                         </div>
                                         <div v-if="!isCollapsed(child4.path)" class="nested-children">
-                                          <div v-for="child5 in child4.children" :key="child5.path" class="field">
+                                          <div v-for="child5 in child4.children" :key="child5.path" class="field" @mouseenter="onFieldHover(child5.byteRange)">
                                             <span class="field-name">{{ child5.name }}:</span>
                                             <span class="field-value">{{ child5.value }}</span>
                                           </div>
                                         </div>
                                       </div>
                                     </template>
-                                    <div v-else class="field">
+                                    <div v-else class="field" @mouseenter="onFieldHover(child4.byteRange)">
                                       <span class="field-name">{{ child4.name }}:</span>
                                       <span class="field-value">{{ child4.value }}</span>
                                     </div>
@@ -1159,7 +1340,7 @@ const formatValue = (key, path, value) => {
                                 </div>
                               </div>
                             </template>
-                            <div v-else class="field">
+                            <div v-else class="field" @mouseenter="onFieldHover(child3.byteRange)">
                               <span class="field-name">{{ child3.name }}:</span>
                               <span class="field-value">{{ child3.value }}</span>
                             </div>
@@ -1167,7 +1348,7 @@ const formatValue = (key, path, value) => {
                         </div>
                       </div>
                     </template>
-                    <div v-else class="field">
+                    <div v-else class="field" @mouseenter="onFieldHover(child2.byteRange)">
                       <span class="field-name">{{ child2.name }}:</span>
                       <span class="field-value">{{ child2.value }}</span>
                     </div>
@@ -1175,7 +1356,7 @@ const formatValue = (key, path, value) => {
                 </div>
               </div>
             </template>
-            <div v-else class="field">
+            <div v-else class="field" @mouseenter="onFieldHover(field.byteRange)">
               <span class="field-name">{{ field.name }}:</span>
               <span class="field-value">{{ field.value }}</span>
             </div>

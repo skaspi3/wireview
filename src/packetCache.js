@@ -8,7 +8,7 @@ import { packets, trackFetched, trackSent, setPacketCacheClearer } from './globa
 const WINDOW_SIZE = 3;        // Prefetch ±3 packets around selected
 const MAX_CACHE_SIZE = 100;   // Maximum packets to cache (LRU eviction)
 
-// Cache storage: Map<frameNumber, { details, hex, accessTime }>
+// Cache storage: Map<frameNumber, { details, hex, rawHex, accessTime }>
 const cache = new Map();
 
 // Loading state for UI feedback
@@ -23,7 +23,7 @@ export const getCachedPacket = (frameNumber) => {
   const entry = cache.get(frameNumber);
   if (entry) {
     entry.accessTime = Date.now(); // Update for LRU
-    return { details: entry.details, hex: entry.hex };
+    return { details: entry.details, hex: entry.hex, rawHex: entry.rawHex };
   }
   return null;
 };
@@ -40,6 +40,7 @@ const addToCache = (packetsData) => {
     cache.set(frame, {
       details: data.details,
       hex: data.hex,
+      rawHex: data.rawHex || '',
       accessTime: Date.now()
     });
   }
