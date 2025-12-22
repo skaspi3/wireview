@@ -205,6 +205,10 @@ const selectBySortedIndex = (sortedIdx) => {
   const originalIdx = packets.value.findIndex(p => p.number === pkt.number);
   if (originalIdx !== -1) {
     activePacketIndex.value = originalIdx;
+    // Broadcast selected packet number to viewers if owner (keyboard navigation)
+    if (isSessionOwner.value) {
+      broadcastOwnerState({ selectedPacketNumber: pkt.number });
+    }
   }
 };
 

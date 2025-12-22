@@ -250,6 +250,17 @@ const scheduleUpdate = () => {
   });
 };
 
+// Batched update for allPackets (for live count when filter is active)
+let pendingAllPacketsUpdate = false;
+const scheduleAllPacketsUpdate = () => {
+  if (pendingAllPacketsUpdate) return;
+  pendingAllPacketsUpdate = true;
+  requestAnimationFrame(() => {
+    triggerRef(allPackets);
+    pendingAllPacketsUpdate = false;
+  });
+};
+
 // WebSocket proxied through Vite - same origin, /ws path
 const WS_URL = `wss://${window.location.host}/ws`;
 
@@ -448,6 +459,7 @@ const connect = () => {
             scheduleUpdate();
           } else {
             allPackets.value.push(msg.data);
+            scheduleAllPacketsUpdate();  // Trigger reactivity for live packet count
           }
         }
 

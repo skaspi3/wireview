@@ -1,6 +1,6 @@
 <script setup>
 import { ref, useTemplateRef, computed } from 'vue';
-import { clearPackets, filterLoading, filterProgress, cancelFilter, packets } from './globals';
+import { clearPackets, filterLoading, filterProgress, cancelFilter, packets, allPackets, captureActive } from './globals';
 import './packetCache';  // Initialize packet cache (registers clearer callback)
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
 import PacketList from './components/panes/PacketList.vue';
@@ -44,6 +44,16 @@ const handleFileSelect = (filePath) => {
 const handleOpenInsights = () => {
   showInsights.value = true;
 };
+
+// Total packet count (from allPackets when filter is active, otherwise from packets)
+const totalPacketCount = computed(() => {
+  return allPackets.value.length > 0 ? allPackets.value.length : packets.value.length;
+});
+
+// Show packet counter only when capturing or has packets
+const showPacketCounter = computed(() => {
+  return captureActive.value || packets.value.length > 0;
+});
 </script>
 
 <template>
@@ -90,6 +100,11 @@ const handleOpenInsights = () => {
           <template #slot3><PacketBytes /></template>
         </DefaultLayout>
       </div>
+    </div>
+
+    <!-- Packet Counter (bottom-center) -->
+    <div v-if="showPacketCounter" class="packet-counter">
+      {{ totalPacketCount.toLocaleString() }} packets
     </div>
 
     <StatusBar />
@@ -203,5 +218,23 @@ const handleOpenInsights = () => {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* Packet Counter - bottom center */
+.packet-counter {
+  position: fixed;
+  bottom: 28px;  /* Above status bar */
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(134, 239, 172, 0.9);  /* Light green/salad */
+  color: #166534;  /* Dark green text */
+  padding: 4px 16px;
+  border-radius: 12px;
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  pointer-events: none;
 }
 </style>
