@@ -1,7 +1,16 @@
 <script setup>
-import { computed, ref, watch, onMounted, useTemplateRef } from "vue";
+import { computed, ref, watch, onMounted, onUnmounted, useTemplateRef } from "vue";
 import { useResizeObserver, useScroll } from "@vueuse/core";
-import { packets, activePacketIndex, displayFilter, allPackets } from "../../globals";
+import { packets, activePacketIndex, displayFilter, allPackets, isSessionOwner, followOwner, broadcastOwnerState, onOwnerStateChange, applyDisplayFilter } from "../../globals";
+
+// Debounce helper for scroll broadcasts
+let scrollBroadcastTimeout = null;
+const broadcastScrollDebounced = (scrollPos) => {
+  if (scrollBroadcastTimeout) clearTimeout(scrollBroadcastTimeout);
+  scrollBroadcastTimeout = setTimeout(() => {
+    broadcastOwnerState({ scrollY: scrollPos });
+  }, 50);
+};
 
 // Row height for virtual scrolling
 const rowHeight = 20;
@@ -147,6 +156,10 @@ useResizeObserver(scrollableEl, (entries) => {
 const { y: scrollYPos } = useScroll(scrollableEl);
 watch(scrollYPos, (val) => {
   scrollY.value = Math.floor(val);
+  // Broadcast scroll position to viewers if owner
+  if (isSessionOwner.value) {
+    broadcastScrollDebounced(scrollY.value);
+  }
 });
 
 // Handle mousewheel
@@ -169,6 +182,10 @@ const selectPacket = (sortedIndex) => {
   const originalIndex = packets.value.findIndex(p => p.number === pkt.number);
   if (originalIndex !== -1) {
     activePacketIndex.value = originalIndex;
+    // Broadcast selected packet number to viewers if owner
+    if (isSessionOwner.value) {
+      broadcastOwnerState({ selectedPacketNumber: pkt.number });
+    }
   }
 };
 
@@ -295,6 +312,44 @@ const formatTime = (time) => {
   if (typeof time !== 'number') return '0.000000';
   return time.toFixed(6);
 };
+
+// Flag to prevent feedback loop when applying owner state
+let applyingOwnerState = false;
+
+// Listen for owner state changes (for viewers)
+const unsubscribeOwnerState = onOwnerStateChange((state) => {
+  // Only apply if we're a viewer and following is enabled
+  if (isSessionOwner.value || !followOwner.value) return;
+
+  applyingOwnerState = true;
+
+  // Apply selected packet
+  if (state.selectedPacketNumber !== undefined) {
+    const idx = packets.value.findIndex(p => p.number === state.selectedPacketNumber);
+    if (idx !== -1) {
+      activePacketIndex.value = idx;
+    }
+  }
+
+  // Apply scroll position
+  if (state.scrollY !== undefined && scrollableEl.value) {
+    scrollY.value = state.scrollY;
+    scrollableEl.value.scrollTop = state.scrollY;
+  }
+
+  // Apply display filter (viewer applies the same filter locally)
+  if (state.displayFilter !== undefined && state.displayFilter !== displayFilter.value) {
+    applyDisplayFilter(state.displayFilter);
+  }
+
+  applyingOwnerState = false;
+});
+
+// Cleanup on unmount
+onUnmounted(() => {
+  unsubscribeOwnerState();
+  if (scrollBroadcastTimeout) clearTimeout(scrollBroadcastTimeout);
+});
 </script>
 
 <template>

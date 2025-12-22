@@ -1,6 +1,6 @@
 <script setup>
-import { ref, watch, computed } from "vue";
-import { packets, activePacketIndex, activePacketDetails, activePacketHex, activePacketRawHex, highlightedByteRange } from "../../globals";
+import { ref, watch, computed, onUnmounted } from "vue";
+import { packets, activePacketIndex, activePacketDetails, activePacketHex, activePacketRawHex, highlightedByteRange, isSessionOwner, followOwner, broadcastOwnerState, onOwnerStateChange } from "../../globals";
 import { getPacketWithPrefetch, getCachedPacket, isFetchingBatch } from "../../packetCache";
 
 // Collapsed state for tree nodes
@@ -10,10 +10,39 @@ const isLoading = ref(false);
 // Toggle collapse state
 const toggleCollapse = (path) => {
   collapsed.value[path] = !collapsed.value[path];
+  // Broadcast collapsed state change to viewers if owner
+  if (isSessionOwner.value) {
+    broadcastOwnerState({ collapsed: { ...collapsed.value } });
+  }
 };
 
 // Check if collapsed
 const isCollapsed = (path) => collapsed.value[path] !== false;
+
+// Listen for owner state changes (for viewers)
+const unsubscribeOwnerState = onOwnerStateChange((state) => {
+  // Only apply if we're a viewer and following is enabled
+  if (isSessionOwner.value || !followOwner.value) return;
+
+  // Apply collapsed state
+  if (state.collapsed !== undefined) {
+    collapsed.value = { ...state.collapsed };
+  }
+
+  // Apply highlighted byte range
+  if (state.highlightedByteRange !== undefined) {
+    highlightedByteRange.value = state.highlightedByteRange;
+  }
+});
+
+// Cleanup timeout reference (set later)
+let cleanupHighlightTimeout = null;
+
+// Cleanup on unmount
+onUnmounted(() => {
+  unsubscribeOwnerState();
+  if (cleanupHighlightTimeout) clearTimeout(cleanupHighlightTimeout);
+});
 
 // MAC OUI (Organizationally Unique Identifier) vendor lookup
 // Format: first 3 bytes of MAC address (uppercase, colon-separated) -> vendor short name
@@ -1081,16 +1110,32 @@ const getByteRange = (rawData, key) => {
   return null;
 };
 
+// Debounce helper for highlight broadcasts
+const broadcastHighlightDebounced = (byteRange) => {
+  if (cleanupHighlightTimeout) clearTimeout(cleanupHighlightTimeout);
+  cleanupHighlightTimeout = setTimeout(() => {
+    broadcastOwnerState({ highlightedByteRange: byteRange });
+  }, 30);
+};
+
 // Handle field hover - set highlighted byte range
 const onFieldHover = (byteRange) => {
   if (byteRange) {
     highlightedByteRange.value = byteRange;
+    // Broadcast to viewers if owner
+    if (isSessionOwner.value) {
+      broadcastHighlightDebounced(byteRange);
+    }
   }
 };
 
 // Handle mouse leave from tree - clear highlight
 const onTreeLeave = () => {
   highlightedByteRange.value = null;
+  // Broadcast to viewers if owner
+  if (isSessionOwner.value) {
+    broadcastHighlightDebounced(null);
+  }
 };
 
 // Parse layer fields into tree nodes (recursive for arbitrary depth)

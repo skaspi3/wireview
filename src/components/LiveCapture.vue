@@ -76,6 +76,11 @@
         <button v-if="isSessionOwner" @click="showShareDialog = true" class="btn btn-share" title="Share capture session">
           🔗 Share
         </button>
+        <!-- Follow Owner toggle for viewers -->
+        <label v-if="!isSessionOwner" class="follow-toggle" title="Follow owner's view (selected packet, scroll, filter)">
+          <input type="checkbox" v-model="followOwner" />
+          <span class="follow-label">Follow</span>
+        </label>
       </span>
 
       <button v-if="isSessionOwner || !sessionId" @click="confirmRestartCapture" class="btn btn-warning" title="Restart Capture">
@@ -146,7 +151,7 @@
 
 <script setup>
 import { ref, triggerRef, onUnmounted, onMounted, computed } from 'vue';
-import { nodeVersion, tsharkLuaVersion, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture } from '../globals';
+import { nodeVersion, tsharkLuaVersion, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange } from '../globals';
 import ConfirmDialog from './ConfirmDialog.vue';
 import InterfaceSelector from './InterfaceSelector.vue';
 
@@ -322,6 +327,7 @@ const connect = () => {
         if (msg.type === 'sessionCreated') {
           sessionId.value = msg.sessionId;
           isSessionOwner.value = true;
+          globalIsSessionOwner.value = true;
           sessionClientCount.value = 1;
           myViewerId.value = 'Owner';
           selectedInterface.value = msg.interface;
@@ -335,6 +341,8 @@ const connect = () => {
         if (msg.type === 'sessionJoined') {
           sessionId.value = msg.sessionId;
           isSessionOwner.value = false;
+          globalIsSessionOwner.value = false;
+          followOwner.value = true;  // Default to following owner
           myViewerId.value = msg.viewerId;
           selectedInterface.value = msg.interface;
           isCapturing.value = msg.isCapturing;
@@ -343,6 +351,12 @@ const connect = () => {
           emit('clear');
           // Clear URL parameter
           window.history.replaceState({}, '', window.location.pathname);
+        }
+
+        // Owner state update (collaborative viewing)
+        if (msg.type === 'ownerState') {
+          // Notify all subscribed components about state change
+          notifyOwnerStateChange(msg.state);
         }
 
         // Session catch-up packets (when joining existing session)
@@ -409,6 +423,7 @@ const connect = () => {
         if (msg.type === 'sessionLeft') {
           sessionId.value = null;
           isSessionOwner.value = false;
+          globalIsSessionOwner.value = false;
           sessionClientCount.value = 0;
           myViewerId.value = null;
           pendingJoinRequests.value = [];
@@ -1014,6 +1029,33 @@ onUnmounted(() => {
 
 .btn-share:hover {
   background: #a78bfa;
+}
+
+/* Follow Owner toggle */
+.follow-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  margin-left: 8px;
+  padding: 3px 8px;
+  background: #374151;
+  border-radius: 12px;
+  font-size: 0.8em;
+  user-select: none;
+}
+
+.follow-toggle input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: #3b82f6;
+}
+
+.follow-toggle .follow-label {
+  color: #9ca3af;
+}
+
+.follow-toggle:has(input:checked) .follow-label {
+  color: #93c5fd;
 }
 
 .share-dialog-overlay {

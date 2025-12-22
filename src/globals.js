@@ -47,6 +47,35 @@ export const captureActive = ref(false);
 // True when user explicitly stopped a live capture (not when loading/closing files)
 export const stoppedCapture = ref(false);
 
+// Session collaborative viewing state
+export const isSessionOwner = ref(false);       // True if we are the session owner
+export const followOwner = ref(true);           // True if viewer wants to follow owner's actions
+export const ownerState = shallowRef(null);     // Latest state received from owner
+
+// Broadcast owner state change (called by owner components)
+export const broadcastOwnerState = (stateUpdate) => {
+  if (!isSessionOwner.value || !websocket.value || websocket.value.readyState !== WebSocket.OPEN) {
+    return;
+  }
+  const msg = JSON.stringify({
+    type: 'ownerState',
+    state: stateUpdate
+  });
+  websocket.value.send(msg);
+};
+
+// Callback for owner state changes (set by components that need to react)
+let ownerStateCallbacks = [];
+export const onOwnerStateChange = (callback) => {
+  ownerStateCallbacks.push(callback);
+  return () => {
+    ownerStateCallbacks = ownerStateCallbacks.filter(cb => cb !== callback);
+  };
+};
+export const notifyOwnerStateChange = (state) => {
+  ownerStateCallbacks.forEach(cb => cb(state));
+};
+
 // TLS certificate info
 export const certInfo = ref(null);
 
@@ -116,6 +145,11 @@ export const applyDisplayFilter = (filter) => {
   });
   trackSent(msg.length);
   websocket.value.send(msg);
+
+  // Broadcast filter to viewers if owner (they will apply locally when results arrive)
+  if (isSessionOwner.value) {
+    broadcastOwnerState({ displayFilter: filter });
+  }
 };
 
 // Cancel filter operation
