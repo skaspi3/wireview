@@ -196,10 +196,10 @@ const isSelfSigned = computed(() => {
       </div>
     </div>
 
-    <!-- Center section - filtered packet count -->
+    <!-- Center section - filtered packet count (positioned above packet counter) -->
     <div v-if="displayFilter" class="center-section">
       <span class="filtered-count">
-        {{ displayedPackets.toLocaleString() }} of {{ totalPackets.toLocaleString() }} packets displayed
+        {{ displayedPackets.toLocaleString() }} packets filtered
       </span>
     </div>
 
@@ -303,13 +303,11 @@ const isSelfSigned = computed(() => {
   position: relative;
 }
 .center-section {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  position: absolute;
+  position: fixed;
+  bottom: 28px;  /* Above the packet counter */
   left: 50%;
   transform: translateX(-50%);
+  z-index: 1001;
 }
 .right-section {
   flex: 1;
