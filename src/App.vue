@@ -220,21 +220,21 @@ const showPacketCounter = computed(() => {
   100% { transform: rotate(360deg); }
 }
 
-/* Packet Counter - bottom center */
+/* Packet Counter - bottom edge center */
 .packet-counter {
   position: fixed;
-  bottom: 28px;  /* Above status bar */
+  bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(134, 239, 172, 0.9);  /* Light green/salad */
+  background: rgba(134, 239, 172, 0.95);  /* Light green/salad */
   color: #166534;  /* Dark green text */
-  padding: 4px 16px;
-  border-radius: 12px;
+  padding: 3px 20px;
+  border-radius: 8px 8px 0 0;
   font-family: monospace;
   font-size: 13px;
   font-weight: 600;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  z-index: 100;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
   pointer-events: none;
 }
 </style>

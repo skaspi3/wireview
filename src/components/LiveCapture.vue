@@ -457,6 +457,7 @@ const connect = () => {
             packets.value.push(msg.data);
             allPackets.value.push(msg.data);
             scheduleUpdate();
+            scheduleAllPacketsUpdate();  // Also trigger allPackets for live count
           } else {
             allPackets.value.push(msg.data);
             scheduleAllPacketsUpdate();  // Trigger reactivity for live packet count
