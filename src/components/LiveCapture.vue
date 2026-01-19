@@ -152,6 +152,7 @@
 <script setup>
 import { ref, triggerRef, onUnmounted, onMounted, computed } from 'vue';
 import { nodeVersion, tsharkLuaVersion, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange } from '../globals';
+import { decompress as zstdDecompress } from 'fzstd';
 import ConfirmDialog from './ConfirmDialog.vue';
 import InterfaceSelector from './InterfaceSelector.vue';
 
@@ -296,13 +297,26 @@ const connect = () => {
       websocket.value = ws.value; // Store in global for filter requests
     };
 
-    ws.value.onmessage = (event) => {
+    ws.value.onmessage = async (event) => {
       // Track received bytes
       const dataSize = typeof event.data === 'string' ? event.data.length : event.data.size;
       trackReceived(dataSize);
 
       try {
-        const msg = JSON.parse(event.data);
+        let msg;
+
+        // Check if data is compressed (Blob/ArrayBuffer) or plain JSON string
+        if (event.data instanceof Blob) {
+          // Compressed zstd data - decompress it
+          const compressedBuffer = await event.data.arrayBuffer();
+          const compressedArray = new Uint8Array(compressedBuffer);
+          const decompressed = zstdDecompress(compressedArray);
+          const jsonStr = new TextDecoder().decode(decompressed);
+          msg = JSON.parse(jsonStr);
+        } else {
+          // Plain JSON string (uncompressed)
+          msg = JSON.parse(event.data);
+        }
 
         if (msg.type === 'interfaces') {
           interfaces.value = msg.list;
