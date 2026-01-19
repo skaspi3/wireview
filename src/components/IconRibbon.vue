@@ -112,11 +112,14 @@ const savePackets = async () => {
 
     const data = await response.json();
 
-    if (data.success) {
+    if (data.success && data.jobId) {
+      // Add job to progress indicator (via LiveCapture component)
+      if (liveCaptureRef.value?.saveProgressIndicator) {
+        liveCaptureRef.value.saveProgressIndicator.addSaveJob(data.jobId);
+      }
       closeSaveDialog();
-      emit('saveFiltered', data.path);
-    } else {
-      saveError.value = data.error || 'Failed to save file';
+    } else if (data.error) {
+      saveError.value = data.error;
     }
   } catch (e) {
     saveError.value = e.message || 'Failed to save file';

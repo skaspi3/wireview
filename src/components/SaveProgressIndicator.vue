@@ -32,6 +32,7 @@
       </div>
       <div class="progress-info">
         <div class="progress-message">{{ save.message }}</div>
+        <div v-if="save.path" class="progress-path" :title="save.path">📁 {{ save.path }}</div>
         <div class="progress-status">{{ save.status }}</div>
       </div>
     </div>
@@ -64,16 +65,17 @@ const updateSaveProgress = (data) => {
     save.progress = data.progress;
     save.status = data.status;
     save.message = data.message;
+    if (data.path) save.path = data.path;
 
     // Auto-remove after completion or error
     if (data.status === 'complete') {
       setTimeout(() => {
         removeSaveJob(data.jobId);
-      }, 3000); // Keep for 3 seconds to show completion
+      }, 5000); // Keep for 5 seconds to show completion and path
     } else if (data.status === 'error') {
       setTimeout(() => {
         removeSaveJob(data.jobId);
-      }, 5000); // Keep errors longer
+      }, 7000); // Keep errors longer
     }
   } else {
     // Add if not found
@@ -81,13 +83,14 @@ const updateSaveProgress = (data) => {
       jobId: data.jobId,
       progress: data.progress,
       status: data.status,
-      message: data.message
+      message: data.message,
+      path: data.path || null
     });
 
     if (data.status === 'complete') {
-      setTimeout(() => removeSaveJob(data.jobId), 3000);
-    } else if (data.status === 'error') {
       setTimeout(() => removeSaveJob(data.jobId), 5000);
+    } else if (data.status === 'error') {
+      setTimeout(() => removeSaveJob(data.jobId), 7000);
     }
   }
 };
@@ -127,7 +130,8 @@ defineExpose({
   border-radius: 8px;
   padding: 12px 16px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  min-width: 280px;
+  min-width: 320px;
+  max-width: 500px;
   animation: slideIn 0.3s ease-out;
 }
 
@@ -179,6 +183,16 @@ defineExpose({
   color: #fff;
   font-size: 13px;
   font-weight: 500;
+}
+
+.progress-path {
+  color: #4a9eff;
+  font-size: 11px;
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: help;
 }
 
 .progress-status {
