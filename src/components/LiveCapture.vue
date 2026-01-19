@@ -716,7 +716,7 @@ const generateDefaultFilename = () => {
     .replace(/[:.]/g, '-')
     .replace('T', '_')
     .slice(0, 19);
-  return `${timestamp}_webcap.pcapng.lz4`;
+  return `${timestamp}_webcap.pcapng.zst`;
 };
 
 const onSaveConfirmYes = async () => {

@@ -59,13 +59,13 @@
           v-model="filename"
           @keydown.enter="save"
           class="filename-input"
-          placeholder="capture.pcapng.lz4"
+          placeholder="capture.pcapng.zst"
         />
       </div>
 
       <div class="format-hint">
         <span class="hint-text">
-          Use <code>.pcapng.lz4</code> or <code>.pcap.lz4</code> for LZ4 compression (fast),
+          Use <code>.pcapng.zst</code> or <code>.pcap.zst</code> for Zstandard compression (fast),
           <code>.pcapng</code> or <code>.pcap</code> for uncompressed
         </span>
       </div>
@@ -127,8 +127,8 @@ const canSave = computed(() => {
   const lower = filename.value.toLowerCase();
   return lower.endsWith('.pcap') ||
          lower.endsWith('.pcapng') ||
-         lower.endsWith('.pcap.lz4') ||
-         lower.endsWith('.pcapng.lz4');
+         lower.endsWith('.pcap.zst') ||
+         lower.endsWith('.pcapng.zst');
 });
 
 const generateDefaultFilename = () => {
@@ -137,7 +137,7 @@ const generateDefaultFilename = () => {
     .replace(/[:.]/g, '-')
     .replace('T', '_')
     .slice(0, 19);
-  return `${timestamp}_webcap.pcapng.lz4`;
+  return `${timestamp}_webcap.pcapng.zst`;
 };
 
 const open = () => {
