@@ -720,9 +720,9 @@ const generateDefaultFilename = () => {
 };
 
 const onSaveConfirmYes = async () => {
-  // Auto-save to /tmp with default filename
+  // Auto-save to /tmp/wireview with default filename
   const filename = generateDefaultFilename();
-  const savePath = `/tmp/${filename}`;
+  const savePath = `/tmp/wireview/${filename}`;
 
   try {
     const response = await fetch('/api/save-pcap', {
@@ -736,7 +736,7 @@ const onSaveConfirmYes = async () => {
       const data = JSON.parse(text);
       if (data.success) {
         // Show toast notification
-        saveToast.value = `Capture saved: ${filename} under /tmp folder`;
+        saveToast.value = `Capture saved: ${filename} under /tmp/wireview folder`;
         setTimeout(() => {
           saveToast.value = null;
         }, 2000);

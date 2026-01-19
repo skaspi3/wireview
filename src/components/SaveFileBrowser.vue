@@ -147,7 +147,7 @@ const open = () => {
   saveError.value = null;
   saving.value = false;
   filename.value = generateDefaultFilename();
-  loadDirectory('');
+  loadDirectory('/tmp/wireview');
 };
 
 const close = () => {
