@@ -146,6 +146,9 @@
     <div v-if="sessionNotification" class="session-notification">
       {{ sessionNotification }}
     </div>
+
+    <!-- Save Progress Indicator -->
+    <SaveProgressIndicator ref="saveProgressIndicator" />
   </div>
 </template>
 
@@ -155,6 +158,7 @@ import { nodeVersion, tsharkLuaVersion, backendPort, backendStatus, certInfo, pa
 import { decompress as zstdDecompress } from 'fzstd';
 import ConfirmDialog from './ConfirmDialog.vue';
 import InterfaceSelector from './InterfaceSelector.vue';
+import SaveProgressIndicator from './SaveProgressIndicator.vue';
 
 const emit = defineEmits(['clear', 'stop', 'openFileBrowser']);
 
@@ -239,6 +243,7 @@ const onSelectorStartCapture = (ifaceName) => {
 // Save dialogs refs
 const saveConfirmDialog = ref(null);
 const saveToast = ref(null);
+const saveProgressIndicator = ref(null);
 
 // Batched update for performance
 let pendingUpdate = false;
@@ -590,6 +595,13 @@ const connect = () => {
           error.value = msg.error;
         }
 
+        // Handle save progress updates
+        if (msg.type === 'saveProgress') {
+          if (saveProgressIndicator.value) {
+            saveProgressIndicator.value.updateSaveProgress(msg);
+          }
+        }
+
         if (msg.type === 'error') {
           error.value = msg.message;
           stopCapture();
@@ -734,12 +746,11 @@ const onSaveConfirmYes = async () => {
     const text = await response.text();
     if (text) {
       const data = JSON.parse(text);
-      if (data.success) {
-        // Show toast notification
-        saveToast.value = `Capture saved: ${filename} under /tmp/wireview folder`;
-        setTimeout(() => {
-          saveToast.value = null;
-        }, 2000);
+      if (data.success && data.jobId) {
+        // Add job to progress indicator
+        if (saveProgressIndicator.value) {
+          saveProgressIndicator.value.addSaveJob(data.jobId);
+        }
       }
     }
   } catch (e) {
