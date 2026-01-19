@@ -95,8 +95,9 @@ const savePackets = async () => {
   let filename = saveFilename.value.trim();
 
   // Handle extension logic
-  if (!filename.endsWith('.pcap') && !filename.endsWith('.pcapng')) {
-    filename += '.pcapng';
+  if (!filename.endsWith('.pcap') && !filename.endsWith('.pcapng') &&
+      !filename.endsWith('.pcap.zst') && !filename.endsWith('.pcapng.zst')) {
+    filename += '.pcapng.zst';
   }
 
   saveSaving.value = true;
