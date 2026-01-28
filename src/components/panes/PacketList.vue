@@ -292,6 +292,11 @@ const getProtocolColor = (protocol) => {
     'UDP': '#daeeff',
     'MDNS': '#daeeff',    // mDNS - light blue (same as UDP)
     'SSDP': '#daeeff',    // SSDP - light blue (same as UDP)
+    'NBNS': '#daeeff',    // NBNS - light blue (NetBIOS Name Service)
+    'NBDGM': '#daeeff',   // NetBIOS Datagram - light blue
+    'NBSS': '#e7e6ff',    // NetBIOS Session Service - light purple (TCP-based)
+    'SMB': '#ffe7a0',     // SMB - light yellow
+    'SMB2': '#ffe7a0',    // SMB2 - light yellow
     'DNS': '#daffe7',
     'DHCP': '#daffe7',
     'DHCPv6': '#daffe7',  // DHCPv6 - light green (same as DNS/DHCP)

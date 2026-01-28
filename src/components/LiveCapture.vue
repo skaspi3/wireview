@@ -154,7 +154,7 @@
 
 <script setup>
 import { ref, triggerRef, onUnmounted, onMounted, computed } from 'vue';
-import { nodeVersion, tsharkLuaVersion, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange } from '../globals';
+import { goVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange } from '../globals';
 import { decompress as zstdDecompress } from 'fzstd';
 import ConfirmDialog from './ConfirmDialog.vue';
 import InterfaceSelector from './InterfaceSelector.vue';
@@ -295,6 +295,8 @@ const connect = () => {
   backendStatus.value = 'connecting';
   try {
     ws.value = new WebSocket(WS_URL);
+    // Use arraybuffer for binary messages (more efficient than blob)
+    ws.value.binaryType = 'arraybuffer';
 
     ws.value.onopen = () => {
       isConnected.value = true;
@@ -304,17 +306,16 @@ const connect = () => {
 
     ws.value.onmessage = async (event) => {
       // Track received bytes
-      const dataSize = typeof event.data === 'string' ? event.data.length : event.data.size;
+      const dataSize = typeof event.data === 'string' ? event.data.length : event.data.byteLength || event.data.length;
       trackReceived(dataSize);
 
       try {
         let msg;
 
-        // Check if data is compressed (Blob/ArrayBuffer) or plain JSON string
-        if (event.data instanceof Blob) {
+        // Check if data is compressed (ArrayBuffer) or plain JSON string
+        if (event.data instanceof ArrayBuffer) {
           // Compressed zstd data - decompress it
-          const compressedBuffer = await event.data.arrayBuffer();
-          const compressedArray = new Uint8Array(compressedBuffer);
+          const compressedArray = new Uint8Array(event.data);
           const decompressed = zstdDecompress(compressedArray);
           const jsonStr = new TextDecoder().decode(decompressed);
           msg = JSON.parse(jsonStr);
@@ -330,11 +331,11 @@ const connect = () => {
           } else if (msg.list.length > 0) {
             selectedInterface.value = msg.list[0];
           }
-          if (msg.nodeVersion) {
-            nodeVersion.value = msg.nodeVersion;
+          if (msg.goVersion) {
+            goVersion.value = msg.goVersion;
           }
-          if (msg.tsharkLuaVersion) {
-            tsharkLuaVersion.value = msg.tsharkLuaVersion;
+          if (msg.tsharkLibraries) {
+            tsharkLibraries.value = msg.tsharkLibraries;
           }
           if (msg.backendPort) {
             backendPort.value = msg.backendPort;
@@ -537,14 +538,14 @@ const connect = () => {
             filterError.value = null;
             displayFilter.value = msg.filter || '';
 
-            // If filter is empty, restore all packets
+            // If filter is empty, restore all packets from backend
             if (!msg.filter) {
-              // allPackets contains the full list, restore it
-              if (allPackets.value.length > 0) {
-                packets.value = [...allPackets.value];
-              }
+              // Backend sends all buffered packets when filter is cleared
+              packets.value = [...msg.packets];
+              // Update allPackets to keep them in sync
+              allPackets.value = [...msg.packets];
             } else {
-              // Store current packets as allPackets if not already saved
+              // Store current packets as allPackets before filtering (first time only)
               if (allPackets.value.length === 0 && packets.value.length > 0) {
                 allPackets.value = [...packets.value];
               }

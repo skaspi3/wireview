@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from "vue";
-import { packets, allPackets, nodeVersion, tsharkLuaVersion, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesFetched } from "../globals";
+import { packets, allPackets, goVersion, tsharkLibraries, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesFetched } from "../globals";
 import GitHubIcon from "./icons/GitHubIcon.vue";
 
 const showFilterPopup = ref(false);
@@ -8,9 +8,7 @@ const showCertPopup = ref(false);
 const showBackendPopup = ref(false);
 const showThinClientPopup = ref(false);
 
-// System memory stats
-const systemStats = ref(null);
-const systemStatsLoading = ref(false);
+// Removed system stats - no longer needed for Go backend
 
 // Reduction ratio - updated periodically
 const reductionRatio = ref(0);
@@ -94,25 +92,8 @@ const statusTitle = computed(() => {
   }
 });
 
-// Fetch system memory stats when hovering over LED
-const fetchSystemStats = async () => {
-  if (systemStatsLoading.value) return;
-  try {
-    systemStatsLoading.value = true;
-    const response = await fetch('/api/stats/system');
-    if (response.ok) {
-      systemStats.value = await response.json();
-    }
-  } catch (e) {
-    console.error('Failed to fetch system stats:', e);
-  } finally {
-    systemStatsLoading.value = false;
-  }
-};
-
 const onBackendHover = () => {
   showBackendPopup.value = true;
-  fetchSystemStats();
 };
 
 const onBackendLeave = () => {
@@ -222,15 +203,12 @@ const isSelfSigned = computed(() => {
             @mouseenter="onBackendHover"
             @mouseleave="onBackendLeave"
           >
-            <div v-if="showBackendPopup" class="backend-popup">
-              <div class="popup-row">Node.js: {{ nodeVersion || 'unknown' }}</div>
-              <div class="popup-row">tshark Lua: {{ tsharkLuaVersion || 'N/A' }}</div>
-              <div v-if="systemStats" class="memory-section">
-                <div class="popup-row">SQLite: {{ systemStats.sqliteVersion || 'N/A' }}</div>
-                <div class="popup-row memory-row">Heap: {{ formatMemory(systemStats.heapUsed) }} / {{ formatMemory(systemStats.heapTotal) }}</div>
-                <div class="popup-row memory-row">Total Memory: {{ formatMemory(systemStats.rss) }}</div>
+            <div v-if="showBackendPopup" class="backend-popup tshark-libraries">
+              <div class="popup-row go-version">{{ goVersion || 'unknown' }}</div>
+              <div v-if="tsharkLibraries" class="libraries-section">
+                <div class="libraries-header">tshark compiled with:</div>
+                <div class="libraries-text">{{ tsharkLibraries }}</div>
               </div>
-              <div v-else-if="systemStatsLoading" class="popup-row loading-row">Loading stats...</div>
             </div>
           </span>
         | <span class="lock-icon" @mouseenter="showCertPopup = true" @mouseleave="showCertPopup = false">
@@ -487,24 +465,46 @@ const isSelfSigned = computed(() => {
   background: #1f2937;
   border: 1px solid #374151;
   border-radius: 6px;
-  padding: 8px 12px;
-  white-space: nowrap;
+  padding: 10px 14px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   z-index: 1000;
   font-size: 13px;
   color: #d1d5db;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.backend-popup.tshark-libraries {
+  min-width: 400px;
+  max-width: 600px;
 }
 .popup-row {
   margin: 2px 0;
 }
-.memory-section {
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px solid #374151;
+.go-version {
+  font-weight: 600;
+  color: #60a5fa;
+  margin-bottom: 10px;
+  font-size: 14px;
+  white-space: nowrap;
 }
-.memory-row {
-  color: #22c55e;
-  font-family: monospace;
+.libraries-section {
+  margin-top: 8px;
+}
+.libraries-header {
+  font-weight: 500;
+  color: #9ca3af;
+  margin-bottom: 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+.libraries-text {
+  color: #d1d5db;
+  font-size: 12px;
+  line-height: 1.6;
+  word-wrap: break-word;
+  white-space: normal;
 }
 .loading-row {
   color: #9ca3af;

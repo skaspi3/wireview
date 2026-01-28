@@ -985,6 +985,40 @@ const detailsTree = computed(() => {
     layerList.push({ layerName, layerData, fullRange });
   }
 
+  // Sort layers using tshark's protocol hierarchy from frame.protocols
+  // Example: "eth:ethertype:ip:tcp:http" shows the correct protocol stack order
+  const protocolOrder = {};
+  const frameProtocols = layers.frame?.['frame.protocols'];
+  if (typeof frameProtocols === 'string') {
+    // Split "eth:ethertype:ip:tcp:http" and assign order indices
+    const protocols = frameProtocols.split(':');
+    protocols.forEach((proto, index) => {
+      protocolOrder[proto] = index;
+    });
+  }
+
+  // Sort by tshark's protocol hierarchy order
+  layerList.sort((a, b) => {
+    const orderA = protocolOrder[a.layerName];
+    const orderB = protocolOrder[b.layerName];
+
+    // Both protocols are in the hierarchy - use tshark's order
+    if (orderA !== undefined && orderB !== undefined) {
+      return orderA - orderB;
+    }
+
+    // Frame is always first if not in protocols list
+    if (a.layerName === 'frame') return -1;
+    if (b.layerName === 'frame') return 1;
+
+    // One protocol is in hierarchy, other isn't - hierarchy comes first
+    if (orderA !== undefined) return -1;
+    if (orderB !== undefined) return 1;
+
+    // Neither in hierarchy - sort alphabetically
+    return a.layerName.localeCompare(b.layerName);
+  });
+
   // Known protocol header sizes (in bytes)
   const getKnownHeaderSize = (layerName, layerData) => {
     switch (layerName) {
