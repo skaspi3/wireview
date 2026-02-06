@@ -1,7 +1,43 @@
 <script setup>
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { activePacketIndex, activePacketRawHex, highlightedByteRange } from "../../globals";
 import { isFetchingBatch } from "../../packetCache";
+
+// Store field positions for the current packet
+const fieldPositions = ref([]);
+const byteToFieldMap = ref(new Map());
+const hoveredField = ref(null);
+
+// Fetch field positions when packet changes
+watch(activePacketIndex, async (newIndex) => {
+  if (newIndex === null) {
+    fieldPositions.value = [];
+    byteToFieldMap.value = new Map();
+    hoveredField.value = null;
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/packet-fields?frame=${newIndex + 1}`);
+    if (response.ok) {
+      const data = await response.json();
+      fieldPositions.value = data.fields || [];
+
+      // Build byte-to-field mapping
+      const map = new Map();
+      for (const field of data.fields || []) {
+        for (let i = 0; i < field.size; i++) {
+          map.set(field.pos + i, field);
+        }
+      }
+      byteToFieldMap.value = map;
+    }
+  } catch (error) {
+    console.error('Error fetching field positions:', error);
+    fieldPositions.value = [];
+    byteToFieldMap.value = new Map();
+  }
+}, { immediate: true });
 
 // Parse raw hex into bytes array
 const bytes = computed(() => {
@@ -46,13 +82,30 @@ const formatOffset = (offset) => {
 
 // Handle mouse enter on a byte
 const onByteHover = (byteIndex) => {
-  // When hovering on a single byte, highlight just that byte
-  highlightedByteRange.value = { start: byteIndex, end: byteIndex + 1 };
+  // Look up the field for this byte
+  const field = byteToFieldMap.value.get(byteIndex);
+
+  if (field) {
+    // Highlight the entire field
+    highlightedByteRange.value = {
+      start: field.pos,
+      end: field.pos + field.size
+    };
+    hoveredField.value = field;
+  } else {
+    // No field mapping - highlight just this byte
+    highlightedByteRange.value = {
+      start: byteIndex,
+      end: byteIndex + 1
+    };
+    hoveredField.value = null;
+  }
 };
 
 // Handle mouse leave from hex area
 const onHexLeave = () => {
   highlightedByteRange.value = null;
+  hoveredField.value = null;
 };
 </script>
 
@@ -107,6 +160,16 @@ const onHexLeave = () => {
             @mouseenter="onByteHover(row.offset + i)"
           >{{ char }}</span>
         </span>
+      </div>
+
+      <!-- Tooltip for field information -->
+      <div v-if="hoveredField" class="field-tooltip">
+        <div class="tooltip-layer">{{ hoveredField.layerShowname || hoveredField.layer }}</div>
+        <div class="tooltip-field">{{ hoveredField.showname || hoveredField.name }}</div>
+        <div class="tooltip-details">
+          <span class="tooltip-name">{{ hoveredField.name }}</span>
+          <span class="tooltip-size">{{ hoveredField.size }} byte{{ hoveredField.size !== 1 ? 's' : '' }}</span>
+        </div>
       </div>
     </div>
   </div>
@@ -213,5 +276,53 @@ const onHexLeave = () => {
 .ascii-char.highlighted {
   background: #264f78;
   color: #fff;
+}
+
+.field-tooltip {
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+  background: #2d2d2d;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 8px 12px;
+  color: #e0e0e0;
+  font-family: var(--ws-font-family-monospace);
+  font-size: 11px;
+  line-height: 1.4;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  max-width: 500px;
+  pointer-events: none;
+}
+
+.tooltip-layer {
+  color: #4ec9b0;
+  font-weight: 600;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.tooltip-field {
+  color: #dcdcaa;
+  margin-bottom: 4px;
+  word-wrap: break-word;
+}
+
+.tooltip-details {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid #444;
+  font-size: 10px;
+}
+
+.tooltip-name {
+  color: #9cdcfe;
+}
+
+.tooltip-size {
+  color: #b5cea8;
 }
 </style>

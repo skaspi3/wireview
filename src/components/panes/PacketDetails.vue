@@ -1129,16 +1129,23 @@ const shouldFilterField = (key) => {
 };
 
 // Get byte range from _raw field
-// tshark _raw fields are arrays: [hex_value, byte_offset, byte_length]
+// tshark _raw fields are arrays: [hex_value, bit_offset, bit_length]
+// Note: offsets and lengths are in BITS, not bytes, so we divide by 8
 const getByteRange = (rawData, key) => {
   if (!rawData) return null;
   const rawKey = `${key}_raw`;
   const raw = rawData[rawKey];
   if (Array.isArray(raw) && raw.length >= 3) {
-    const offset = parseInt(raw[1]);
-    const length = parseInt(raw[2]);
-    if (!isNaN(offset) && !isNaN(length)) {
-      return { start: offset, end: offset + length };
+    const bitOffset = parseInt(raw[1]);
+    const bitLength = parseInt(raw[2]);
+    if (!isNaN(bitOffset) && !isNaN(bitLength)) {
+      const byteOffset = Math.floor(bitOffset / 8);
+      const byteLength = Math.ceil(bitLength / 8);
+      // Debug log for IPv4 to see actual values
+      if (key.includes('ip') && !key.includes('ipv6')) {
+        console.log(`getByteRange: key=${key}, rawKey=${rawKey}, bitOffset=${bitOffset}, bitLength=${bitLength}, byteOffset=${byteOffset}, byteLength=${byteLength}`);
+      }
+      return { start: byteOffset, end: byteOffset + byteLength };
     }
   }
   return null;
@@ -1185,8 +1192,8 @@ const parseLayerFields = (data, prefix, parentData = null) => {
 
     const path = `${prefix}.${key}`;
     const displayName = getFieldName(path);
-    // Look up byte range from _raw field
-    const byteRange = getByteRange(rawLookup, key);
+    // Look up byte range from _raw field - use data (current level) not parentData
+    const byteRange = getByteRange(data, key);
 
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
       // Nested object - recurse, passing data as parent for child lookups

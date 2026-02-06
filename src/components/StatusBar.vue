@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from "vue";
-import { packets, allPackets, goVersion, tsharkLibraries, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesFetched } from "../globals";
+import { packets, allPackets, nodeVersion, tsharkLuaVersion, tsharkLibraries, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesFetched } from "../globals";
 import GitHubIcon from "./icons/GitHubIcon.vue";
 
 const showFilterPopup = ref(false);
@@ -203,11 +203,17 @@ const isSelfSigned = computed(() => {
             @mouseenter="onBackendHover"
             @mouseleave="onBackendLeave"
           >
-            <div v-if="showBackendPopup" class="backend-popup tshark-libraries">
-              <div class="popup-row go-version">{{ goVersion || 'unknown' }}</div>
-              <div v-if="tsharkLibraries" class="libraries-section">
-                <div class="libraries-header">tshark compiled with:</div>
-                <div class="libraries-text">{{ tsharkLibraries }}</div>
+            <div v-if="showBackendPopup" class="backend-popup">
+              <div class="popup-row">Node.js: {{ nodeVersion || 'unknown' }}</div>
+              <div v-if="tsharkLibraries.length > 0" class="libs-section">
+                <div class="libs-title">tshark libraries:</div>
+                <div class="libs-grid">
+                  <span v-for="lib in tsharkLibraries" :key="lib.name" class="lib-entry">
+                    {{ lib.name }}<template v-if="lib.version">: {{ lib.version }}</template>
+                  </span>
+                </div>
+              </div>
+              <div v-else class="popup-row">tshark Lua: {{ tsharkLuaVersion || 'N/A' }}</div>
               </div>
             </div>
           </span>
@@ -480,29 +486,27 @@ const isSelfSigned = computed(() => {
 .popup-row {
   margin: 2px 0;
 }
-.go-version {
-  font-weight: 600;
-  color: #60a5fa;
-  margin-bottom: 10px;
-  font-size: 14px;
-  white-space: nowrap;
+.libs-section {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid #374151;
 }
-.libraries-section {
-  margin-top: 8px;
-}
-.libraries-header {
-  font-weight: 500;
+.libs-title {
   color: #9ca3af;
-  margin-bottom: 6px;
   font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
+  margin-bottom: 3px;
 }
-.libraries-text {
-  color: #d1d5db;
-  font-size: 12px;
-  line-height: 1.6;
+.libs-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  max-width: 360px;
+  white-space: normal;
+}
+.lib-entry {
+  font-size: 11px;
+  color: #a5b4c8;
+  font-family: monospace;
   word-wrap: break-word;
   white-space: normal;
 }

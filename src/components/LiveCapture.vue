@@ -154,7 +154,7 @@
 
 <script setup>
 import { ref, triggerRef, onUnmounted, onMounted, computed } from 'vue';
-import { goVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange } from '../globals';
+import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange } from '../globals';
 import { decompress as zstdDecompress } from 'fzstd';
 import ConfirmDialog from './ConfirmDialog.vue';
 import InterfaceSelector from './InterfaceSelector.vue';
@@ -331,8 +331,11 @@ const connect = () => {
           } else if (msg.list.length > 0) {
             selectedInterface.value = msg.list[0];
           }
-          if (msg.goVersion) {
-            goVersion.value = msg.goVersion;
+          if (msg.nodeVersion) {
+            nodeVersion.value = msg.nodeVersion;
+          }
+          if (msg.tsharkLuaVersion) {
+            tsharkLuaVersion.value = msg.tsharkLuaVersion;
           }
           if (msg.tsharkLibraries) {
             tsharkLibraries.value = msg.tsharkLibraries;

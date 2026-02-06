@@ -31,9 +31,6 @@
 
   --ws-ugly-red: #c62828;     /* Dark red for invalid filter */
   --ws-ugly-green: #2e7d32;   /* Dark green for valid filter */
-  --ws-nice-blue: #3794ff;
-  --ws-hmmm-yellow: #dcdcaa;
-
   --ws-pane-border: 1px solid var(--ws-gray);
 
   font-synthesis: none;
