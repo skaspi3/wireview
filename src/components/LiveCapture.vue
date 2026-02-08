@@ -541,12 +541,11 @@ const connect = () => {
             filterError.value = null;
             displayFilter.value = msg.filter || '';
 
-            // If filter is empty, restore all packets from backend
+            // If filter is empty, restore all packets from local cache
             if (!msg.filter) {
-              // Backend sends all buffered packets when filter is cleared
-              packets.value = [...msg.packets];
-              // Update allPackets to keep them in sync
-              allPackets.value = [...msg.packets];
+              // Use our local allPackets which has been maintained with all received packets
+              // (backend buffer may be truncated by MAX_PACKET_BUFFER cap)
+              packets.value = [...allPackets.value];
             } else {
               // Store current packets as allPackets before filtering (first time only)
               if (allPackets.value.length === 0 && packets.value.length > 0) {
@@ -736,9 +735,9 @@ const generateDefaultFilename = () => {
 };
 
 const onSaveConfirmYes = async () => {
-  // Auto-save to /tmp/wireview with default filename
+  // Auto-save with default filename via save-pcap endpoint
   const filename = generateDefaultFilename();
-  const savePath = `/tmp/wireview/${filename}`;
+  const savePath = `/pcap/${filename}`;
 
   try {
     const response = await fetch('/api/save-pcap', {
@@ -824,7 +823,7 @@ const goBackToInterfaces = () => {
   emit('clear');
 };
 
-defineExpose({ getWebSocket, loadPcapFile, goBackToInterfaces });
+defineExpose({ getWebSocket, loadPcapFile, goBackToInterfaces, saveProgressIndicator });
 
 // Auto-connect on mount
 onMounted(() => {

@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from "vue";
-import { activePacketIndex, activePacketRawHex, highlightedByteRange } from "../../globals";
+import { activePacketIndex, activePacketRawHex, highlightedByteRange, packets } from "../../globals";
 import { isFetchingBatch } from "../../packetCache";
 
 // Store field positions for the current packet
@@ -17,8 +17,12 @@ watch(activePacketIndex, async (newIndex) => {
     return;
   }
 
+  const packet = packets.value[newIndex];
+  if (!packet) return;
+  const frameNumber = packet.number;
+
   try {
-    const response = await fetch(`/api/packet-fields?frame=${newIndex + 1}`);
+    const response = await fetch(`/api/packet-fields?frame=${frameNumber}`);
     if (response.ok) {
       const data = await response.json();
       fieldPositions.value = data.fields || [];

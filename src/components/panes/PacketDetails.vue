@@ -1141,10 +1141,6 @@ const getByteRange = (rawData, key) => {
     if (!isNaN(bitOffset) && !isNaN(bitLength)) {
       const byteOffset = Math.floor(bitOffset / 8);
       const byteLength = Math.ceil(bitLength / 8);
-      // Debug log for IPv4 to see actual values
-      if (key.includes('ip') && !key.includes('ipv6')) {
-        console.log(`getByteRange: key=${key}, rawKey=${rawKey}, bitOffset=${bitOffset}, bitLength=${bitLength}, byteOffset=${byteOffset}, byteLength=${byteLength}`);
-      }
       return { start: byteOffset, end: byteOffset + byteLength };
     }
   }

@@ -39,14 +39,25 @@ const goBack = () => {
   liveCaptureRef.value?.goBackToInterfaces();
 };
 
-// Open save dialog for all packets
-const openSaveAllDialog = () => {
+// Generate save filename with optional filter prefix
+const generateSaveFilename = (mode) => {
   const now = new Date();
   const timestamp = now.toISOString()
     .replace(/[:.]/g, '-')
     .replace('T', '_')
     .slice(0, 19);
-  saveFilename.value = `capture_${timestamp}`;
+  const filter = displayFilter.value?.trim();
+  if (filter) {
+    // Sanitize filter for filename: replace non-alphanumeric with underscore
+    const sanitized = filter.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/_+/g, '_');
+    return `${sanitized}_${timestamp}`;
+  }
+  return `capture_${timestamp}`;
+};
+
+// Open save dialog for all packets
+const openSaveAllDialog = () => {
+  saveFilename.value = generateSaveFilename('all');
   saveError.value = null;
   saveDialogMode.value = 'all';
   showSaveDialog.value = true;
@@ -54,12 +65,7 @@ const openSaveAllDialog = () => {
 
 // Open save dialog for filtered packets
 const openSaveFilteredDialog = () => {
-  const now = new Date();
-  const timestamp = now.toISOString()
-    .replace(/[:.]/g, '-')
-    .replace('T', '_')
-    .slice(0, 19);
-  saveFilename.value = `filtered_${timestamp}`;
+  saveFilename.value = generateSaveFilename('filtered');
   saveError.value = null;
   saveDialogMode.value = 'filtered';
   showSaveDialog.value = true;

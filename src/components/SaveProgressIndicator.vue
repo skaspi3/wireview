@@ -51,6 +51,8 @@ const strokeDashoffset = (progress) => {
 };
 
 const addSaveJob = (jobId) => {
+  // Skip if already exists (WebSocket progress may arrive before HTTP response)
+  if (activeSaves.value.find(s => s.jobId === jobId)) return;
   activeSaves.value.push({
     jobId,
     progress: 0,

@@ -214,7 +214,6 @@ const isSelfSigned = computed(() => {
                 </div>
               </div>
               <div v-else class="popup-row">tshark Lua: {{ tsharkLuaVersion || 'N/A' }}</div>
-              </div>
             </div>
           </span>
         | <span class="lock-icon" @mouseenter="showCertPopup = true" @mouseleave="showCertPopup = false">
