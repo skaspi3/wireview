@@ -80,13 +80,9 @@ const getSortedPackets = () => {
 
 // Handle column sort click
 const handleSort = (column) => {
-  // Clear display filter when sorting
+  // Clear display filter when sorting (notify backend to clear its filter too)
   if (displayFilter.value) {
-    displayFilter.value = '';
-    // Restore all packets
-    if (allPackets.value.length > 0) {
-      packets.value = [...allPackets.value];
-    }
+    applyDisplayFilter('');
   }
 
   if (sortColumn.value === column) {
@@ -155,7 +151,7 @@ useResizeObserver(scrollableEl, (entries) => {
 // Scroll handling
 const { y: scrollYPos } = useScroll(scrollableEl);
 watch(scrollYPos, (val) => {
-  scrollY.value = Math.floor(val);
+  scrollY.value = Math.floor(val / rowHeight);
   // Broadcast scroll position to viewers if owner
   if (isSessionOwner.value) {
     broadcastScrollDebounced(scrollY.value);
@@ -168,7 +164,7 @@ const handleWheel = (event) => {
   event.preventDefault();
   scrollY.value = Math.max(0, Math.min(extraRows.value, scrollY.value + Math.round(event.deltaY / rowHeight)));
   if (scrollableEl.value) {
-    scrollableEl.value.scrollTop = scrollY.value;
+    scrollableEl.value.scrollTop = scrollY.value * rowHeight;
   }
 };
 
@@ -262,7 +258,7 @@ watch(() => packets.value.length, (newLen, oldLen) => {
     // Was at bottom, stay at bottom
     scrollY.value = Math.max(0, newLen - visibleRowCount.value);
     if (scrollableEl.value) {
-      scrollableEl.value.scrollTop = scrollY.value;
+      scrollableEl.value.scrollTop = scrollY.value * rowHeight;
     }
   }
 });
@@ -281,7 +277,7 @@ watch(activePacketIndex, (index) => {
     scrollY.value = sortedIdx - visibleRowCount.value + 1;
   }
   if (scrollableEl.value) {
-    scrollableEl.value.scrollTop = scrollY.value;
+    scrollableEl.value.scrollTop = scrollY.value * rowHeight;
   }
 });
 
@@ -422,7 +418,7 @@ onUnmounted(() => {
       </table>
     </div>
     <!-- Spacer for scrolling -->
-    <div :style="{ height: extraRows + 'px' }"></div>
+    <div :style="{ height: extraRows * rowHeight + 'px' }"></div>
   </div>
 </template>
 

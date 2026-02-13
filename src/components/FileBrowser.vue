@@ -48,7 +48,7 @@
         </div>
 
         <div v-if="files.length === 0" class="empty">
-          No capture files in this directory (.pcap, .pcapng, .pcap.gz, .pcapng.gz)
+          No capture files in this directory (.pcap, .pcapng, .pcap.zst, .pcapng.zst)
         </div>
       </div>
 
