@@ -119,8 +119,12 @@ export const clearPackets = () => {
   activePacketIndex.value = null;
   activePacketDetails.value = null;
   activePacketHex.value = '';
+  activePacketRawHex.value = '';
+  highlightedByteRange.value = null;
   displayFilter.value = '';
   filterError.value = null;
+  filterLoading.value = false;
+  filterProgress.value = 0;
   captureActive.value = false;
   stoppedCapture.value = false;
   bytesReceived.value = 0;

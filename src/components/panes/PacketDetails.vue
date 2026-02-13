@@ -893,8 +893,13 @@ const flattenLayerData = (data, prefix = '', result = {}) => {
   return result;
 };
 
+// Generation counter to discard stale fetch responses on fast selection changes
+let detailsFetchGen = 0;
+
 // Fetch packet details and hex when selection changes
 watch(activePacketIndex, async (index) => {
+  const gen = ++detailsFetchGen;
+
   // Clear highlight when packet changes
   highlightedByteRange.value = null;
 
@@ -939,6 +944,7 @@ watch(activePacketIndex, async (index) => {
 
   try {
     const data = await getPacketWithPrefetch(frameNumber, packets.value.length);
+    if (gen !== detailsFetchGen) return; // selection changed, discard
     if (data && data.details) {
       activePacketDetails.value = data.details;
       activePacketHex.value = data.hex || '';
@@ -950,12 +956,15 @@ watch(activePacketIndex, async (index) => {
       activePacketRawHex.value = '';
     }
   } catch (e) {
+    if (gen !== detailsFetchGen) return;
     console.error("Failed to fetch packet data:", e);
     activePacketDetails.value = null;
     activePacketHex.value = '';
     activePacketRawHex.value = '';
   } finally {
-    isLoading.value = false;
+    if (gen === detailsFetchGen) {
+      isLoading.value = false;
+    }
   }
 });
 

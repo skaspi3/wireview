@@ -7,9 +7,12 @@ import { isFetchingBatch } from "../../packetCache";
 const fieldPositions = ref([]);
 const byteToFieldMap = ref(new Map());
 const hoveredField = ref(null);
+let fetchGen = 0; // Generation counter to discard stale responses
 
 // Fetch field positions when packet changes
 watch(activePacketIndex, async (newIndex) => {
+  const gen = ++fetchGen;
+
   if (newIndex === null) {
     fieldPositions.value = [];
     byteToFieldMap.value = new Map();
@@ -23,8 +26,10 @@ watch(activePacketIndex, async (newIndex) => {
 
   try {
     const response = await fetch(`/api/packet-fields?frame=${frameNumber}`);
+    if (gen !== fetchGen) return; // selection changed, discard
     if (response.ok) {
       const data = await response.json();
+      if (gen !== fetchGen) return;
       fieldPositions.value = data.fields || [];
 
       // Build byte-to-field mapping
@@ -37,6 +42,7 @@ watch(activePacketIndex, async (newIndex) => {
       byteToFieldMap.value = map;
     }
   } catch (error) {
+    if (gen !== fetchGen) return;
     console.error('Error fetching field positions:', error);
     fieldPositions.value = [];
     byteToFieldMap.value = new Map();
