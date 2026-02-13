@@ -1,8 +1,9 @@
 // Packet Cache with Prefetch
 // Caches packet details and prefetches adjacent packets for smooth navigation
+// Uses WebSocket for requests (eliminates HTTP/1.1 head-of-line blocking)
 
 import { ref } from 'vue';
-import { packets, trackFetched, trackSent, setPacketCacheClearer } from './globals';
+import { packets, trackFetched, trackSent, setPacketCacheClearer, wsRequest } from './globals';
 
 // Configuration
 const WINDOW_SIZE = 3;        // Prefetch ±3 packets around selected
@@ -70,20 +71,8 @@ export const clearPacketCache = () => {
 
 // Calculate the range of frames that should be fetched
 const calculateFetchRange = (targetFrame, totalPackets) => {
-  // Get frame numbers from packets array
-  // targetFrame is the frame.number, not index
-
-  // Calculate window bounds
   let startFrame = Math.max(1, targetFrame - WINDOW_SIZE);
   let endFrame = targetFrame + WINDOW_SIZE;
-
-  // Clamp to available packets if we know the total
-  // Note: totalPackets is the count, last frame might be higher due to filtering
-  if (totalPackets > 0) {
-    // We can't really know the max frame number without checking
-    // Just request the range and let server return what exists
-  }
-
   return { startFrame, endFrame };
 };
 
@@ -98,7 +87,7 @@ const getUncachedFrames = (startFrame, endFrame) => {
   return needed;
 };
 
-// Fetch a batch of packets from server
+// Fetch a batch of packets from server via WebSocket
 const fetchBatch = async (startFrame, endFrame) => {
   const rangeKey = `${startFrame}-${endFrame}`;
 
@@ -109,23 +98,12 @@ const fetchBatch = async (startFrame, endFrame) => {
 
   isFetchingBatch.value = true;
 
-  const url = `/api/packets-batch?start=${startFrame}&end=${endFrame}`;
-  trackSent(url.length);
-
   pendingFetchRange = rangeKey;
-  pendingFetch = fetch(url)
-    .then(async (response) => {
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      // Track compressed bytes transferred (Content-Length header)
-      const contentLength = parseInt(response.headers.get('content-length')) || 0;
-      if (contentLength > 0) {
-        trackFetched(contentLength);
-      }
-      return response.json();
-    })
+  pendingFetch = wsRequest('getPacketsBatch', { start: startFrame, end: endFrame })
     .then((data) => {
+      if (data.error) {
+        throw new Error(data.error);
+      }
       if (data.packets) {
         addToCache(data.packets);
       }

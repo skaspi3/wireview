@@ -106,6 +106,44 @@ fetch('/api/cert-info')
   .then(data => { if (data) certInfo.value = data; })
   .catch(() => {});
 
+// WebSocket request/response dispatcher
+// Sends a message with a unique reqId, returns a promise that resolves when the response arrives
+const pendingRequests = new Map(); // reqId -> { resolve, reject }
+let nextReqId = 1;
+
+export const wsRequest = (type, payload) => {
+  return new Promise((resolve, reject) => {
+    const ws = websocket.value;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      reject(new Error('WebSocket not connected'));
+      return;
+    }
+    const reqId = nextReqId++;
+    pendingRequests.set(reqId, { resolve, reject });
+    const msg = JSON.stringify({ type, reqId, ...payload });
+    trackSent(msg.length);
+    ws.send(msg);
+  });
+};
+
+// Called by LiveCapture.vue onmessage to resolve pending requests
+export const resolveWsRequest = (reqId, data) => {
+  const pending = pendingRequests.get(reqId);
+  if (pending) {
+    pendingRequests.delete(reqId);
+    pending.resolve(data);
+  }
+};
+
+// Clear pending requests (on disconnect/reconnect)
+export const clearPendingWsRequests = () => {
+  for (const [, pending] of pendingRequests) {
+    pending.reject(new Error('WebSocket disconnected'));
+  }
+  pendingRequests.clear();
+  nextReqId = 1;
+};
+
 // Callback for clearing packet cache (set by packetCache.js to avoid circular import)
 let clearPacketCacheCallback = null;
 export const setPacketCacheClearer = (callback) => {

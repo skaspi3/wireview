@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from "vue";
-import { activePacketIndex, activePacketRawHex, highlightedByteRange, packets } from "../../globals";
+import { activePacketIndex, activePacketRawHex, highlightedByteRange, packets, wsRequest } from "../../globals";
 import { isFetchingBatch } from "../../packetCache";
 
 // Store field positions for the current packet
@@ -25,22 +25,18 @@ watch(activePacketIndex, async (newIndex) => {
   const frameNumber = packet.number;
 
   try {
-    const response = await fetch(`/api/packet-fields?frame=${frameNumber}`);
+    const data = await wsRequest('getPacketFields', { frame: frameNumber });
     if (gen !== fetchGen) return; // selection changed, discard
-    if (response.ok) {
-      const data = await response.json();
-      if (gen !== fetchGen) return;
-      fieldPositions.value = data.fields || [];
+    fieldPositions.value = data.fields || [];
 
-      // Build byte-to-field mapping
-      const map = new Map();
-      for (const field of data.fields || []) {
-        for (let i = 0; i < field.size; i++) {
-          map.set(field.pos + i, field);
-        }
+    // Build byte-to-field mapping
+    const map = new Map();
+    for (const field of data.fields || []) {
+      for (let i = 0; i < field.size; i++) {
+        map.set(field.pos + i, field);
       }
-      byteToFieldMap.value = map;
     }
+    byteToFieldMap.value = map;
   } catch (error) {
     if (gen !== fetchGen) return;
     console.error('Error fetching field positions:', error);

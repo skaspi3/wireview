@@ -154,7 +154,7 @@
 
 <script setup>
 import { ref, triggerRef, onUnmounted, onMounted, computed } from 'vue';
-import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange } from '../globals';
+import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange, resolveWsRequest, clearPendingWsRequests } from '../globals';
 import { decompress as zstdDecompress } from 'fzstd';
 import ConfirmDialog from './ConfirmDialog.vue';
 import InterfaceSelector from './InterfaceSelector.vue';
@@ -279,6 +279,7 @@ const closeSocket = () => {
     ws.value.close();
     ws.value = null;
   }
+  clearPendingWsRequests();
 };
 
 // Helper to send and track bytes
@@ -322,6 +323,11 @@ const connect = () => {
         } else {
           // Plain JSON string (uncompressed)
           msg = JSON.parse(event.data);
+        }
+
+        // Dispatch responses to pending WebSocket requests (packet batches, field positions)
+        if (msg.reqId !== undefined) {
+          resolveWsRequest(msg.reqId, msg);
         }
 
         if (msg.type === 'interfaces') {
