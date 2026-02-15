@@ -138,6 +138,10 @@ export default defineConfig(({ mode }) => {
         '/api/interfaces': {
           target: 'http://127.0.0.1:3000',
           changeOrigin: true,
+        },
+        '/api/resolve-ips': {
+          target: 'http://127.0.0.1:3000',
+          changeOrigin: true,
         }
       }
     }

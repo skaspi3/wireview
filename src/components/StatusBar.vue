@@ -203,14 +203,12 @@ const isSelfSigned = computed(() => {
             @mouseenter="onBackendHover"
             @mouseleave="onBackendLeave"
           >
-            <div v-if="showBackendPopup" class="backend-popup">
+            <div v-if="showBackendPopup" :class="['backend-popup', { 'tshark-libraries': tsharkLibraries.length > 0 }]">
               <div class="popup-row">Node.js: {{ nodeVersion || 'unknown' }}</div>
               <div v-if="tsharkLibraries.length > 0" class="libs-section">
                 <div class="libs-title">tshark libraries:</div>
                 <div class="libs-grid">
-                  <span v-for="lib in tsharkLibraries" :key="lib.name" class="lib-entry">
-                    {{ lib.name }}<template v-if="lib.version">: {{ lib.version }}</template>
-                  </span>
+                  <span v-for="(lib, i) in tsharkLibraries" :key="lib.name" class="lib-entry">{{ lib.name }}<template v-if="lib.version"> {{ lib.version }}</template><template v-if="i < tsharkLibraries.length - 1">, </template></span>
                 </div>
               </div>
               <div v-else class="popup-row">tshark Lua: {{ tsharkLuaVersion || 'N/A' }}</div>
@@ -480,7 +478,7 @@ const isSelfSigned = computed(() => {
 }
 .backend-popup.tshark-libraries {
   min-width: 400px;
-  max-width: 600px;
+  max-width: 700px;
 }
 .popup-row {
   margin: 2px 0;
@@ -496,11 +494,8 @@ const isSelfSigned = computed(() => {
   margin-bottom: 3px;
 }
 .libs-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 10px;
-  max-width: 360px;
-  white-space: normal;
+  display: inline;
+  line-height: 1.6;
 }
 .lib-entry {
   font-size: 11px;

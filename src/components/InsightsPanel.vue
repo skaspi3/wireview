@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { packets, hostIP } from '../globals';
+import { packets, hostIP, tsharkLibraries } from '../globals';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { PieChart, BarChart, LineChart, TreeChart, ChordChart } from 'echarts/charts';
@@ -38,6 +38,36 @@ const summary = ref(null);
 const protocols = ref([]);
 const talkers = ref([]);
 const timeline = ref([]);
+
+// IP resolution state
+const resolvedIPs = ref(new Map());
+const isResolving = ref(false);
+const hasMaxMind = computed(() => tsharkLibraries.value.some(lib => /maxmind/i.test(lib.name)));
+
+const resolveIPs = async () => {
+  if (isResolving.value || !talkers.value.length) return;
+  isResolving.value = true;
+  try {
+    const ips = talkers.value.slice(0, 10).map(t => t.ip_address);
+    const response = await fetch('/api/resolve-ips', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ips })
+    });
+    if (response.ok) {
+      const data = await response.json();
+      const newMap = new Map(resolvedIPs.value);
+      for (const [ip, hostname] of Object.entries(data.resolved || {})) {
+        newMap.set(ip, hostname);
+      }
+      resolvedIPs.value = newMap;
+    }
+  } catch (e) {
+    console.error('Failed to resolve IPs:', e);
+  } finally {
+    isResolving.value = false;
+  }
+};
 
 // tshark analysis data
 const expert = ref(null);
@@ -309,8 +339,19 @@ const talkersBarOption = computed(() => {
     },
     yAxis: {
       type: 'category',
-      data: top10.map(t => t.ip_address).reverse(),
-      axisLabel: { color: '#9ca3af', fontSize: 10 }
+      data: top10.map(t => {
+        const hostname = resolvedIPs.value.get(t.ip_address);
+        return hostname ? `${hostname}` : t.ip_address;
+      }).reverse(),
+      axisLabel: { color: '#9ca3af', fontSize: 12 },
+      tooltip: {
+        show: true,
+        formatter: (params) => {
+          const ip = top10[top10.length - 1 - params.dataIndex]?.ip_address;
+          const hostname = resolvedIPs.value.get(ip);
+          return hostname ? `${hostname}\n${ip}` : ip;
+        }
+      }
     },
     series: [{
       type: 'bar',
@@ -681,7 +722,12 @@ const hierarchyTreeOption = computed(() => {
 
             <!-- Top Talkers Bar Chart -->
             <div v-if="talkersBarOption" class="chart-container">
-              <h3>Top Talkers (Bytes)</h3>
+              <div class="chart-header">
+                <h3>Top Talkers (Bytes)</h3>
+                <button v-if="hasMaxMind" class="resolve-btn" @click="resolveIPs" :disabled="isResolving">
+                  {{ isResolving ? 'Resolving...' : 'Resolve IPs' }}
+                </button>
+              </div>
               <v-chart class="chart" :option="talkersBarOption" autoresize />
             </div>
           </div>
@@ -1070,11 +1116,47 @@ const hierarchyTreeOption = computed(() => {
   padding: 16px;
 }
 
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.chart-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #e5e7eb;
+}
+
 .chart-container h3 {
   margin: 0 0 12px 0;
   font-size: 14px;
   font-weight: 500;
   color: #e5e7eb;
+}
+
+.resolve-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  border: 1px solid #4b5563;
+  border-radius: 4px;
+  background: #1f2937;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.resolve-btn:hover:not(:disabled) {
+  background: #374151;
+  color: #e5e7eb;
+  border-color: #6b7280;
+}
+
+.resolve-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .chart {
