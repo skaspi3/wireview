@@ -260,8 +260,8 @@ const isSelfSigned = computed(() => {
       </span>
       <a
         class="github"
-        href="https://github.com/radiantly/Wireview"
-        aria-label="Visit the Wireview project page on GitHub"
+        href="https://github.com/skaspi3/webpcap"
+        aria-label="Visit the WebPCAP project page on GitHub"
         target="_blank"
       >
         <GitHubIcon />
