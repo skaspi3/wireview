@@ -471,7 +471,7 @@ const isSelfSigned = computed(() => {
   padding: 10px 14px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   z-index: 1000;
-  font-size: 13px;
+  font-size: 16px;
   color: #d1d5db;
   max-height: 400px;
   overflow-y: auto;
@@ -490,7 +490,7 @@ const isSelfSigned = computed(() => {
 }
 .libs-title {
   color: #9ca3af;
-  font-size: 11px;
+  font-size: 14px;
   margin-bottom: 3px;
 }
 .libs-grid {
@@ -498,7 +498,7 @@ const isSelfSigned = computed(() => {
   line-height: 1.6;
 }
 .lib-entry {
-  font-size: 11px;
+  font-size: 14px;
   color: #a5b4c8;
   font-family: monospace;
   word-wrap: break-word;

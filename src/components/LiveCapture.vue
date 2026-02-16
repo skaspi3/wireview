@@ -68,19 +68,15 @@
     <!-- Capturing State -->
     <div v-else-if="isCapturing" class="status-bar">
       <span class="recording-indicator">● Capture</span>
-      <span class="interface-tag">on {{ selectedInterface }}</span>
-
-      <!-- Session info -->
-      <span v-if="sessionId" class="session-info" :title="'Session: ' + sessionId">
-        <span class="session-badge">{{ sessionClientCount }} viewer{{ sessionClientCount !== 1 ? 's' : '' }}</span>
-        <button v-if="isSessionOwner" @click="showShareDialog = true" class="btn btn-share" title="Share capture session">
-          🔗 Share
-        </button>
-        <!-- Follow Owner toggle for viewers -->
-        <label v-if="!isSessionOwner" class="follow-toggle" title="Follow owner's view (selected packet, scroll, filter)">
-          <input type="checkbox" v-model="followOwner" />
-          <span class="follow-label">Follow</span>
-        </label>
+      <span class="interface-tag-wrapper" @mouseenter="showIfaceTooltip = true" @mouseleave="showIfaceTooltip = false">
+        <span class="interface-tag">on {{ selectedInterface }}</span>
+        <div v-if="showIfaceTooltip && activeIfaceDetails" class="iface-tooltip">
+          <div class="iface-tooltip-row" v-if="activeIfaceDetails.driver"><span class="iface-tooltip-label">Driver:</span> {{ activeIfaceDetails.driver }}</div>
+          <div class="iface-tooltip-row" v-if="activeIfaceDetails.mac"><span class="iface-tooltip-label">MAC:</span> {{ activeIfaceDetails.mac }}</div>
+          <div class="iface-tooltip-row" v-if="activeIfaceDetails.ip"><span class="iface-tooltip-label">IPv4:</span> {{ activeIfaceDetails.ip }}</div>
+          <div class="iface-tooltip-row" v-if="activeIfaceDetails.ipv6"><span class="iface-tooltip-label">IPv6:</span> {{ activeIfaceDetails.ipv6 }}</div>
+          <div class="iface-tooltip-row" v-if="activeIfaceDetails.speed"><span class="iface-tooltip-label">Speed:</span> {{ activeIfaceDetails.speed }} Mbps</div>
+        </div>
       </span>
 
       <button v-if="isSessionOwner || !sessionId" @click="confirmRestartCapture" class="btn btn-warning" title="Restart Capture">
@@ -93,6 +89,18 @@
         Leave
       </button>
     </div>
+
+    <!-- Session info (top-right corner) -->
+    <span v-if="isCapturing && sessionId" class="session-info" :title="'Session: ' + sessionId">
+      <span class="session-badge">{{ sessionClientCount }} viewer{{ sessionClientCount !== 1 ? 's' : '' }}</span>
+      <button v-if="isSessionOwner" @click="showShareDialog = true" class="btn btn-share" title="Share capture session">
+        🔗 Share
+      </button>
+      <label v-if="!isSessionOwner" class="follow-toggle" title="Follow owner's view (selected packet, scroll, filter)">
+        <input type="checkbox" v-model="followOwner" />
+        <span class="follow-label">Follow</span>
+      </label>
+    </span>
 
     <!-- Share Dialog -->
     <div v-if="showShareDialog" class="share-dialog-overlay" @click.self="showShareDialog = false">
@@ -167,6 +175,14 @@ const isConnected = ref(false);
 const isCapturing = ref(false);
 const interfaces = ref([]);
 const selectedInterface = ref('');
+const interfaceDetails = ref({});
+const showIfaceTooltip = ref(false);
+const activeIfaceDetails = computed(() => {
+  const d = interfaceDetails.value[selectedInterface.value];
+  if (!d) return null;
+  if (!d.driver && !d.mac && !d.ip && !d.ipv6) return null;
+  return d;
+});
 
 const error = ref(null);
 
@@ -332,6 +348,7 @@ const connect = () => {
 
         if (msg.type === 'interfaces') {
           interfaces.value = msg.list;
+          if (msg.details) interfaceDetails.value = msg.details;
           if (msg.default && msg.list.includes(msg.default)) {
             selectedInterface.value = msg.default;
           } else if (msg.list.length > 0) {
@@ -915,12 +932,55 @@ onUnmounted(() => {
   font-weight: bold;
 }
 
+.interface-tag-wrapper {
+  position: relative;
+}
+
 .interface-tag {
   color: #9ca3af;
   margin-left: 10px;
   font-size: 1.0em;
   border-left: 1px solid #6b7280;
   padding-left: 10px;
+  cursor: default;
+}
+
+.iface-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  background: #1f2937;
+  border: 1px solid #4b5563;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-family: monospace;
+  color: #e5e7eb;
+  white-space: nowrap;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.iface-tooltip::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 16px;
+  width: 8px;
+  height: 8px;
+  background: #1f2937;
+  border-left: 1px solid #4b5563;
+  border-top: 1px solid #4b5563;
+  transform: rotate(45deg);
+}
+
+.iface-tooltip-row {
+  padding: 2px 0;
+}
+
+.iface-tooltip-label {
+  color: #9ca3af;
+  margin-right: 6px;
 }
 
 .error-toast {
@@ -1050,28 +1110,29 @@ onUnmounted(() => {
 
 /* Session sharing styles */
 .session-info {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: 12px;
-  padding-left: 12px;
-  border-left: 1px solid #4b5563;
 }
 
 .session-badge {
   background: #065f46;
   color: #d1fae5;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 0.8em;
+  padding: 2.3px 9.2px;
+  border-radius: 14px;
+  font-size: 0.92em;
   font-weight: 500;
 }
 
 .btn-share {
   background: #8b5cf6;
   color: white;
-  padding: 4px 10px;
-  font-size: 0.85em;
+  padding: 4.6px 11.5px;
+  font-size: 0.98em;
 }
 
 .btn-share:hover {

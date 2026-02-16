@@ -211,6 +211,7 @@ defineExpose({ loadPcapFile });
 
 <style scoped>
 .ribbon {
+  position: relative;
   background: var(--ws-lighter-gray);
   padding: 4px;
   display: flex;
