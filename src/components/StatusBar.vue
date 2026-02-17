@@ -66,6 +66,11 @@ const toggleFilterPopup = () => {
   showFilterPopup.value = !showFilterPopup.value;
 };
 
+const totalCapturedBytes = computed(() => {
+  const pkts = allPackets.value.length > 0 ? allPackets.value : packets.value;
+  return pkts.reduce((sum, pkt) => sum + (pkt.length || 0), 0);
+});
+
 // Update reduction ratio periodically
 let reductionRatioInterval = null;
 
@@ -194,6 +199,8 @@ const isSelfSigned = computed(() => {
         Thin Client Mode
         <div v-if="showThinClientPopup" class="thin-client-popup">
           <div class="popup-row reduction-row">Reduction Ratio: {{ reductionRatio.toFixed(1) }}%</div>
+          <div class="popup-row">Captured on interface: {{ formatBytes(totalCapturedBytes) }}</div>
+          <div class="popup-row">Sent to browser: {{ formatBytes(bytesReceived + bytesFetched) }}</div>
         </div>
       </span>
       <span class="version-info wss-info">

@@ -145,6 +145,7 @@ defineExpose({ loadPcapFile });
       @stop="() => emit('stop')"
       @openFileBrowser="() => emit('openFileBrowser')"
     />
+    <img v-if="!hideInsights" src="/webpcap-logo.png" alt="WebPCAP" class="ribbon-logo" />
     <template v-if="!hideInsights">
       <div class="separator"></div>
       <button class="insights-btn" @click="emit('openInsights')" title="Capture Insights">
@@ -218,6 +219,18 @@ defineExpose({ loadPcapFile });
   align-items: center;
   gap: 1px;
   border-bottom: var(--ws-pane-border);
+}
+.ribbon-logo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  height: 53px;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  opacity: 0.9;
 }
 .icon {
   padding: 3px;
