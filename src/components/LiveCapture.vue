@@ -79,12 +79,19 @@
         </div>
       </span>
 
-      <button v-if="isSessionOwner || !sessionId" @click="confirmRestartCapture" class="btn btn-warning" title="Restart Capture">
-        ↺
-      </button>
-      <button v-if="isSessionOwner || !sessionId" @click="stopCapture" class="btn btn-danger">
-        Stop
-      </button>
+      <div v-if="isSessionOwner || !sessionId" class="capture-controls">
+        <button @click="confirmRestartCapture" class="ctrl-btn ctrl-restart" title="Restart Capture">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="1 4 1 10 7 10"/>
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+          </svg>
+        </button>
+        <button @click="stopCapture" class="ctrl-btn ctrl-stop" title="Stop Capture">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <rect x="4" y="4" width="16" height="16" rx="2"/>
+          </svg>
+        </button>
+      </div>
       <button v-else @click="stopCapture" class="btn btn-secondary">
         Leave
       </button>
@@ -913,6 +920,81 @@ onUnmounted(() => {
 .btn-danger { background-color: #ef4444; color: white; margin-left: 10px; padding: 8px 16px; font-size: 1.0em; }
 .btn-warning { background-color: #f59e0b; color: white; margin-left: 10px; padding: 8px 14px; font-size: 1.1em; }
 .btn-file { background-color: #6366f1; color: white; }
+
+/* Combined capture control button */
+.capture-controls {
+  display: flex;
+  margin-left: 10px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.ctrl-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  padding: 7px 12px;
+  overflow: hidden;
+  transition: filter 0.2s, transform 0.1s;
+}
+
+.ctrl-btn svg {
+  width: 16px;
+  height: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.ctrl-restart {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  border-right: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 8px 0 0 8px;
+}
+
+.ctrl-stop {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  border-radius: 0 8px 8px 0;
+}
+
+/* Shimmer/glitter overlay on hover */
+.ctrl-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    120deg,
+    transparent 0%,
+    transparent 30%,
+    rgba(255, 255, 255, 0.4) 50%,
+    transparent 70%,
+    transparent 100%
+  );
+  z-index: 2;
+  transition: none;
+}
+
+.ctrl-btn:hover::before {
+  left: 100%;
+  transition: left 0.5s ease;
+}
+
+.ctrl-btn:hover {
+  filter: brightness(1.2);
+}
+
+.ctrl-btn:active {
+  transform: scale(0.93);
+  filter: brightness(0.95);
+}
 
 .status-bar {
   display: flex;
