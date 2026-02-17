@@ -169,7 +169,7 @@
 
 <script setup>
 import { ref, triggerRef, onUnmounted, onMounted, computed } from 'vue';
-import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange, resolveWsRequest, clearPendingWsRequests } from '../globals';
+import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange, resolveWsRequest, clearPendingWsRequests, pcapDirUsage } from '../globals';
 import { decompress as zstdDecompress } from 'fzstd';
 import ConfirmDialog from './ConfirmDialog.vue';
 import InterfaceSelector from './InterfaceSelector.vue';
@@ -192,6 +192,7 @@ const activeIfaceDetails = computed(() => {
 });
 
 const error = ref(null);
+let pcapDirUsageInterval = null;
 
 // Session sharing state
 const sessionId = ref(null);
@@ -297,6 +298,7 @@ const WS_URL = `wss://${window.location.host}/ws`;
 const getWebSocket = () => ws.value;
 
 const closeSocket = () => {
+  if (pcapDirUsageInterval) { clearInterval(pcapDirUsageInterval); pcapDirUsageInterval = null; }
   if (ws.value) {
     ws.value.onclose = null; // Prevent loops
     ws.value.close();
@@ -326,6 +328,13 @@ const connect = () => {
       isConnected.value = true;
       backendStatus.value = 'connected';
       websocket.value = ws.value; // Store in global for filter requests
+
+      // Poll pcap dir usage every 3 seconds
+      if (pcapDirUsageInterval) clearInterval(pcapDirUsageInterval);
+      pcapDirUsageInterval = setInterval(() => {
+        sendMessage({ type: 'getPcapDirUsage' });
+      }, 3000);
+      sendMessage({ type: 'getPcapDirUsage' }); // Initial request
     };
 
     ws.value.onmessage = async (event) => {
@@ -527,6 +536,10 @@ const connect = () => {
 
         if (msg.type === 'stopped') {
           // Capture stopped by server
+        }
+
+        if (msg.type === 'pcapDirUsage') {
+          pcapDirUsage.value = { used: msg.used, total: msg.total, fsType: msg.fsType };
         }
 
         // Handle filter validation response
@@ -868,6 +881,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  if (pcapDirUsageInterval) clearInterval(pcapDirUsageInterval);
   if (ws.value) ws.value.close();
 });
 </script>

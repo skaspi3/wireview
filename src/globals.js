@@ -80,6 +80,9 @@ export const notifyOwnerStateChange = (state) => {
 // TLS certificate info
 export const certInfo = ref(null);
 
+// Pcap temp directory usage stats
+export const pcapDirUsage = ref(null); // { used, total, fsType }
+
 // Data transfer tracking (bytes)
 export const bytesReceived = ref(0);
 export const bytesSent = ref(0);

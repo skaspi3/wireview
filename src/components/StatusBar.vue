@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from "vue";
-import { packets, allPackets, nodeVersion, tsharkLuaVersion, tsharkLibraries, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesFetched } from "../globals";
+import { packets, allPackets, nodeVersion, tsharkLuaVersion, tsharkLibraries, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesFetched, pcapDirUsage } from "../globals";
 import GitHubIcon from "./icons/GitHubIcon.vue";
 
 const showFilterPopup = ref(false);
@@ -77,7 +77,8 @@ let reductionRatioInterval = null;
 const formatBytes = (bytes) => {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
 };
 
 onMounted(() => {
@@ -201,6 +202,9 @@ const isSelfSigned = computed(() => {
           <div class="popup-row reduction-row">Reduction Ratio: {{ reductionRatio.toFixed(1) }}%</div>
           <div class="popup-row">Captured on interface: {{ formatBytes(totalCapturedBytes) }}</div>
           <div class="popup-row">Sent to browser: {{ formatBytes(bytesReceived + bytesFetched) }}</div>
+          <div v-if="pcapDirUsage" class="popup-row pcap-dir-row">
+            {{ pcapDirUsage.fsType === 'tmpfs' ? 'RAM' : 'Disk' }}: {{ formatBytes(pcapDirUsage.used) }} / {{ formatBytes(pcapDirUsage.total) }}
+          </div>
         </div>
       </span>
       <span class="version-info wss-info">
@@ -429,6 +433,13 @@ const isSelfSigned = computed(() => {
 .thin-client-popup .reduction-row {
   color: #22c55e;
   font-weight: 500;
+}
+.thin-client-popup .pcap-dir-row {
+  color: #9ca3af;
+  font-size: 13px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #374151;
 }
 .thin-client-popup .compression-row {
   color: #9ca3af;

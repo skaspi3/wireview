@@ -13,6 +13,7 @@ const props = defineProps({
 const emit = defineEmits(['clear', 'stop', 'openFileBrowser', 'openInsights', 'saveFiltered']);
 
 const liveCaptureRef = useTemplateRef('live-capture');
+const showWarning = ref(false);
 
 // Save dialog state
 const showSaveDialog = ref(false);
@@ -146,6 +147,22 @@ defineExpose({ loadPcapFile });
       @openFileBrowser="() => emit('openFileBrowser')"
     />
     <img v-if="!hideInsights" src="/webpcap-logo.png" alt="WebPCAP" class="ribbon-logo" />
+    <!-- Warning sign - between logo and right edge -->
+    <div v-if="!hideInsights" class="warning-badge" @mouseenter="showWarning = true" @mouseleave="showWarning = false">
+      <svg class="warning-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" fill="#f59e0b" stroke="#b45309" stroke-width="1"/>
+        <line x1="12" y1="9" x2="12" y2="14" stroke="#78350f" stroke-width="2.2" stroke-linecap="round"/>
+        <circle cx="12" cy="17" r="1.1" fill="#78350f"/>
+      </svg>
+      <div v-if="showWarning" class="warning-balloon">
+        <div class="warning-balloon-title">Warning</div>
+        <div class="warning-balloon-text">
+          Live capture of data-path traffic is a CPU, memory and I/O intensive operation.
+          Use with caution, for a limited amount of time/streams, and don't forget to stop
+          when you no longer need it. Otherwise the system may become unresponsive, freeze and/or stall.
+        </div>
+      </div>
+    </div>
     <template v-if="!hideInsights">
       <div class="separator"></div>
       <button class="insights-btn" @click="emit('openInsights')" title="Capture Insights">
@@ -225,7 +242,7 @@ defineExpose({ loadPcapFile });
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  height: 53px;
+  height: 47px;
   object-fit: contain;
   pointer-events: none;
   user-select: none;
@@ -486,5 +503,99 @@ defineExpose({ loadPcapFile });
 
 .btn-cancel:hover {
   background: #6b7280;
+}
+
+/* Warning badge */
+.warning-badge {
+  position: absolute;
+  left: calc(50% + 130px);
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  z-index: 10;
+}
+.warning-icon {
+  width: 28px;
+  height: 28px;
+  filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.5));
+  animation: warning-glow 2s ease-in-out infinite;
+}
+@keyframes warning-glow {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.4)); }
+  50% { filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.9)) drop-shadow(0 0 20px rgba(251, 191, 36, 0.4)); }
+}
+.warning-badge::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border-radius: 6px;
+  background: linear-gradient(135deg,
+    transparent 20%,
+    rgba(251, 191, 36, 0.3) 40%,
+    rgba(255, 255, 255, 0.5) 50%,
+    rgba(251, 191, 36, 0.3) 60%,
+    transparent 80%
+  );
+  background-size: 200% 200%;
+  animation: warning-shimmer 3s linear infinite;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.warning-badge:hover::before {
+  opacity: 1;
+}
+@keyframes warning-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.warning-badge:hover .warning-icon {
+  animation: warning-glow-intense 0.8s ease-in-out infinite;
+  transform: scale(1.1);
+  transition: transform 0.2s;
+}
+@keyframes warning-glow-intense {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.7)) drop-shadow(0 0 12px rgba(251, 191, 36, 0.3)); }
+  50% { filter: drop-shadow(0 0 14px rgba(245, 158, 11, 1)) drop-shadow(0 0 28px rgba(251, 191, 36, 0.6)); }
+}
+.warning-balloon {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #1c1a17, #2a2520);
+  border: 1px solid #b45309;
+  border-radius: 8px;
+  padding: 14px 18px;
+  width: 340px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5), 0 0 12px rgba(245, 158, 11, 0.15);
+  z-index: 2000;
+}
+.warning-balloon::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 12px;
+  height: 12px;
+  background: #1c1a17;
+  border-left: 1px solid #b45309;
+  border-top: 1px solid #b45309;
+}
+.warning-balloon-title {
+  color: #fbbf24;
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+.warning-balloon-text {
+  color: #d6d3d1;
+  font-size: 13px;
+  line-height: 1.5;
 }
 </style>
