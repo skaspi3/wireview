@@ -148,7 +148,7 @@ defineExpose({ loadPcapFile });
     />
     <img v-if="!hideInsights" src="/webpcap-logo.png" alt="WebPCAP" class="ribbon-logo" />
     <!-- Warning sign - between logo and right edge -->
-    <div v-if="!hideInsights" class="warning-badge" @mouseenter="showWarning = true" @mouseleave="showWarning = false">
+    <div v-if="!hideInsights && !stoppedCapture" class="warning-badge" @mouseenter="showWarning = true" @mouseleave="showWarning = false">
       <svg class="warning-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" fill="#f59e0b" stroke="#b45309" stroke-width="1"/>
         <line x1="12" y1="9" x2="12" y2="14" stroke="#78350f" stroke-width="2.2" stroke-linecap="round"/>
@@ -157,9 +157,7 @@ defineExpose({ loadPcapFile });
       <div v-if="showWarning" class="warning-balloon">
         <div class="warning-balloon-title">Warning</div>
         <div class="warning-balloon-text">
-          Live capture of data-path traffic is a CPU, memory and I/O intensive operation.
-          Use with caution, for a limited amount of time/streams, and don't forget to stop
-          when you no longer need it. Otherwise the system may become unresponsive, freeze and/or stall.
+          Live capture of data-path traffic is a CPU, memory and I/O intensive operation. Use with caution, for a limited amount of time/streams
         </div>
       </div>
     </div>
@@ -589,13 +587,13 @@ defineExpose({ loadPcapFile });
 .warning-balloon-title {
   color: #fbbf24;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 16px;
   margin-bottom: 8px;
   letter-spacing: 0.5px;
 }
 .warning-balloon-text {
   color: #d6d3d1;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.5;
 }
 </style>

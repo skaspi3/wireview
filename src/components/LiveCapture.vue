@@ -692,9 +692,8 @@ const stopCapture = () => {
   if (ws.value && isConnected.value) {
     try {
       if (sessionId.value) {
-        // Stop session capture
+        // Stop session capture — stay in session so pcap file remains accessible
         sendMessage({ type: 'stopSession' });
-        sendMessage({ type: 'leaveSession' });
       } else {
         sendMessage({ type: 'stop' });
       }
@@ -704,9 +703,6 @@ const stopCapture = () => {
   isCapturing.value = false;
   captureActive.value = false;
   stoppedCapture.value = true;
-  sessionId.value = null;
-  isSessionOwner.value = false;
-  sessionClientCount.value = 0;
   emit('stop');
 };
 
@@ -853,6 +849,14 @@ const closePcapFile = () => {
 
 // Go back to interface list (clears current capture state)
 const goBackToInterfaces = () => {
+  // Leave session if in one (triggers cleanup on backend)
+  if (sessionId.value && ws.value && isConnected.value) {
+    try { sendMessage({ type: 'leaveSession' }); } catch (e) {}
+  }
+  sessionId.value = null;
+  isSessionOwner.value = false;
+  sessionClientCount.value = 0;
+
   loadedPcapFile.value = null;
   isCapturing.value = false;
   captureActive.value = false;
