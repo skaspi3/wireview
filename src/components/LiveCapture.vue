@@ -168,8 +168,8 @@
 </template>
 
 <script setup>
-import { ref, triggerRef, onUnmounted, onMounted, computed } from 'vue';
-import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange, resolveWsRequest, clearPendingWsRequests, pcapDirUsage } from '../globals';
+import { ref, triggerRef, onUnmounted, onMounted, computed, watch } from 'vue';
+import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange, resolveWsRequest, clearPendingWsRequests, pcapDirUsage, idleCountdownSeconds, setCancelIdleCountdown } from '../globals';
 import { decompress as zstdDecompress } from 'fzstd';
 import ConfirmDialog from './ConfirmDialog.vue';
 import InterfaceSelector from './InterfaceSelector.vue';
@@ -193,6 +193,69 @@ const activeIfaceDetails = computed(() => {
 
 const error = ref(null);
 let pcapDirUsageInterval = null;
+
+// Idle kill-switch
+const IDLE_TIMEOUT_S = 60;
+let idleTimeout = null;
+let countdownInterval = null;
+
+const stopIdleDetection = () => {
+  if (idleTimeout) { clearTimeout(idleTimeout); idleTimeout = null; }
+  if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+  idleCountdownSeconds.value = 0;
+  document.removeEventListener('mousemove', onUserActivity);
+  document.removeEventListener('keydown', onUserActivity);
+  document.removeEventListener('visibilitychange', onVisibilityChange);
+};
+
+const startCountdown = () => {
+  if (countdownInterval) return; // Already counting
+  let remaining = IDLE_TIMEOUT_S;
+  idleCountdownSeconds.value = remaining;
+  countdownInterval = setInterval(() => {
+    remaining--;
+    idleCountdownSeconds.value = remaining;
+    if (remaining <= 0) {
+      stopIdleDetection();
+      stopCapture();
+    }
+  }, 1000);
+};
+
+const resetIdleTimer = () => {
+  if (idleTimeout) clearTimeout(idleTimeout);
+  if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+  idleCountdownSeconds.value = 0;
+  if (!isCapturing.value || stoppedCapture.value) return;
+  idleTimeout = setTimeout(startCountdown, IDLE_TIMEOUT_S * 1000);
+};
+
+const onUserActivity = () => {
+  if (document.visibilityState === 'visible' && isCapturing.value && !stoppedCapture.value) {
+    resetIdleTimer();
+  }
+};
+
+const onVisibilityChange = () => {
+  if (!isCapturing.value || stoppedCapture.value) return;
+  if (document.visibilityState === 'hidden') {
+    // Tab hidden — start countdown immediately
+    if (idleTimeout) { clearTimeout(idleTimeout); idleTimeout = null; }
+    startCountdown();
+  } else {
+    // Tab visible again — treat as activity
+    resetIdleTimer();
+  }
+};
+
+const startIdleDetection = () => {
+  document.addEventListener('mousemove', onUserActivity);
+  document.addEventListener('keydown', onUserActivity);
+  document.addEventListener('visibilitychange', onVisibilityChange);
+  resetIdleTimer();
+};
+
+setCancelIdleCountdown(() => onUserActivity());
 
 // Session sharing state
 const sessionId = ref(null);
@@ -706,6 +769,15 @@ const stopCapture = () => {
   emit('stop');
 };
 
+// Start/stop idle detection based on capture state
+watch(isCapturing, (capturing) => {
+  if (capturing && !stoppedCapture.value) {
+    startIdleDetection();
+  } else {
+    stopIdleDetection();
+  }
+});
+
 // Get shareable URL for current session
 const getShareUrl = () => {
   if (!sessionId.value) return '';
@@ -886,6 +958,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (pcapDirUsageInterval) clearInterval(pcapDirUsageInterval);
+  stopIdleDetection();
   if (ws.value) ws.value.close();
 });
 </script>

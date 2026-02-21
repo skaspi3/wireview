@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from "vue";
-import { packets, allPackets, nodeVersion, tsharkLuaVersion, tsharkLibraries, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesFetched, pcapDirUsage } from "../globals";
+import { packets, allPackets, nodeVersion, tsharkLuaVersion, tsharkLibraries, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesFetched, pcapDirUsage, appVersion } from "../globals";
 import GitHubIcon from "./icons/GitHubIcon.vue";
 
 const showFilterPopup = ref(false);
@@ -163,6 +163,7 @@ const isSelfSigned = computed(() => {
       <div class="bpf-filter-link" @click="toggleFilterPopup">
         Current BPF filter
       </div>
+      <span v-if="appVersion" class="app-version">{{ appVersion }}</span>
 
       <!-- BPF Filter Popup -->
       <div v-if="showFilterPopup" class="filter-popup">
@@ -306,6 +307,12 @@ const isSelfSigned = computed(() => {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+}
+.app-version {
+  color: #6b7280;
+  font-size: 11px;
+  font-family: monospace;
+  margin-left: 10px;
 }
 .bpf-filter-link {
   color: #3b82f6;

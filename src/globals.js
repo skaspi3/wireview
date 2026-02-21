@@ -48,6 +48,12 @@ export const captureActive = ref(false);
 // True when user explicitly stopped a live capture (not when loading/closing files)
 export const stoppedCapture = ref(false);
 
+// Idle kill-switch state
+export const idleCountdownSeconds = ref(0); // Remaining seconds (0 = not counting)
+let cancelIdleCountdownFn = () => {};
+export const cancelIdleCountdown = () => cancelIdleCountdownFn();
+export const setCancelIdleCountdown = (fn) => { cancelIdleCountdownFn = fn; };
+
 // Session collaborative viewing state
 export const isSessionOwner = ref(false);       // True if we are the session owner
 export const followOwner = ref(true);           // True if viewer wants to follow owner's actions
@@ -102,6 +108,13 @@ export const trackSent = (bytes) => {
 export const trackFetched = (bytes) => {
   bytesFetched.value += bytes;
 };
+
+// App version
+export const appVersion = ref('');
+fetch('/VERSION')
+  .then(res => res.text())
+  .then(text => { const build = text.trim(); if (build) appVersion.value = `v1.0.${build}`; })
+  .catch(() => {});
 
 // Fetch certificate info from Vite API
 fetch('/api/cert-info')

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, useTemplateRef, computed } from 'vue';
-import { displayFilter, packets, stoppedCapture, allPackets } from '../globals';
+import { displayFilter, packets, stoppedCapture, allPackets, idleCountdownSeconds, cancelIdleCountdown } from '../globals';
 import LiveCapture from "./LiveCapture.vue";
 
 const props = defineProps({
@@ -14,6 +14,15 @@ const emit = defineEmits(['clear', 'stop', 'openFileBrowser', 'openInsights', 's
 
 const liveCaptureRef = useTemplateRef('live-capture');
 const showWarning = ref(false);
+
+// Idle countdown formatting
+const idleCountdownFormatted = computed(() => {
+  const s = idleCountdownSeconds.value;
+  const min = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${min}:${sec.toString().padStart(2, '0')}`;
+});
+const resumeCapture = () => cancelIdleCountdown();
 
 // Save dialog state
 const showSaveDialog = ref(false);
@@ -159,6 +168,20 @@ defineExpose({ loadPcapFile });
         <div class="warning-balloon-text">
           Live capture of data-path traffic is a CPU, memory and I/O intensive operation. Use with caution, for a limited amount of time/streams
         </div>
+      </div>
+    </div>
+    <!-- Idle countdown warning -->
+    <div v-if="idleCountdownSeconds > 0 && !stoppedCapture" class="idle-countdown">
+      <div class="idle-countdown-inner">
+        <svg class="idle-clock" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+        <div class="idle-text">
+          <div class="idle-title">Capture stopping in</div>
+          <div class="idle-timer">{{ idleCountdownFormatted }}</div>
+        </div>
+        <button class="idle-resume-btn" @click="resumeCapture">Resume</button>
       </div>
     </div>
     <template v-if="!hideInsights">
@@ -595,5 +618,76 @@ defineExpose({ loadPcapFile });
   color: #d6d3d1;
   font-size: 15px;
   line-height: 1.5;
+}
+
+/* Idle kill-switch countdown */
+.idle-countdown {
+  position: absolute;
+  left: calc(50% + 168px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  animation: idle-slide-in 0.3s ease-out;
+}
+@keyframes idle-slide-in {
+  from { opacity: 0; transform: translateY(-50%) translateX(-10px); }
+  to { opacity: 1; transform: translateY(-50%) translateX(0); }
+}
+.idle-countdown-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #1c1a17, #2a2520);
+  border: 1px solid #b45309;
+  border-radius: 8px;
+  padding: 6px 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 8px rgba(245, 158, 11, 0.15);
+  white-space: nowrap;
+}
+.idle-clock {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  animation: idle-pulse 1s ease-in-out infinite;
+}
+@keyframes idle-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+.idle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.idle-title {
+  color: #d6d3d1;
+  font-size: 11px;
+  font-weight: 500;
+}
+.idle-timer {
+  color: #fbbf24;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: monospace;
+  letter-spacing: 1px;
+}
+.idle-resume-btn {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-left: 4px;
+}
+.idle-resume-btn:hover {
+  background: linear-gradient(135deg, #4ade80, #22c55e);
+  transform: scale(1.05);
+}
+.idle-resume-btn:active {
+  transform: scale(0.95);
 }
 </style>
