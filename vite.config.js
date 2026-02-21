@@ -59,6 +59,9 @@ const getCertInfo = () => {
   }
 };
 
+// Cache cert info at startup (avoids 4x execSync on every request)
+const cachedCertInfo = JSON.stringify(getCertInfo());
+
 export default defineConfig(({ mode }) => {
   // Load env file from current directory
   const env = loadEnv(mode, process.cwd(), '');
@@ -70,11 +73,11 @@ export default defineConfig(({ mode }) => {
       {
         name: 'configure-response-headers',
         configureServer: (server) => {
-          // API endpoint for certificate info
+          // API endpoint for certificate info (cached)
           server.middlewares.use((req, res, next) => {
             if (req.url === '/api/cert-info') {
               res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify(getCertInfo()));
+              res.end(cachedCertInfo);
               return;
             }
             next();

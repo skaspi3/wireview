@@ -309,8 +309,8 @@ const isSelfSigned = computed(() => {
   justify-content: flex-end;
 }
 .app-version {
-  color: #6b7280;
-  font-size: 11px;
+  color: #d1d5db;
+  font-size: 13px;
   font-family: monospace;
   margin-left: 10px;
 }
