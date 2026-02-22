@@ -5,6 +5,7 @@ import GitHubIcon from "./icons/GitHubIcon.vue";
 
 const showFilterPopup = ref(false);
 const showCertPopup = ref(false);
+const showReleaseNotes = ref(false);
 const showBackendPopup = ref(false);
 const showThinClientPopup = ref(false);
 
@@ -163,7 +164,30 @@ const isSelfSigned = computed(() => {
       <div class="bpf-filter-link" @click="toggleFilterPopup">
         Current BPF filter
       </div>
-      <span v-if="appVersion" class="app-version">{{ appVersion }}</span>
+      <span v-if="appVersion" class="app-version" @click="showReleaseNotes = true">{{ appVersion }}</span>
+
+      <!-- Release Notes Popup -->
+      <div v-if="showReleaseNotes" class="release-overlay" @click.self="showReleaseNotes = false">
+        <div class="release-popup">
+          <div class="release-header">
+            <span class="release-title">WebPCAP</span>
+            <span class="release-ver">{{ appVersion }}</span>
+            <button class="release-close" @click="showReleaseNotes = false">&times;</button>
+          </div>
+          <ul class="release-list">
+            <li>Live packet capture with tshark — real-time streaming via WebSocket</li>
+            <li>Thin Client architecture — zstd-compressed packet delivery with up to 95% bandwidth reduction</li>
+            <li>Display filters — apply Wireshark-compatible filters during live or stopped capture</li>
+            <li>Session sharing — invite viewers to watch your capture in real-time</li>
+            <li>Capture Insights — protocol hierarchy, top talkers, traffic timeline charts</li>
+            <li>Save &amp; export — pcapng with optional zstd compression, filtered or full capture</li>
+            <li>RAM-backed storage — pcap files written to tmpfs for minimal disk I/O</li>
+            <li>Idle kill-switch — auto-stops capture after inactivity to protect system resources</li>
+            <li>File browser — load and analyze existing pcap/pcapng files from the server</li>
+            <li>Custom Lua dissector support for proprietary protocol analysis</li>
+          </ul>
+        </div>
+      </div>
 
       <!-- BPF Filter Popup -->
       <div v-if="showFilterPopup" class="filter-popup">
@@ -309,10 +333,84 @@ const isSelfSigned = computed(() => {
   justify-content: flex-end;
 }
 .app-version {
-  color: #d1d5db;
+  color: #60a5fa;
   font-size: 13px;
   font-family: monospace;
   margin-left: 10px;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.app-version:hover {
+  color: #93c5fd;
+  text-decoration: underline;
+}
+.release-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+}
+.release-popup {
+  background: #1a1d23;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  padding: 24px 28px;
+  min-width: 460px;
+  max-width: 560px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.release-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #374151;
+}
+.release-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #f9fafb;
+}
+.release-ver {
+  font-size: 14px;
+  font-family: monospace;
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.1);
+  padding: 2px 10px;
+  border-radius: 12px;
+}
+.release-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.release-close:hover {
+  color: #f9fafb;
+}
+.release-list {
+  margin: 0;
+  padding-left: 20px;
+  color: #d1d5db;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.release-list li {
+  margin: 4px 0;
+}
+.release-list li::marker {
+  color: #60a5fa;
 }
 .bpf-filter-link {
   color: #3b82f6;
