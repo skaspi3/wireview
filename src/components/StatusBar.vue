@@ -6,6 +6,7 @@ import GitHubIcon from "./icons/GitHubIcon.vue";
 const showFilterPopup = ref(false);
 const showCertPopup = ref(false);
 const showReleaseNotes = ref(false);
+const showNotices = ref(false);
 const showBackendPopup = ref(false);
 const showThinClientPopup = ref(false);
 
@@ -164,7 +165,6 @@ const isSelfSigned = computed(() => {
       <div class="bpf-filter-link" @click="toggleFilterPopup">
         Current BPF filter
       </div>
-      <span v-if="appVersion" class="app-version" @click="showReleaseNotes = true">{{ appVersion }}</span>
 
       <!-- Release Notes Popup -->
       <div v-if="showReleaseNotes" class="release-overlay" @click.self="showReleaseNotes = false">
@@ -172,6 +172,7 @@ const isSelfSigned = computed(() => {
           <div class="release-header">
             <span class="release-title">WebPCAP</span>
             <span class="release-ver">{{ appVersion }}</span>
+            <a class="notices-link" @click.prevent="showNotices = true; showReleaseNotes = false">Notices</a>
             <button class="release-close" @click="showReleaseNotes = false">&times;</button>
           </div>
           <ul class="release-list">
@@ -186,6 +187,45 @@ const isSelfSigned = computed(() => {
             <li>File browser — load and analyze existing pcap/pcapng files from the server</li>
             <li>Custom Lua dissector support for proprietary protocol analysis</li>
           </ul>
+        </div>
+      </div>
+
+      <!-- Open Source Notices Popup -->
+      <div v-if="showNotices" class="release-overlay" @click.self="showNotices = false">
+        <div class="notices-popup">
+          <div class="release-header">
+            <span class="release-title">3rd-Party Software</span>
+            <button class="release-close" @click="showNotices = false">&times;</button>
+          </div>
+          <div class="notices-content">
+            <div class="notices-section">
+              <div class="notices-section-title">Backend (Node.js)</div>
+              <table class="notices-table">
+                <thead><tr><th>Package</th><th>Version</th><th>License</th></tr></thead>
+                <tbody>
+                  <tr><td><a href="https://www.npmjs.com/package/ws" target="_blank">ws</a></td><td>8.18</td><td>MIT</td></tr>
+                  <tr><td><a href="https://www.npmjs.com/package/@mongodb-js/zstd" target="_blank">@mongodb-js/zstd</a></td><td>7.0</td><td>Apache-2.0</td></tr>
+                  <tr><td><a href="https://www.npmjs.com/package/sql.js" target="_blank">sql.js</a></td><td>1.13</td><td>MIT</td></tr>
+                  <tr><td><a href="https://www.npmjs.com/package/dotenv" target="_blank">dotenv</a></td><td>16.6</td><td>BSD-2-Clause</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="notices-section">
+              <div class="notices-section-title">Frontend (Vue.js)</div>
+              <table class="notices-table">
+                <thead><tr><th>Package</th><th>Version</th><th>License</th></tr></thead>
+                <tbody>
+                  <tr><td><a href="https://www.npmjs.com/package/vue" target="_blank">vue</a></td><td>3.5</td><td>MIT</td></tr>
+                  <tr><td><a href="https://www.npmjs.com/package/@vueuse/core" target="_blank">@vueuse/core</a></td><td>13.6</td><td>MIT</td></tr>
+                  <tr><td><a href="https://www.npmjs.com/package/echarts" target="_blank">echarts</a></td><td>6.0</td><td>Apache-2.0</td></tr>
+                  <tr><td><a href="https://www.npmjs.com/package/vue-echarts" target="_blank">vue-echarts</a></td><td>8.0</td><td>MIT</td></tr>
+                  <tr><td><a href="https://www.npmjs.com/package/fzstd" target="_blank">fzstd</a></td><td>0.1</td><td>MIT</td></tr>
+                  <tr><td><a href="https://www.npmjs.com/package/vite" target="_blank">vite</a></td><td>6.3</td><td>MIT</td></tr>
+                  <tr><td><a href="https://www.npmjs.com/package/@vitejs/plugin-vue" target="_blank">@vitejs/plugin-vue</a></td><td>5.2</td><td>MIT</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -303,6 +343,7 @@ const isSelfSigned = computed(() => {
         <GitHubIcon />
       </a>
     </div>
+    <span v-if="appVersion" class="app-version" @click="showReleaseNotes = true">{{ appVersion }}</span>
   </div>
 </template>
 
@@ -333,10 +374,12 @@ const isSelfSigned = computed(() => {
   justify-content: flex-end;
 }
 .app-version {
+  position: absolute;
+  left: 25%;
+  transform: translateX(-50%);
   color: #60a5fa;
   font-size: 13px;
   font-family: monospace;
-  margin-left: 10px;
   cursor: pointer;
   transition: color 0.15s;
 }
@@ -411,6 +454,72 @@ const isSelfSigned = computed(() => {
 }
 .release-list li::marker {
   color: #60a5fa;
+}
+.notices-link {
+  margin-left: auto;
+  margin-right: 8px;
+  color: #60a5fa;
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.notices-link:hover {
+  color: #93c5fd;
+  text-decoration: underline;
+}
+.notices-popup {
+  background: #1a1d23;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  padding: 24px 28px;
+  min-width: 520px;
+  max-width: 620px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.notices-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.notices-section-title {
+  color: #9ca3af;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.notices-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.notices-table th {
+  text-align: left;
+  color: #6b7280;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #374151;
+}
+.notices-table td {
+  padding: 7px 10px;
+  color: #d1d5db;
+  border-bottom: 1px solid #1f2937;
+}
+.notices-table tr:hover td {
+  background: rgba(96, 165, 250, 0.05);
+}
+.notices-table a {
+  color: #60a5fa;
+  text-decoration: none;
+}
+.notices-table a:hover {
+  text-decoration: underline;
 }
 .bpf-filter-link {
   color: #3b82f6;
