@@ -33,6 +33,9 @@
       <div class="progress-info">
         <div class="progress-message">{{ save.message }}</div>
         <div v-if="save.path" class="progress-path" :title="save.path">📁 {{ save.path }}</div>
+        <div v-if="save.compressed && save.originalSize && save.savedSize" class="progress-compression">
+          {{ formatSize(save.originalSize) }} → {{ formatSize(save.savedSize) }} ({{ compressionRatio(save.originalSize, save.savedSize) }}% reduction)
+        </div>
         <div class="progress-status">{{ save.status }}</div>
       </div>
     </div>
@@ -48,6 +51,18 @@ const circumference = 2 * Math.PI * 16; // radius = 16
 
 const strokeDashoffset = (progress) => {
   return circumference - (progress / 100) * circumference;
+};
+
+const formatSize = (bytes) => {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+};
+
+const compressionRatio = (original, compressed) => {
+  if (!original) return 0;
+  return ((1 - compressed / original) * 100).toFixed(1);
 };
 
 const addSaveJob = (jobId) => {
@@ -68,12 +83,15 @@ const updateSaveProgress = (data) => {
     save.status = data.status;
     save.message = data.message;
     if (data.path) save.path = data.path;
+    if (data.compressed) save.compressed = true;
+    if (data.originalSize) save.originalSize = data.originalSize;
+    if (data.savedSize) save.savedSize = data.savedSize;
 
     // Auto-remove after completion or error
     if (data.status === 'complete') {
       setTimeout(() => {
         removeSaveJob(data.jobId);
-      }, 5000); // Keep for 5 seconds to show completion and path
+      }, 7000); // Keep for 7 seconds to show completion, path and compression
     } else if (data.status === 'error') {
       setTimeout(() => {
         removeSaveJob(data.jobId);
@@ -86,7 +104,10 @@ const updateSaveProgress = (data) => {
       progress: data.progress,
       status: data.status,
       message: data.message,
-      path: data.path || null
+      path: data.path || null,
+      compressed: data.compressed || false,
+      originalSize: data.originalSize || null,
+      savedSize: data.savedSize || null
     });
 
     if (data.status === 'complete') {
@@ -169,7 +190,7 @@ defineExpose({
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 10px;
+  font-size: 13px;
   font-weight: bold;
   color: #fff;
 }
@@ -183,13 +204,13 @@ defineExpose({
 
 .progress-message {
   color: #fff;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 500;
 }
 
 .progress-path {
   color: #4a9eff;
-  font-size: 11px;
+  font-size: 14px;
   font-family: monospace;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -197,9 +218,15 @@ defineExpose({
   cursor: help;
 }
 
+.progress-compression {
+  color: #22c55e;
+  font-size: 13px;
+  font-family: monospace;
+}
+
 .progress-status {
   color: #aaa;
-  font-size: 11px;
+  font-size: 14px;
   text-transform: capitalize;
 }
 </style>

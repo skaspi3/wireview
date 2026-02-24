@@ -1,7 +1,7 @@
 <template>
   <div class="live-capture-wrapper" :class="{ 'show-selector': showInterfaceSelector }">
     <!-- Connecting State (in header bar) -->
-    <div v-if="!isCapturing && !isLoadingPcap && !loadedPcapFile && !showInterfaceSelector" class="controls">
+    <div v-if="!isCapturing && !isLoadingPcap && !loadedPcapFile && !showInterfaceSelector && !showStoppedBar" class="controls">
       <div v-if="!isConnected">
         <button @click="connect" class="btn btn-secondary">
           Connect to Backend
@@ -97,6 +97,23 @@
       </button>
     </div>
 
+    <!-- Stopped Capture State -->
+    <div v-else-if="showStoppedBar" class="status-bar stopped-bar">
+      <select v-model="selectedInterface" class="stopped-interface-select">
+        <option v-for="iface in interfaces" :key="iface" :value="iface">
+          {{ iface }}{{ interfaceDetails[iface] ? formatIfaceOption(interfaceDetails[iface]) : '' }}
+        </option>
+      </select>
+      <div class="capture-controls">
+        <button @click="resumeCaptureOnSameInterface" class="ctrl-btn ctrl-play" title="Start">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="6,3 20,12 6,21"/>
+          </svg>
+          Start
+        </button>
+      </div>
+    </div>
+
     <!-- Session info (top-right corner) -->
     <span v-if="isCapturing && sessionId" class="session-info" :title="'Session: ' + sessionId">
       <span class="session-badge">{{ sessionClientCount }} viewer{{ sessionClientCount !== 1 ? 's' : '' }}</span>
@@ -190,6 +207,15 @@ const activeIfaceDetails = computed(() => {
   if (!d.driver && !d.mac && !d.ip && !d.ipv6) return null;
   return d;
 });
+
+// Format interface details for dropdown option text
+const formatIfaceOption = (details) => {
+  const parts = [];
+  if (details.driver) parts.push(details.driver);
+  if (details.ip) parts.push(details.ip);
+  if (details.speed) parts.push(details.speed >= 1000 ? `${details.speed / 1000}G` : `${details.speed}M`);
+  return parts.length > 0 ? ` — ${parts.join(', ')}` : '';
+};
 
 const error = ref(null);
 let pcapDirUsageInterval = null;
@@ -311,9 +337,14 @@ const loadedPcapFilename = computed(() => {
   return parts[parts.length - 1];
 });
 
+// Show stopped-capture bar (capture ended but packets still displayed)
+const showStoppedBar = computed(() => {
+  return stoppedCapture.value && packets.value.length > 0 && !isCapturing.value && !isLoadingPcap.value && !loadedPcapFile.value && isConnected.value;
+});
+
 // Show interface selector when connected but not capturing/loading
 const showInterfaceSelector = computed(() => {
-  return isConnected.value && !isCapturing.value && !isLoadingPcap.value && !loadedPcapFile.value;
+  return isConnected.value && !isCapturing.value && !isLoadingPcap.value && !loadedPcapFile.value && !showStoppedBar.value;
 });
 
 // Handle interface selection from selector
@@ -769,6 +800,17 @@ const stopCapture = () => {
   emit('stop');
 };
 
+// Resume capture on the same interface (from stopped state)
+const resumeCaptureOnSameInterface = () => {
+  if (!ws.value || !isConnected.value || !selectedInterface.value) return;
+  stoppedCapture.value = false;
+  emit('clear');
+  sendMessage({
+    type: 'createSession',
+    interface: selectedInterface.value
+  });
+};
+
 // Start/stop idle detection based on capture state
 watch(isCapturing, (capturing) => {
   if (capturing && !stoppedCapture.value) {
@@ -1051,6 +1093,54 @@ onUnmounted(() => {
   background: linear-gradient(135deg, #ef4444, #dc2626);
   color: white;
   border-radius: 0 8px 8px 0;
+}
+
+.ctrl-play {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: white;
+  border-radius: 8px;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ctrl-play svg {
+  width: 14px;
+  height: 14px;
+}
+
+.stopped-indicator {
+  color: #9ca3af;
+  margin-right: 10px;
+  font-size: 1.1em;
+  font-weight: bold;
+}
+
+.stopped-bar {
+  background: #1a2332;
+}
+
+.stopped-interface-select {
+  background: #111827;
+  color: #e5e7eb;
+  border: 1px solid #374151;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 13px;
+  margin-right: 10px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.stopped-interface-select:hover {
+  border-color: #22c55e;
+}
+
+.stopped-interface-select:focus {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
 }
 
 /* Shimmer/glitter overlay on hover */

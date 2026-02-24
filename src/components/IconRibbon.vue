@@ -36,17 +36,8 @@ const showSaveButton = computed(() => {
   return stoppedCapture.value && packets.value.length > 0 && !displayFilter.value;
 });
 
-// Show back button when user clicked Stop
-const showBackButton = computed(() => {
-  return stoppedCapture.value && packets.value.length > 0;
-});
-
 const loadPcapFile = (filePath) => {
   liveCaptureRef.value?.loadPcapFile(filePath);
-};
-
-const goBack = () => {
-  liveCaptureRef.value?.goBackToInterfaces();
 };
 
 // Generate save filename with optional filter prefix
@@ -211,14 +202,6 @@ defineExpose({ loadPcapFile });
         </svg>
         Save Selected
       </button>
-      <!-- Back button - shown when capture stopped -->
-      <button v-if="showBackButton" class="back-btn" @click="goBack" title="Back to interface list">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M19 12H5"/>
-          <polyline points="12 19 5 12 12 5"/>
-        </svg>
-        Back
-      </button>
     </template>
 
     <!-- Save Dialog -->
@@ -309,7 +292,7 @@ defineExpose({ loadPcapFile });
   color: #fff;
   border: none;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
@@ -369,7 +352,7 @@ defineExpose({ loadPcapFile });
   color: #fff;
   border: none;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
@@ -385,36 +368,6 @@ defineExpose({ loadPcapFile });
 }
 
 .save-btn svg {
-  width: 16px;
-  height: 16px;
-}
-
-.back-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  margin-left: 6px;
-  background: linear-gradient(135deg, #6b7280, #4b5563);
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.back-btn:hover {
-  background: linear-gradient(135deg, #9ca3af, #6b7280);
-  transform: translateY(-1px);
-}
-
-.back-btn:active {
-  transform: translateY(0);
-}
-
-.back-btn svg {
   width: 16px;
   height: 16px;
 }
