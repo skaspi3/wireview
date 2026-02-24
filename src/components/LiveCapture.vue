@@ -1200,9 +1200,9 @@ onUnmounted(() => {
 }
 
 .interface-tag {
-  color: #9ca3af;
+  color: #d1d5db;
   margin-left: 10px;
-  font-size: 1.0em;
+  font-size: 1.1em;
   border-left: 1px solid #6b7280;
   padding-left: 10px;
   cursor: default;
@@ -1387,7 +1387,7 @@ onUnmounted(() => {
   color: #d1fae5;
   padding: 2.3px 9.2px;
   border-radius: 14px;
-  font-size: 0.92em;
+  font-size: 1.02em;
   font-weight: 500;
 }
 
@@ -1395,7 +1395,7 @@ onUnmounted(() => {
   background: #8b5cf6;
   color: white;
   padding: 4.6px 11.5px;
-  font-size: 0.98em;
+  font-size: 1.08em;
 }
 
 .btn-share:hover {
