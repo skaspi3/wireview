@@ -669,6 +669,20 @@ const fieldNames = {
   'quic.stream.offset': 'Offset',
   'quic.stream.length': 'Length',
   'quic.stream.data': 'Stream Data',
+
+  // Zixi Protocol
+  'zixi.type': 'Payload Type',
+  'zixi.fc': 'Flow Control',
+  'zixi.fec_block': 'Fec Block',
+  'zixi.seq': 'Sequence',
+  'zixi.ts': 'Timestamp',
+  'zixi.mh.exthdr': 'ExtHeader',
+  'zixi.mh.sync': 'Sync',
+  'zixi.mh.compress': 'Compression',
+  'zixi.mh.encrypt': 'Encrypted',
+  'zixi.mh.frametype': 'Frame type',
+  'zixi.mh.framestart': 'Frame start',
+  'zixi.mh.ssrc': 'SSRC',
 };
 
 // Metadata field patterns - fields that are observations/analysis, not RFC protocol data
@@ -1138,19 +1152,16 @@ const shouldFilterField = (key) => {
 };
 
 // Get byte range from _raw field
-// tshark _raw fields are arrays: [hex_value, bit_offset, bit_length]
-// Note: offsets and lengths are in BITS, not bytes, so we divide by 8
+// tshark _raw fields are arrays: [value_hex, byte_offset, byte_count, bitmask, field_type]
 const getByteRange = (rawData, key) => {
   if (!rawData) return null;
   const rawKey = `${key}_raw`;
   const raw = rawData[rawKey];
   if (Array.isArray(raw) && raw.length >= 3) {
-    const bitOffset = parseInt(raw[1]);
-    const bitLength = parseInt(raw[2]);
-    if (!isNaN(bitOffset) && !isNaN(bitLength)) {
-      const byteOffset = Math.floor(bitOffset / 8);
-      const byteLength = Math.ceil(bitLength / 8);
-      return { start: byteOffset, end: byteOffset + byteLength };
+    const byteOffset = parseInt(raw[1]);
+    const byteCount = parseInt(raw[2]);
+    if (!isNaN(byteOffset) && !isNaN(byteCount)) {
+      return { start: byteOffset, end: byteOffset + byteCount };
     }
   }
   return null;
@@ -1184,6 +1195,113 @@ const onTreeLeave = () => {
   }
 };
 
+// Generate Wireshark-style bit pattern with bitmask (for sub-byte fields, shows dots)
+// rawHex: full packet hex, byteOffset/byteCount from _raw, bitmask from _raw[3]
+const generateBitPatternWithMask = (rawHex, byteOffset, byteCount, bitmask) => {
+  if (!rawHex) return null;
+  let result = '';
+
+  for (let b = 0; b < byteCount; b++) {
+    const hexStr = rawHex.substr((byteOffset + b) * 2, 2);
+    if (!hexStr || hexStr.length < 2) return null;
+    const byteVal = parseInt(hexStr, 16);
+    if (isNaN(byteVal)) return null;
+
+    for (let bit = 7; bit >= 0; bit--) {
+      // bitmask bit position: for single-byte fields, bit 0 is LSB
+      const bitmaskBitPos = (byteCount - 1 - b) * 8 + bit;
+      const isFieldBit = (bitmask & (1 << bitmaskBitPos)) !== 0;
+
+      if (isFieldBit) {
+        result += (byteVal >> bit) & 1 ? '1' : '0';
+      } else {
+        result += '.';
+      }
+
+      if (bit === 4) result += ' ';
+    }
+
+    if (b < byteCount - 1) result += ' ';
+  }
+  return result;
+};
+
+// Generate bit pattern from a numeric value (for full-byte fields, handles LE correctly)
+const generateBitPatternFromValue = (value, totalBits) => {
+  let numVal;
+  const strVal = String(value);
+  if (strVal.startsWith('0x') || strVal.startsWith('0X')) {
+    numVal = parseInt(strVal, 16);
+  } else {
+    numVal = parseInt(strVal, 10);
+  }
+  if (isNaN(numVal) || totalBits <= 0) return null;
+
+  let result = '';
+  for (let i = totalBits - 1; i >= 0; i--) {
+    result += (numVal >>> i) & 1 ? '1' : '0';
+    const bitsFromLeft = totalBits - i;
+    if (bitsFromLeft % 4 === 0 && i > 0) {
+      result += ' ';
+    }
+  }
+  return result;
+};
+
+// Get bit pattern from _raw field for Zixi protocol fields
+// tshark _raw format: [value_hex, byte_offset, byte_count, bitmask, field_type]
+const getBitPatternInfo = (data, key) => {
+  const rawKey = `${key}_raw`;
+  const raw = data[rawKey];
+  if (!Array.isArray(raw) || raw.length < 4) return null;
+
+  const byteOffset = parseInt(raw[1]);
+  const byteCount = parseInt(raw[2]);
+  const bitmask = parseInt(raw[3]);
+  if (isNaN(byteOffset) || isNaN(byteCount) || byteCount <= 0) return null;
+
+  // bitmask=0 means no bitmask defined — don't show bit pattern
+  if (bitmask === 0) return null;
+
+  // Check if bitmask covers all bits (full-width field with explicit mask)
+  const fullMask = byteCount >= 4 ? 0xFFFFFFFF : ((1 << (byteCount * 8)) - 1);
+  const isFullMask = (bitmask >>> 0) === (fullMask >>> 0);
+
+  if (isFullMask) {
+    // Full-byte field: generate from value (handles LE byte order correctly)
+    const value = data[key];
+    if (value === undefined || value === null) return null;
+    return generateBitPatternFromValue(value, byteCount * 8);
+  } else {
+    // Partial bitmask: show raw bytes with dots for non-field bits
+    if (!activePacketRawHex.value) return null;
+    return generateBitPatternWithMask(activePacketRawHex.value, byteOffset, byteCount, bitmask);
+  }
+};
+
+// Zixi boolean field paths that should show True/False
+const zixiBooleanFields = new Set([
+  'zixi.mh.sync', 'zixi.mh.compress', 'zixi.mh.encrypt',
+  'zixi.mh.framestart',
+]);
+
+// Zixi frame type names
+const zixiFrameTypes = { '0': 'NO_TYPE (0)', '1': 'I_FRAME (1)', '2': 'P_FRAME (2)', '3': 'B_FRAME (3)' };
+
+// Format Zixi field value for display
+const formatZixiValue = (key, path, value) => {
+  const strValue = String(value);
+  // Boolean fields: show True/False
+  if (zixiBooleanFields.has(key)) {
+    return strValue === '1' ? 'True' : 'False';
+  }
+  // Frame type: show name
+  if (key === 'zixi.mh.frametype') {
+    return zixiFrameTypes[strValue] || strValue;
+  }
+  return null; // Use default formatting
+};
+
 // Parse layer fields into tree nodes (recursive for arbitrary depth)
 // parentData is the containing object that has _raw fields alongside regular fields
 const parseLayerFields = (data, prefix, parentData = null) => {
@@ -1191,18 +1309,32 @@ const parseLayerFields = (data, prefix, parentData = null) => {
   // Use data itself as parent for top-level, since _raw fields are at same level
   const rawLookup = parentData || data;
 
+  // Check if this is the Zixi layer (for bit pattern display)
+  const isZixiLayer = prefix === 'zixi' || prefix.startsWith('zixi.');
+
   for (const [key, value] of Object.entries(data)) {
     // Skip _raw and other filtered fields
     if (shouldFilterField(key)) continue;
 
     const path = `${prefix}.${key}`;
-    const displayName = getFieldName(path);
+    // For _ws.lua.text inside zixi layer, show as "Media header"
+    const displayName = (isZixiLayer && key === '_ws.lua.text')
+      ? 'Media header'
+      : getFieldName(path);
     // Look up byte range from _raw field - use data (current level) not parentData
     const byteRange = getByteRange(data, key);
 
+    // Generate bit pattern for Zixi protocol fields
+    let bitPattern = null;
+    if (isZixiLayer) {
+      bitPattern = getBitPatternInfo(data, key);
+    }
+
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
       // Nested object - recurse, passing data as parent for child lookups
-      const children = parseLayerFields(value, path, data);
+      // For _ws.lua.text children, treat as zixi sub-layer for bit patterns
+      const childPrefix = (isZixiLayer && key === '_ws.lua.text') ? 'zixi._ws.lua.text' : path;
+      const children = parseLayerFields(value, childPrefix, data);
       // Only add if there are visible children
       if (children.length > 0) {
         fields.push({
@@ -1239,19 +1371,28 @@ const parseLayerFields = (data, prefix, parentData = null) => {
           value: value.join(', '),
           path,
           byteRange,
+          bitPattern,
         });
       }
     } else {
       // Primitive value
-      const formattedValue = formatValue(key, path, value);
+      let formattedValue;
+      if (isZixiLayer) {
+        formattedValue = formatZixiValue(key, path, value) || formatValue(key, path, value);
+      } else {
+        formattedValue = formatValue(key, path, value);
+      }
+
       fields.push({
         name: displayName,
         value: formattedValue,
         path,
         byteRange,
+        bitPattern,
       });
     }
   }
+
   return fields;
 };
 
@@ -1417,39 +1558,44 @@ const formatValue = (key, path, value) => {
                                         </div>
                                         <div v-if="!isCollapsed(child4.path)" class="nested-children">
                                           <div v-for="child5 in child4.children" :key="child5.path" class="field" @mouseenter="onFieldHover(child5.byteRange)">
+                                            <span v-if="child5.bitPattern" class="bit-pattern">{{ child5.bitPattern }} = </span>
                                             <span class="field-name">{{ child5.name }}:</span>
-                                            <span class="field-value">{{ child5.value }}</span>
+                                            <span class="field-value"> {{ child5.value }}</span>
                                           </div>
                                         </div>
                                       </div>
                                     </template>
                                     <div v-else class="field" @mouseenter="onFieldHover(child4.byteRange)">
+                                      <span v-if="child4.bitPattern" class="bit-pattern">{{ child4.bitPattern }} = </span>
                                       <span class="field-name">{{ child4.name }}:</span>
-                                      <span class="field-value">{{ child4.value }}</span>
+                                      <span class="field-value"> {{ child4.value }}</span>
                                     </div>
                                   </template>
                                 </div>
                               </div>
                             </template>
                             <div v-else class="field" @mouseenter="onFieldHover(child3.byteRange)">
+                              <span v-if="child3.bitPattern" class="bit-pattern">{{ child3.bitPattern }} = </span>
                               <span class="field-name">{{ child3.name }}:</span>
-                              <span class="field-value">{{ child3.value }}</span>
+                              <span class="field-value"> {{ child3.value }}</span>
                             </div>
                           </template>
                         </div>
                       </div>
                     </template>
                     <div v-else class="field" @mouseenter="onFieldHover(child2.byteRange)">
+                      <span v-if="child2.bitPattern" class="bit-pattern">{{ child2.bitPattern }} = </span>
                       <span class="field-name">{{ child2.name }}:</span>
-                      <span class="field-value">{{ child2.value }}</span>
+                      <span class="field-value"> {{ child2.value }}</span>
                     </div>
                   </template>
                 </div>
               </div>
             </template>
             <div v-else class="field" @mouseenter="onFieldHover(field.byteRange)">
+              <span v-if="field.bitPattern" class="bit-pattern">{{ field.bitPattern }} = </span>
               <span class="field-name">{{ field.name }}:</span>
-              <span class="field-value">{{ field.value }}</span>
+              <span class="field-value"> {{ field.value }}</span>
             </div>
           </template>
         </div>
@@ -1598,5 +1744,10 @@ const formatValue = (key, path, value) => {
   color: #ce9178;
   margin-left: 8px;
   word-break: break-all;
+}
+
+.bit-pattern {
+  color: #569cd6;
+  flex-shrink: 0;
 }
 </style>
