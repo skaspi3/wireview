@@ -803,12 +803,25 @@ const stopCapture = () => {
 // Resume capture on the same interface (from stopped state)
 const resumeCaptureOnSameInterface = () => {
   if (!ws.value || !isConnected.value || !selectedInterface.value) return;
+  displayFilter.value = '';
+  filterError.value = null;
   stoppedCapture.value = false;
-  emit('clear');
-  sendMessage({
-    type: 'createSession',
-    interface: selectedInterface.value
-  });
+
+  // Stop existing session if any, then start fresh
+  if (sessionId.value) {
+    sendMessage({ type: 'restartSession' });
+  } else {
+    try { sendMessage({ type: 'stop' }); } catch (e) {}
+    emit('clear');
+    setTimeout(() => {
+      if (ws.value && isConnected.value) {
+        sendMessage({
+          type: 'createSession',
+          interface: selectedInterface.value
+        });
+      }
+    }, 200);
+  }
 };
 
 // Start/stop idle detection based on capture state
