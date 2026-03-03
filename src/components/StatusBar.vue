@@ -158,6 +158,18 @@ const isSelfSigned = computed(() => {
   if (!certInfo.value) return false;
   return certInfo.value.subject === certInfo.value.issuer;
 });
+
+// Check if certificate is expired
+const isExpired = computed(() => {
+  if (!certInfo.value?.validTo) return false;
+  return new Date(certInfo.value.validTo) < new Date();
+});
+
+// Certificate is fully valid: not self-signed and not expired
+const isCertValid = computed(() => {
+  if (!certInfo.value) return false;
+  return !isSelfSigned.value && !isExpired.value;
+});
 </script>
 <template>
   <div class="status-bar">
@@ -283,7 +295,7 @@ const isSelfSigned = computed(() => {
               <div v-else class="popup-row">tshark Lua: {{ tsharkLuaVersion || 'N/A' }}</div>
             </div>
           </span>
-        | <span class="lock-icon" @mouseenter="showCertPopup = true" @mouseleave="showCertPopup = false">
+        | <span class="lock-icon" :class="{ 'lock-valid': isCertValid, 'lock-warning': !isCertValid }" @mouseenter="showCertPopup = true" @mouseleave="showCertPopup = false">
             🔒
             <div v-if="showCertPopup" class="cert-popup">
               <div class="cert-header">
@@ -518,7 +530,7 @@ const isSelfSigned = computed(() => {
   color: #3b82f6;
   cursor: pointer;
   text-decoration: underline;
-  font-size: 13px;
+  font-size: 14.5px;
 }
 .bpf-filter-link:hover {
   color: #60a5fa;
@@ -734,11 +746,17 @@ const isSelfSigned = computed(() => {
   font-style: italic;
 }
 .lock-icon {
-  font-size: 14px;
-  filter: grayscale(100%);
-  opacity: 0.8;
+  font-size: 18px;
   position: relative;
   cursor: pointer;
+}
+.lock-icon.lock-valid {
+  filter: hue-rotate(60deg) saturate(2) brightness(1.2);
+  opacity: 1;
+}
+.lock-icon.lock-warning {
+  filter: hue-rotate(-10deg) saturate(3) brightness(1);
+  opacity: 1;
 }
 .cert-popup {
   position: absolute;
@@ -751,7 +769,7 @@ const isSelfSigned = computed(() => {
   min-width: 280px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   z-index: 1000;
-  font-size: 12px;
+  font-size: 14.5px;
   color: #d1d5db;
 }
 .cert-header {
@@ -765,11 +783,11 @@ const isSelfSigned = computed(() => {
 .cert-title {
   font-weight: 600;
   color: #ffffff;
-  font-size: 13px;
+  font-size: 15.5px;
 }
 .cert-self-signed {
   color: #f59e0b;
-  font-size: 10px;
+  font-size: 12.5px;
   background: rgba(245, 158, 11, 0.15);
   padding: 2px 6px;
   border-radius: 4px;
@@ -781,7 +799,7 @@ const isSelfSigned = computed(() => {
   margin-bottom: 0;
 }
 .cert-section-title {
-  font-size: 10px;
+  font-size: 12.5px;
   color: #9ca3af;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -789,7 +807,7 @@ const isSelfSigned = computed(() => {
 }
 .cert-row {
   display: flex;
-  font-size: 11px;
+  font-size: 13.5px;
   margin: 2px 0;
   white-space: nowrap;
 }
@@ -802,7 +820,7 @@ const isSelfSigned = computed(() => {
 }
 .cert-fingerprint {
   font-family: monospace;
-  font-size: 9px;
+  font-size: 11.5px;
   color: #9ca3af;
   word-break: break-all;
   line-height: 1.4;
