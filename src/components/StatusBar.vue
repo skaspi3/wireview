@@ -248,13 +248,6 @@ const isSelfSigned = computed(() => {
       </div>
     </div>
 
-    <!-- Center section - filtered packet count (positioned above packet counter) -->
-    <div v-if="displayFilter" class="center-section">
-      <span class="filtered-count">
-        {{ displayedPackets.toLocaleString() }} packets filtered
-      </span>
-    </div>
-
     <!-- Right section -->
     <div class="right-section">
       <span
@@ -378,7 +371,7 @@ const isSelfSigned = computed(() => {
   left: 25%;
   transform: translateX(-50%);
   color: #60a5fa;
-  font-size: 13px;
+  font-size: 14.5px;
   font-family: monospace;
   cursor: pointer;
   transition: color 0.15s;

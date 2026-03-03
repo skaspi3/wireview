@@ -4,7 +4,7 @@
     <div v-if="!isCapturing && !isLoadingPcap && !loadedPcapFile && !showInterfaceSelector && !showStoppedBar" class="controls">
       <div v-if="!isConnected">
         <button @click="connect" class="btn btn-secondary">
-          Connect to Backend
+          Connecting to backend...
         </button>
       </div>
 
@@ -186,7 +186,7 @@
 
 <script setup>
 import { ref, triggerRef, onUnmounted, onMounted, computed, watch } from 'vue';
-import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange, resolveWsRequest, clearPendingWsRequests, pcapDirUsage, idleCountdownSeconds, setCancelIdleCountdown } from '../globals';
+import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, sessionId, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange, resolveWsRequest, clearPendingWsRequests, pcapDirUsage, idleCountdownSeconds, setCancelIdleCountdown } from '../globals';
 import { decompress as zstdDecompress } from 'fzstd';
 import ConfirmDialog from './ConfirmDialog.vue';
 import InterfaceSelector from './InterfaceSelector.vue';
@@ -283,8 +283,7 @@ const startIdleDetection = () => {
 
 setCancelIdleCountdown(() => onUserActivity());
 
-// Session sharing state
-const sessionId = ref(null);
+// Session sharing state (sessionId imported from globals)
 const isSessionOwner = ref(false);
 const sessionClientCount = ref(0);
 const pendingSessionJoin = ref(null);  // Session ID from URL to join after connect

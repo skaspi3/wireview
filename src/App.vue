@@ -1,6 +1,6 @@
 <script setup>
 import { ref, useTemplateRef, computed } from 'vue';
-import { clearPackets, filterLoading, filterProgress, cancelFilter, packets, allPackets, captureActive } from './globals';
+import { clearPackets, packets, allPackets, captureActive, displayFilter } from './globals';
 import './packetCache';  // Initialize packet cache (registers clearer callback)
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
 import PacketList from './components/panes/PacketList.vue';
@@ -13,7 +13,7 @@ import FileBrowser from './components/FileBrowser.vue';
 import InsightsPanel from './components/InsightsPanel.vue';
 
 // Show landing page when no packets and not actively using the app
-const showLandingPage = computed(() => packets.value.length === 0);
+const showLandingPage = computed(() => packets.value.length === 0 && allPackets.value.length === 0);
 
 // Row height for packet list (used for virtual scrolling)
 const rowHeight = ref(20);
@@ -52,24 +52,12 @@ const totalPacketCount = computed(() => {
 
 // Show packet counter only when capturing or has packets
 const showPacketCounter = computed(() => {
-  return captureActive.value || packets.value.length > 0;
+  return captureActive.value || packets.value.length > 0 || allPackets.value.length > 0;
 });
 </script>
 
 <template>
   <div class="app-layout">
-    <!-- Filter Loading Overlay -->
-    <div v-if="filterLoading" class="filter-loading-overlay">
-      <div class="filter-loading-popup">
-        <div class="filter-loading-text">Applying filter...</div>
-        <div class="filter-spinner"></div>
-        <div v-if="filterProgress > 0" class="filter-progress">
-          {{ filterProgress }} packets found
-        </div>
-        <button class="filter-cancel-btn" @click="cancelFilter">Cancel</button>
-      </div>
-    </div>
-
     <!-- File Browser Modal -->
     <FileBrowser ref="file-browser" @select="handleFileSelect" />
 
@@ -79,7 +67,7 @@ const showPacketCounter = computed(() => {
     <!-- Main UI -->
     <div class="main-content">
       <IconRibbon ref="icon-ribbon" :hide-insights="showLandingPage" @clear="handleClear" @stop="handleStop" @openFileBrowser="handleOpenFileBrowser" @openInsights="handleOpenInsights" />
-      <DisplayFilter />
+      <DisplayFilter v-if="!showLandingPage" />
 
       <!-- Landing Page with Interface Selector (teleport target) -->
       <!-- Always render container for Teleport, use v-show to hide -->
@@ -104,7 +92,7 @@ const showPacketCounter = computed(() => {
 
     <!-- Packet Counter (bottom-center) -->
     <div v-if="showPacketCounter" class="packet-counter">
-      {{ totalPacketCount.toLocaleString() }} packets
+      Packets: {{ totalPacketCount.toLocaleString() }}<template v-if="displayFilter && allPackets.length > 0"> &bull; Displayed: {{ packets.length.toLocaleString() }}</template>
     </div>
 
     <StatusBar />
@@ -151,73 +139,6 @@ const showPacketCounter = computed(() => {
 
 .landing-hidden {
   display: none;
-}
-
-.filter-loading-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.filter-loading-popup {
-  background: #1f2937;
-  border: 1px solid #374151;
-  border-radius: 12px;
-  padding: 30px 50px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-}
-
-.filter-loading-text {
-  color: #e5e7eb;
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.filter-spinner {
-  width: 60px;
-  height: 60px;
-  border: 5px solid transparent;
-  border-top: 5px solid #3b82f6;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-.filter-progress {
-  color: #9ca3af;
-  font-size: 14px;
-  font-family: monospace;
-}
-
-.filter-cancel-btn {
-  margin-top: 10px;
-  padding: 8px 24px;
-  background: #4b5563;
-  color: #e5e7eb;
-  border: 1px solid #6b7280;
-  border-radius: 6px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.filter-cancel-btn:hover {
-  background: #6b7280;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
 }
 
 /* Packet Counter - bottom edge center */

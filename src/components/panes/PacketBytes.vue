@@ -196,6 +196,7 @@ const onHexLeave = () => {
   padding: 20px;
   color: #b0b0b0;
   text-align: center;
+  font-family: var(--ws-font-family-monospace);
   font-size: 15px;
 }
 

@@ -240,6 +240,8 @@ defineExpose({ loadPcapFile });
   align-items: center;
   gap: 1px;
   border-bottom: var(--ws-pane-border);
+  min-height: 47px;
+  box-sizing: border-box;
 }
 .ribbon-logo {
   position: absolute;

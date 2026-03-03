@@ -55,6 +55,7 @@ export const cancelIdleCountdown = () => cancelIdleCountdownFn();
 export const setCancelIdleCountdown = (fn) => { cancelIdleCountdownFn = fn; };
 
 // Session collaborative viewing state
+export const sessionId = ref(null);              // Current session ID
 export const isSessionOwner = ref(false);       // True if we are the session owner
 export const followOwner = ref(true);           // True if viewer wants to follow owner's actions
 export const ownerState = shallowRef(null);     // Latest state received from owner
