@@ -186,7 +186,7 @@
 
 <script setup>
 import { ref, triggerRef, onUnmounted, onMounted, computed, watch } from 'vue';
-import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, sessionId, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange, resolveWsRequest, clearPendingWsRequests, pcapDirUsage, idleCountdownSeconds, setCancelIdleCountdown } from '../globals';
+import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, sessionId, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange, resolveWsRequest, clearPendingWsRequests, pcapDirUsage, idleCountdownSeconds, setCancelIdleCountdown, linkSpeedMbps } from '../globals';
 import { decompress as zstdDecompress } from 'fzstd';
 import ConfirmDialog from './ConfirmDialog.vue';
 import InterfaceSelector from './InterfaceSelector.vue';
@@ -500,6 +500,9 @@ const connect = () => {
           isCapturing.value = true;
           captureActive.value = true;
           stoppedCapture.value = false;
+          // Set link speed from interface details
+          const ifaceInfo = interfaceDetails.value[msg.interface];
+          linkSpeedMbps.value = ifaceInfo?.speed || 0;
           emit('clear');
         }
 
@@ -514,6 +517,8 @@ const connect = () => {
           isCapturing.value = msg.isCapturing;
           captureActive.value = msg.isCapturing;
           stoppedCapture.value = false;
+          const jIfaceInfo = interfaceDetails.value[msg.interface];
+          linkSpeedMbps.value = jIfaceInfo?.speed || 0;
           emit('clear');
           // Clear URL parameter
           window.history.replaceState({}, '', window.location.pathname);

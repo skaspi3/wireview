@@ -90,6 +90,9 @@ export const certInfo = ref(null);
 // Pcap temp directory usage stats
 export const pcapDirUsage = ref(null); // { used, total, fsType }
 
+// Active interface link speed (Mbps), 0 = unknown
+export const linkSpeedMbps = ref(0);
+
 // Data transfer tracking (bytes)
 export const bytesReceived = ref(0);
 export const bytesSent = ref(0);

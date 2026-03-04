@@ -1,7 +1,14 @@
 <script setup>
-import { ref, useTemplateRef, computed } from 'vue';
-import { displayFilter, packets, stoppedCapture, allPackets, idleCountdownSeconds, cancelIdleCountdown } from '../globals';
+import { ref, useTemplateRef, computed, onMounted, onUnmounted } from 'vue';
+import { displayFilter, packets, stoppedCapture, allPackets, idleCountdownSeconds, cancelIdleCountdown, captureActive, linkSpeedMbps, hostIP } from '../globals';
 import LiveCapture from "./LiveCapture.vue";
+import { use } from 'echarts/core';
+import { CanvasRenderer } from 'echarts/renderers';
+import { GaugeChart } from 'echarts/charts';
+import { TitleComponent } from 'echarts/components';
+import VChart from 'vue-echarts';
+
+use([CanvasRenderer, GaugeChart, TitleComponent]);
 
 const props = defineProps({
   hideInsights: {
@@ -135,6 +142,150 @@ const savePackets = async () => {
   }
 };
 
+// Bandwidth gauge
+const showBwPopup = ref(false);
+const downRate = ref(0); // bytes/s
+const upRate = ref(0);   // bytes/s
+let prevPacketCount = 0;
+let prevDownBytes = 0;
+let prevUpBytes = 0;
+let bwInterval = null;
+
+const formatRate = (bytesPerSec) => {
+  const bits = bytesPerSec * 8;
+  if (bits < 1000) return bits.toFixed(0) + ' bps';
+  if (bits < 1000000) return (bits / 1000).toFixed(1) + ' Kbps';
+  if (bits < 1000000000) return (bits / 1000000).toFixed(2) + ' Mbps';
+  return (bits / 1000000000).toFixed(2) + ' Gbps';
+};
+
+// Link capacity in bytes/s (from Mbps)
+const linkCapacityBps = computed(() => {
+  const mbps = linkSpeedMbps.value;
+  if (mbps > 0) return mbps * 1000000 / 8; // Mbps -> bytes/s
+  return 125000000; // default 1Gbps
+});
+
+const linkSpeedLabel = computed(() => {
+  const mbps = linkSpeedMbps.value || 1000;
+  if (mbps >= 1000) return `${mbps / 1000}G`;
+  return `${mbps}M`;
+});
+
+const makeGaugeOption = (value, label, color) => {
+  const maxVal = linkCapacityBps.value;
+  const pct = maxVal > 0 ? (value / maxVal * 100) : 0;
+  return {
+    series: [{
+      type: 'gauge',
+      startAngle: 210,
+      endAngle: -30,
+      center: ['50%', '60%'],
+      radius: '90%',
+      min: 0,
+      max: 100,
+      splitNumber: 5,
+      axisLine: {
+        lineStyle: {
+          width: 8,
+          color: [
+            [0.3, '#67e0e3'],
+            [0.7, color],
+            [1, '#fd666d']
+          ]
+        }
+      },
+      pointer: {
+        icon: 'path://M12.8,0.7l12,40.1H0.7L12.8,0.7z',
+        length: '55%',
+        width: 8,
+        offsetCenter: [0, '-10%'],
+        itemStyle: { color: 'auto' }
+      },
+      axisTick: {
+        length: 6,
+        lineStyle: { color: 'auto', width: 1 }
+      },
+      splitLine: {
+        length: 12,
+        lineStyle: { color: 'auto', width: 2 }
+      },
+      axisLabel: {
+        color: '#999',
+        fontSize: 12,
+        distance: -40,
+        rotate: 'tangential',
+        formatter: (v) => {
+          if (v === 0) return '';
+          const mbps = linkSpeedMbps.value || 1000;
+          const val = v / 100 * mbps;
+          if (val >= 1000) return (val / 1000).toFixed(0) + 'G';
+          return val.toFixed(0) + 'M';
+        }
+      },
+      title: {
+        offsetCenter: [0, '28%'],
+        fontSize: 13,
+        color: '#ccc',
+        fontWeight: 'bold'
+      },
+      detail: {
+        fontSize: 12,
+        offsetCenter: [0, '52%'],
+        valueAnimation: true,
+        formatter: () => formatRate(value),
+        color: 'inherit'
+      },
+      data: [{ value: Math.min(pct, 100), name: `${label} (${linkSpeedLabel.value})` }]
+    }]
+  };
+};
+
+const downGaugeOption = computed(() => {
+  return makeGaugeOption(downRate.value, 'DOWN', '#37a2da');
+});
+
+const upGaugeOption = computed(() => {
+  return makeGaugeOption(upRate.value, 'UP', '#ffa726');
+});
+
+onMounted(() => {
+  const pkts = allPackets.value.length > 0 ? allPackets.value : packets.value;
+  prevPacketCount = pkts.length;
+  // Compute cumulative bytes so far
+  const hip = hostIP.value;
+  let db = 0, ub = 0;
+  for (const pkt of pkts) {
+    const len = pkt.length || 0;
+    if (hip && pkt.src === hip) ub += len;
+    else db += len;
+  }
+  prevDownBytes = db;
+  prevUpBytes = ub;
+
+  bwInterval = setInterval(() => {
+    const curPkts = allPackets.value.length > 0 ? allPackets.value : packets.value;
+    const hip = hostIP.value;
+    // Only process new packets since last tick
+    let db = prevDownBytes, ub = prevUpBytes;
+    for (let i = prevPacketCount; i < curPkts.length; i++) {
+      const pkt = curPkts[i];
+      const len = pkt.length || 0;
+      if (hip && pkt.src === hip) ub += len;
+      else db += len;
+    }
+    downRate.value = Math.max(0, db - prevDownBytes);
+    upRate.value = Math.max(0, ub - prevUpBytes);
+    prevDownBytes = db;
+    prevUpBytes = ub;
+    prevPacketCount = curPkts.length;
+  }, 1000);
+});
+
+onUnmounted(() => {
+  if (bwInterval) clearInterval(bwInterval);
+});
+
 defineExpose({ loadPcapFile });
 </script>
 
@@ -160,6 +311,22 @@ defineExpose({ loadPcapFile });
           Live capture of data-path traffic is a CPU, memory and I/O intensive operation. Use with caution, for a limited amount of time/streams
         </div>
       </div>
+    </div>
+    <!-- Bandwidth gauge badge -->
+    <div v-if="captureActive" class="bw-badge" @mouseenter="showBwPopup = true" @mouseleave="showBwPopup = false">
+      <svg class="bw-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      <span class="bw-label">BW</span>
+      <Transition name="bw-dropdown">
+        <div v-if="showBwPopup" class="bw-popup">
+          <div class="bw-popup-title">Bandwidth Monitor</div>
+          <div class="bw-gauges">
+            <v-chart class="bw-gauge" :option="downGaugeOption" autoresize />
+            <v-chart class="bw-gauge" :option="upGaugeOption" autoresize />
+          </div>
+        </div>
+      </Transition>
     </div>
     <!-- Idle countdown warning -->
     <div v-if="idleCountdownSeconds > 0 && !stoppedCapture" class="idle-countdown">
@@ -644,5 +811,115 @@ defineExpose({ loadPcapFile });
 }
 .idle-resume-btn:active {
   transform: scale(0.95);
+}
+
+/* Bandwidth gauge badge */
+.bw-badge {
+  position: absolute;
+  right: calc(50% + 130px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  z-index: 10;
+  background: linear-gradient(90deg,
+    rgba(55, 162, 218, 0.15) 0%,
+    rgba(103, 224, 227, 0.25) 25%,
+    rgba(255, 167, 38, 0.2) 50%,
+    rgba(103, 224, 227, 0.25) 75%,
+    rgba(55, 162, 218, 0.15) 100%
+  );
+  background-size: 200% 100%;
+  animation: bw-shimmer 3s linear infinite;
+  border: 1px solid rgba(103, 224, 227, 0.3);
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.bw-badge:hover {
+  border-color: rgba(103, 224, 227, 0.7);
+  box-shadow: 0 0 12px rgba(103, 224, 227, 0.3);
+}
+@keyframes bw-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.bw-icon {
+  width: 18px;
+  height: 18px;
+  color: #67e0e3;
+  filter: drop-shadow(0 0 3px rgba(103, 224, 227, 0.5));
+}
+.bw-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #67e0e3;
+  letter-spacing: 1px;
+  text-shadow: 0 0 6px rgba(103, 224, 227, 0.4);
+}
+
+/* Dropdown popup */
+.bw-popup {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, #1a1d23, #111318);
+  border: 1px solid rgba(103, 224, 227, 0.3);
+  border-radius: 12px;
+  padding: 14px 18px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 16px rgba(103, 224, 227, 0.1);
+  z-index: 2000;
+  width: 580px;
+}
+.bw-popup::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 12px;
+  height: 12px;
+  background: #1a1d23;
+  border-left: 1px solid rgba(103, 224, 227, 0.3);
+  border-top: 1px solid rgba(103, 224, 227, 0.3);
+}
+.bw-popup-title {
+  color: #67e0e3;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+.bw-gauges {
+  display: flex;
+  gap: 8px;
+}
+.bw-gauge {
+  width: 270px;
+  height: 220px;
+}
+
+/* Slide-down transition */
+.bw-dropdown-enter-active {
+  animation: bw-slide-down 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.bw-dropdown-leave-active {
+  animation: bw-slide-down 0.25s cubic-bezier(0.16, 1, 0.3, 1) reverse;
+}
+@keyframes bw-slide-down {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    clip-path: inset(0 0 0 0);
+  }
 }
 </style>
