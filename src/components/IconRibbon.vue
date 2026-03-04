@@ -306,20 +306,6 @@ defineExpose({ loadPcapFile });
       @openFileBrowser="() => emit('openFileBrowser')"
     />
     <img v-if="!hideInsights" src="/webpcap-logo.png" alt="WebPCAP" class="ribbon-logo" />
-    <!-- Warning sign - between logo and right edge -->
-    <div v-if="!hideInsights && !stoppedCapture" class="warning-badge" @mouseenter="showWarning = true" @mouseleave="showWarning = false">
-      <svg class="warning-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" fill="#f59e0b" stroke="#b45309" stroke-width="1"/>
-        <line x1="12" y1="9" x2="12" y2="14" stroke="#78350f" stroke-width="2.2" stroke-linecap="round"/>
-        <circle cx="12" cy="17" r="1.1" fill="#78350f"/>
-      </svg>
-      <div v-if="showWarning" class="warning-balloon">
-        <div class="warning-balloon-title">Warning</div>
-        <div class="warning-balloon-text">
-          Live capture of data-path traffic is a CPU, memory and I/O intensive operation. Use with caution, for a limited amount of time/streams
-        </div>
-      </div>
-    </div>
     <!-- Bandwidth gauge badge -->
     <div v-if="captureActive" class="bw-badge" @mouseenter="onBwEnter" @mouseleave="onBwLeave">
       <svg class="bw-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -335,6 +321,20 @@ defineExpose({ loadPcapFile });
           </div>
         </div>
       </Transition>
+    </div>
+    <!-- Warning sign - right of BW badge -->
+    <div v-if="!hideInsights && !stoppedCapture" class="warning-badge" @mouseenter="showWarning = true" @mouseleave="showWarning = false">
+      <svg class="warning-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" fill="#f59e0b" stroke="#b45309" stroke-width="1"/>
+        <line x1="12" y1="9" x2="12" y2="14" stroke="#78350f" stroke-width="2.2" stroke-linecap="round"/>
+        <circle cx="12" cy="17" r="1.1" fill="#78350f"/>
+      </svg>
+      <div v-if="showWarning" class="warning-balloon">
+        <div class="warning-balloon-title">Warning</div>
+        <div class="warning-balloon-text">
+          Live capture of data-path traffic is a CPU, memory and I/O intensive operation. Use with caution, for a limited amount of time/streams
+        </div>
+      </div>
     </div>
     <!-- Idle countdown warning -->
     <div v-if="idleCountdownSeconds > 0 && !stoppedCapture" class="idle-countdown">
@@ -659,7 +659,7 @@ defineExpose({ loadPcapFile });
 /* Warning badge */
 .warning-badge {
   position: absolute;
-  left: calc(50% + 130px);
+  left: calc(50% + 230px);
   top: 50%;
   transform: translateY(-50%);
   cursor: pointer;
@@ -824,7 +824,7 @@ defineExpose({ loadPcapFile });
 /* Bandwidth gauge badge */
 .bw-badge {
   position: absolute;
-  right: calc(50% + 130px);
+  left: calc(50% + 130px);
   top: 50%;
   transform: translateY(-50%);
   display: flex;

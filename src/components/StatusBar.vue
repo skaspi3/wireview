@@ -9,6 +9,7 @@ const showReleaseNotes = ref(false);
 const showNotices = ref(false);
 const showFeedback = ref(false);
 const showBackendPopup = ref(false);
+const showLedPopup = ref(false);
 const showThinClientPopup = ref(false);
 
 // Removed system stats - no longer needed for Go backend
@@ -101,13 +102,6 @@ const statusTitle = computed(() => {
   }
 });
 
-const onBackendHover = () => {
-  showBackendPopup.value = true;
-};
-
-const onBackendLeave = () => {
-  showBackendPopup.value = false;
-};
 
 // Format bytes for memory display
 const formatMemory = (bytes) => {
@@ -278,23 +272,20 @@ const isCertValid = computed(() => {
         @mouseenter="showThinClientPopup = true"
         @mouseleave="showThinClientPopup = false"
       >
-        Thin Client Mode
+        Thin Client
         <div v-if="showThinClientPopup" class="thin-client-popup">
           <div class="popup-row reduction-row">Reduction Ratio: {{ reductionRatio.toFixed(1) }}%</div>
           <div class="popup-row">Captured on interface: {{ formatBytes(totalCapturedBytes) }}</div>
           <div class="popup-row">Sent to browser: {{ formatBytes(bytesReceived + bytesFetched) }}</div>
-          <div v-if="pcapDirUsage" class="popup-row pcap-dir-row">
-            {{ pcapDirUsage.fsType === 'tmpfs' ? 'RAM' : 'Disk' }}: {{ formatBytes(pcapDirUsage.used) }} / {{ formatBytes(pcapDirUsage.total) }}
-          </div>
         </div>
       </span>
       <span class="version-info wss-info">
         | <span
-            class="led"
-            :class="backendStatus"
-            @mouseenter="onBackendHover"
-            @mouseleave="onBackendLeave"
+            class="version-info backend-status-badge"
+            @mouseenter="showBackendPopup = true"
+            @mouseleave="showBackendPopup = false"
           >
+            Backend Status:
             <div v-if="showBackendPopup" :class="['backend-popup', { 'tshark-libraries': tsharkLibraries.length > 0 }]">
               <div class="popup-row">Node.js: {{ nodeVersion || 'unknown' }}</div>
               <div v-if="tsharkLibraries.length > 0" class="libs-section">
@@ -304,13 +295,26 @@ const isCertValid = computed(() => {
                 </div>
               </div>
               <div v-else class="popup-row">tshark Lua: {{ tsharkLuaVersion || 'N/A' }}</div>
+              <div v-if="pcapDirUsage" class="popup-row pcap-dir-row">
+                {{ pcapDirUsage.fsType === 'tmpfs' ? 'RAM' : 'Disk' }}: {{ formatBytes(pcapDirUsage.used) }} / {{ formatBytes(pcapDirUsage.total) }}
+              </div>
             </div>
           </span>
-        | <span class="lock-icon" :class="{ 'lock-valid': isCertValid, 'lock-warning': !isCertValid }" @mouseenter="showCertPopup = true" @mouseleave="showCertPopup = false">
+          <span
+            class="led"
+            :class="backendStatus"
+            @mouseenter="showLedPopup = true"
+            @mouseleave="showLedPopup = false"
+          >
+            <div v-if="showLedPopup" class="led-popup" :class="{ 'led-popup-red': backendStatus === 'disconnected' }">
+              {{ backendStatus === 'disconnected' ? 'Disconnected' : 'OK — Healthy' }}
+            </div>
+          </span>
+        | <span class="version-info wss-label">WSS:</span> <span class="lock-icon" :class="{ 'lock-valid': isCertValid, 'lock-warning': !isCertValid }" @mouseenter="showCertPopup = true" @mouseleave="showCertPopup = false">
             🔒
             <div v-if="showCertPopup" class="cert-popup">
               <div class="cert-header">
-                <span class="cert-title">TLS Certificate</span>
+                <span class="cert-title">WSS Certificate</span>
                 <span v-if="isSelfSigned" class="cert-self-signed">Self-Signed</span>
               </div>
               <template v-if="certInfo">
@@ -652,7 +656,7 @@ const isCertValid = computed(() => {
 .thin-client-badge {
   color: #60a5fa;
   font-weight: bold;
-  font-size: 13px;
+  font-size: 14.5px;
   cursor: pointer;
   position: relative;
 }
@@ -692,6 +696,36 @@ const isCertValid = computed(() => {
   margin-top: 6px;
   padding-top: 6px;
   border-top: 1px solid #374151;
+}
+.backend-status-badge {
+  color: #60a5fa;
+  font-weight: bold;
+  font-size: 14.5px;
+  cursor: pointer;
+  position: relative;
+}
+.led-popup {
+  position: absolute;
+  bottom: 20px;
+  right: 0;
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 6px 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  font-size: 13px;
+  color: #22c55e;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.wss-label {
+  color: #60a5fa;
+  font-weight: bold;
+  font-size: 14.5px;
+}
+.led-popup-red {
+  color: #ef4444;
 }
 .wss-info {
   display: flex;
