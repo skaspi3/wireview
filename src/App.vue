@@ -1,6 +1,7 @@
 <script setup>
-import { ref, useTemplateRef, computed } from 'vue';
+import { ref, useTemplateRef, computed, getCurrentInstance } from 'vue';
 import { clearPackets, packets, allPackets, captureActive, displayFilter } from './globals';
+import { getSentryConsent, enableSentry, disableSentry } from './sentry';
 import './packetCache';  // Initialize packet cache (registers clearer callback)
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
 import PacketList from './components/panes/PacketList.vue';
@@ -54,6 +55,20 @@ const totalPacketCount = computed(() => {
 const showPacketCounter = computed(() => {
   return captureActive.value || packets.value.length > 0 || allPackets.value.length > 0;
 });
+
+// Sentry consent banner
+const showSentryBanner = ref(getSentryConsent() === null);
+const app = getCurrentInstance()?.appContext.app;
+
+const onSentryEnable = () => {
+  enableSentry(app);
+  showSentryBanner.value = false;
+};
+
+const onSentryDismiss = () => {
+  disableSentry();
+  showSentryBanner.value = false;
+};
 </script>
 
 <template>
@@ -73,6 +88,12 @@ const showPacketCounter = computed(() => {
       <!-- Always render container for Teleport, use v-show to hide -->
       <div class="landing-page" :class="{ 'landing-hidden': !showLandingPage }">
         <div id="interface-selector-container"></div>
+        <!-- Sentry consent banner -->
+        <div v-if="showSentryBanner && showLandingPage" class="sentry-banner">
+          <span class="sentry-banner-text">Help improve WebPCAP — automatically send crash reports to help fix bugs. No personal data is collected.</span>
+          <button class="sentry-btn sentry-enable" @click="onSentryEnable">Enable</button>
+          <button class="sentry-btn sentry-dismiss" @click="onSentryDismiss">No thanks</button>
+        </div>
       </div>
 
       <!-- Workspace (shown when packets available or hidden when landing page) -->
@@ -157,5 +178,49 @@ const showPacketCounter = computed(() => {
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.15);
   z-index: 1000;
   pointer-events: none;
+}
+
+/* Sentry consent banner */
+.sentry-banner {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(30, 41, 59, 0.95);
+  border: 1px solid #374151;
+  border-radius: 10px;
+  padding: 14px 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  max-width: 780px;
+  z-index: 100;
+}
+.sentry-banner-text {
+  color: #d1d5db;
+  font-size: 15px;
+  line-height: 1.4;
+}
+.sentry-btn {
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: filter 0.15s;
+}
+.sentry-btn:hover {
+  filter: brightness(1.15);
+}
+.sentry-enable {
+  background: #3b82f6;
+  color: white;
+}
+.sentry-dismiss {
+  background: #4b5563;
+  color: #d1d5db;
 }
 </style>

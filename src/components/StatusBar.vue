@@ -7,6 +7,7 @@ const showFilterPopup = ref(false);
 const showCertPopup = ref(false);
 const showReleaseNotes = ref(false);
 const showNotices = ref(false);
+const showFeedback = ref(false);
 const showBackendPopup = ref(false);
 const showThinClientPopup = ref(false);
 
@@ -184,7 +185,6 @@ const isCertValid = computed(() => {
           <div class="release-header">
             <span class="release-title">WebPCAP</span>
             <span class="release-ver">{{ appVersion }}</span>
-            <a class="notices-link" @click.prevent="showNotices = true; showReleaseNotes = false">Notices</a>
             <button class="release-close" @click="showReleaseNotes = false">&times;</button>
           </div>
           <ul class="release-list">
@@ -238,6 +238,17 @@ const isCertValid = computed(() => {
               </table>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Feedback Popup (placeholder) -->
+      <div v-if="showFeedback" class="release-overlay" @click.self="showFeedback = false">
+        <div class="release-popup">
+          <div class="release-header">
+            <span class="release-title">Feedback</span>
+            <button class="release-close" @click="showFeedback = false">&times;</button>
+          </div>
+          <div class="feedback-placeholder">Coming soon</div>
         </div>
       </div>
 
@@ -348,7 +359,13 @@ const isCertValid = computed(() => {
         <GitHubIcon />
       </a>
     </div>
-    <span v-if="appVersion" class="app-version" @click="showReleaseNotes = true">{{ appVersion }}</span>
+    <div v-if="appVersion" class="app-version-group">
+      <span class="app-version-link" @click="showFeedback = true">Feedback</span>
+      <span class="app-version-sep">|</span>
+      <span class="app-version-link" @click="showReleaseNotes = true">{{ appVersion }}</span>
+      <span class="app-version-sep">|</span>
+      <span class="app-version-link" @click="showNotices = true">Notices</span>
+    </div>
   </div>
 </template>
 
@@ -378,19 +395,28 @@ const isCertValid = computed(() => {
   align-items: center;
   justify-content: flex-end;
 }
-.app-version {
+.app-version-group {
   position: absolute;
   left: 25%;
   transform: translateX(-50%);
-  color: #60a5fa;
-  font-size: 14.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-family: monospace;
+  font-size: 14.5px;
+}
+.app-version-link {
+  color: #60a5fa;
   cursor: pointer;
   transition: color 0.15s;
 }
-.app-version:hover {
+.app-version-link:hover {
   color: #93c5fd;
   text-decoration: underline;
+}
+.app-version-sep {
+  color: #4b5563;
+  user-select: none;
 }
 .release-overlay {
   position: fixed;
@@ -828,6 +854,13 @@ const isCertValid = computed(() => {
 }
 .cert-no-info {
   color: #6b7280;
+  font-style: italic;
+}
+.feedback-placeholder {
+  color: #6b7280;
+  font-size: 15px;
+  text-align: center;
+  padding: 20px 0;
   font-style: italic;
 }
 </style>

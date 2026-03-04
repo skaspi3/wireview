@@ -144,6 +144,14 @@ const savePackets = async () => {
 
 // Bandwidth gauge
 const showBwPopup = ref(false);
+let bwPopupLeaveTimer = null;
+const onBwEnter = () => {
+  if (bwPopupLeaveTimer) { clearTimeout(bwPopupLeaveTimer); bwPopupLeaveTimer = null; }
+  showBwPopup.value = true;
+};
+const onBwLeave = () => {
+  bwPopupLeaveTimer = setTimeout(() => { showBwPopup.value = false; }, 150);
+};
 const downRate = ref(0); // bytes/s
 const upRate = ref(0);   // bytes/s
 let prevPacketCount = 0;
@@ -313,7 +321,7 @@ defineExpose({ loadPcapFile });
       </div>
     </div>
     <!-- Bandwidth gauge badge -->
-    <div v-if="captureActive" class="bw-badge" @mouseenter="showBwPopup = true" @mouseleave="showBwPopup = false">
+    <div v-if="captureActive" class="bw-badge" @mouseenter="onBwEnter" @mouseleave="onBwLeave">
       <svg class="bw-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
       </svg>
@@ -922,4 +930,6 @@ defineExpose({ loadPcapFile });
     clip-path: inset(0 0 0 0);
   }
 }
+
+
 </style>
