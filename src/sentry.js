@@ -1,7 +1,7 @@
 import * as Sentry from '@sentry/vue';
 
 // Replace with your actual Sentry DSN after creating a project at https://sentry.io
-const SENTRY_DSN = '';
+const SENTRY_DSN = 'https://92e381b7431276b22a9c7bdd722d124b@o4510990920384512.ingest.us.sentry.io/4510990961213440';
 
 const CONSENT_KEY = 'sentry-consent';
 

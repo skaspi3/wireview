@@ -186,7 +186,7 @@
 
 <script setup>
 import { ref, triggerRef, onUnmounted, onMounted, computed, watch } from 'vue';
-import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, sessionId, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange, resolveWsRequest, clearPendingWsRequests, pcapDirUsage, idleCountdownSeconds, setCancelIdleCountdown, linkSpeedMbps } from '../globals';
+import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, sessionId, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange, resolveWsRequest, clearPendingWsRequests, pcapDirUsage, idleCountdownSeconds, setCancelIdleCountdown, linkSpeedMbps, savedCapturesCount } from '../globals';
 import { decompress as zstdDecompress } from 'fzstd';
 import ConfirmDialog from './ConfirmDialog.vue';
 import InterfaceSelector from './InterfaceSelector.vue';
@@ -503,6 +503,7 @@ const connect = () => {
           // Set link speed from interface details
           const ifaceInfo = interfaceDetails.value[msg.interface];
           linkSpeedMbps.value = ifaceInfo?.speed || 0;
+          savedCapturesCount.value = 0;  // Fresh session — reset count
           emit('clear');
         }
 
@@ -744,6 +745,9 @@ const connect = () => {
           if (saveProgressIndicator.value) {
             saveProgressIndicator.value.updateSaveProgress(msg);
           }
+          if (msg.status === 'complete') {
+            savedCapturesCount.value++;
+          }
         }
 
         if (msg.type === 'error') {
@@ -905,15 +909,14 @@ const generateDefaultFilename = () => {
 };
 
 const onSaveConfirmYes = async () => {
-  // Auto-save with default filename via save-pcap endpoint
+  // Auto-save with default filename via save-pcap endpoint (saves to captures dir)
   const filename = generateDefaultFilename();
-  const savePath = `/pcap/${filename}`;
 
   try {
     const response = await fetch('/api/save-pcap', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: savePath })
+      body: JSON.stringify({ path: filename, useCaptures: true })
     });
 
     const text = await response.text();

@@ -48,6 +48,9 @@ export const captureActive = ref(false);
 // True when user explicitly stopped a live capture (not when loading/closing files)
 export const stoppedCapture = ref(false);
 
+// Saved captures count (incremented on save complete, reset on new capture)
+export const savedCapturesCount = ref(0);
+
 // Idle kill-switch state
 export const idleCountdownSeconds = ref(0); // Remaining seconds (0 = not counting)
 let cancelIdleCountdownFn = () => {};
@@ -188,6 +191,8 @@ export const clearPackets = () => {
   bytesReceived.value = 0;
   bytesSent.value = 0;
   bytesFetched.value = 0;
+  // Note: savedCapturesCount is NOT reset here — it persists across restarts
+  // and is synced from backend via /api/saved-captures
   // Clear packet details cache
   if (clearPacketCacheCallback) {
     clearPacketCacheCallback();

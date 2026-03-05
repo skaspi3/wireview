@@ -32,7 +32,7 @@
       </div>
       <div class="progress-info">
         <div class="progress-message">{{ save.message }}</div>
-        <div v-if="save.path" class="progress-path" :title="save.path">📁 {{ save.path }}</div>
+        <div v-if="save.path" class="progress-path" :title="save.path">📁 {{ save.path.split('/').pop() }}</div>
         <div v-if="save.compressed && save.originalSize && save.savedSize" class="progress-compression">
           {{ formatSize(save.originalSize) }} → {{ formatSize(save.savedSize) }} ({{ compressionRatio(save.originalSize, save.savedSize) }}% reduction)
         </div>
