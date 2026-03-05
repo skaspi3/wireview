@@ -62,19 +62,20 @@ body {
 
 /* Scrollbar Styling for Dark Mode */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--ws-almost-white);
+  background: #1a1e2e;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--ws-dark-gray);
-  border-radius: 5px;
+  background: linear-gradient(180deg, #3a5a8a, #2a4570);
+  border-radius: 7px;
+  border: 2px solid #1a1e2e;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--ws-darker-gray);
+  background: linear-gradient(180deg, #4a6a9a, #3a5a8a);
 }
 ::-webkit-scrollbar-corner {
-  background: var(--ws-almost-white);
+  background: #1a1e2e;
 }

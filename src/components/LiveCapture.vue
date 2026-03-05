@@ -900,12 +900,7 @@ const confirmRestartCapture = () => {
 };
 
 const generateDefaultFilename = () => {
-  const now = new Date();
-  const timestamp = now.toISOString()
-    .replace(/[:.]/g, '-')
-    .replace('T', '_')
-    .slice(0, 19);
-  return `${timestamp}_webcap.pcapng.zst`;
+  return `webcap.pcapng.zst`;
 };
 
 const onSaveConfirmYes = async () => {

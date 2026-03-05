@@ -74,6 +74,29 @@ const onSentryDismiss = () => {
 const showSavedCaptures = ref(false);
 const savedFiles = ref([]);
 const savedCapturesGlow = ref(false);
+const sortColumn = ref('created'); // 'name', 'size', 'created'
+const sortAsc = ref(false);
+
+const sortedFiles = computed(() => {
+  const col = sortColumn.value;
+  const asc = sortAsc.value;
+  return [...savedFiles.value].sort((a, b) => {
+    let cmp = 0;
+    if (col === 'name') cmp = a.name.localeCompare(b.name);
+    else if (col === 'size') cmp = (a.size || 0) - (b.size || 0);
+    else if (col === 'created') cmp = new Date(a.created || 0) - new Date(b.created || 0);
+    return asc ? cmp : -cmp;
+  });
+});
+
+const toggleSort = (col) => {
+  if (sortColumn.value === col) {
+    sortAsc.value = !sortAsc.value;
+  } else {
+    sortColumn.value = col;
+    sortAsc.value = true;
+  }
+};
 
 watch(savedCapturesCount, (newVal, oldVal) => {
   if (newVal > oldVal) {
@@ -235,13 +258,14 @@ const downloadCapture = (name) => {
           <table class="saved-captures-table">
             <thead>
               <tr>
-                <th>File Name</th>
-                <th>Time</th>
+                <th class="sc-th-sort" @click="toggleSort('name')">File Name <span class="sc-sort-arrow">{{ sortColumn === 'name' ? (sortAsc ? '▲' : '▼') : '⇅' }}</span></th>
+                <th class="sc-th-sort" @click="toggleSort('size')">Size <span class="sc-sort-arrow">{{ sortColumn === 'size' ? (sortAsc ? '▲' : '▼') : '⇅' }}</span></th>
+                <th class="sc-th-sort" @click="toggleSort('created')">Time <span class="sc-sort-arrow">{{ sortColumn === 'created' ? (sortAsc ? '▲' : '▼') : '⇅' }}</span></th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="file in savedFiles" :key="file.name">
+              <tr v-for="file in sortedFiles" :key="file.name">
                 <td class="sc-td-name">
                   <template v-if="renamingFile === file.name">
                     <input
@@ -255,9 +279,9 @@ const downloadCapture = (name) => {
                   </template>
                   <template v-else>
                     <span class="saved-captures-name" :title="file.name">{{ file.name }}</span>
-                    <span class="saved-captures-size">{{ formatFileSize(file.size) }}</span>
                   </template>
                 </td>
+                <td class="sc-td-size">{{ formatFileSize(file.size) }}</td>
                 <td class="sc-td-time">{{ formatTimestamp(file.created) }}</td>
                 <td class="sc-td-action">
                   <div class="saved-captures-actions">
@@ -521,13 +545,26 @@ const downloadCapture = (name) => {
 }
 .saved-captures-table thead th {
   text-align: left;
-  color: #6b7280;
-  font-size: 11px;
+  color: #d1d5db;
+  font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 6px 10px;
   border-bottom: 1px solid #374151;
+  user-select: none;
+}
+.sc-th-sort {
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.sc-th-sort:hover {
+  color: #60a5fa;
+}
+.sc-sort-arrow {
+  font-size: 10px;
+  color: #6b7280;
+  margin-left: 4px;
 }
 .saved-captures-table tbody tr {
   transition: background 0.15s;
@@ -550,9 +587,9 @@ const downloadCapture = (name) => {
   white-space: nowrap;
   display: block;
 }
-.saved-captures-size {
-  color: #6b7280;
-  font-size: 11px;
+.sc-td-size {
+  color: #9ca3af;
+  font-size: 12px;
   white-space: nowrap;
 }
 .sc-td-time {

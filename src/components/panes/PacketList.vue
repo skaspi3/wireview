@@ -430,13 +430,17 @@ onUnmounted(() => {
   overflow-x: auto;
   height: 100%;
   width: 100%;
-  background: #e8f4fc;
+  background: linear-gradient(180deg, #e6f0ff 0%, #d4e4f8 100%);
   outline: none;
+  border: 2px solid #4a7fae;
+  border-radius: 4px;
+  box-shadow: inset 0 3px 14px rgba(30, 80, 160, 0.1), 0 3px 12px rgba(0, 0, 0, 0.15);
 }
 
 .packet-list-scrollable:focus {
-  outline: 2px solid #3875d7;
-  outline-offset: -2px;
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: inset 0 3px 14px rgba(30, 80, 160, 0.1), 0 0 0 3px rgba(37, 99, 235, 0.3), 0 3px 12px rgba(0, 0, 0, 0.15);
 }
 
 .content {
@@ -460,14 +464,16 @@ onUnmounted(() => {
 }
 
 .packet-table th {
-  background: #2d2d30;
-  border: 1px solid #3e3e42;
-  padding: 4px 8px;
+  background: linear-gradient(180deg, #1e3a5f, #162d4a);
+  border: 1px solid #2a5080;
+  padding: 7px 10px;
   text-align: left;
-  font-weight: normal;
+  font-weight: 700;
   white-space: nowrap;
-  color: #e5e5e5;
-  font-size: 13px;
+  color: #e8f0ff;
+  font-size: 14px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  letter-spacing: 0.3px;
 }
 
 .packet-table th.sortable {
@@ -476,7 +482,7 @@ onUnmounted(() => {
 }
 
 .packet-table th.sortable:hover {
-  background: #3d3d40;
+  background: linear-gradient(180deg, #264a73, #1e3a5f);
   color: #fff;
 }
 
@@ -488,12 +494,12 @@ onUnmounted(() => {
 
 .packet-table td {
   border: none;
-  padding: 2px 8px;
+  padding: 3px 8px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  height: 20px;
-  line-height: 20px;
+  height: 22px;
+  line-height: 22px;
 }
 
 .packet-table tbody tr {

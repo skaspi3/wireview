@@ -49,18 +49,12 @@ const loadPcapFile = (filePath) => {
 
 // Generate save filename with optional filter prefix
 const generateSaveFilename = (mode) => {
-  const now = new Date();
-  const timestamp = now.toISOString()
-    .replace(/[:.]/g, '-')
-    .replace('T', '_')
-    .slice(0, 19);
   const filter = displayFilter.value?.trim();
   if (filter) {
-    // Sanitize filter for filename: replace non-alphanumeric with underscore
     const sanitized = filter.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/_+/g, '_');
-    return `${sanitized}_${timestamp}`;
+    return sanitized;
   }
-  return `capture_${timestamp}`;
+  return 'capture';
 };
 
 // Open save dialog for all packets
