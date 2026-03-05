@@ -209,10 +209,10 @@ const isCertValid = computed(() => {
               <table class="notices-table">
                 <thead><tr><th>Package</th><th>Version</th><th>License</th></tr></thead>
                 <tbody>
-                  <tr><td><a href="https://www.npmjs.com/package/ws" target="_blank">ws</a></td><td>8.18</td><td>MIT</td></tr>
+                  <tr><td><a href="https://www.npmjs.com/package/ws" target="_blank">ws</a></td><td>8.18.3</td><td>MIT</td></tr>
                   <tr><td><a href="https://www.npmjs.com/package/@mongodb-js/zstd" target="_blank">@mongodb-js/zstd</a></td><td>7.0</td><td>Apache-2.0</td></tr>
                   <tr><td><a href="https://www.npmjs.com/package/sql.js" target="_blank">sql.js</a></td><td>1.13</td><td>MIT</td></tr>
-                  <tr><td><a href="https://www.npmjs.com/package/dotenv" target="_blank">dotenv</a></td><td>16.6</td><td>BSD-2-Clause</td></tr>
+                  <tr><td><a href="https://www.npmjs.com/package/dotenv" target="_blank">dotenv</a></td><td>17.3.1</td><td>BSD-2-Clause</td></tr>
                 </tbody>
               </table>
             </div>
@@ -221,13 +221,13 @@ const isCertValid = computed(() => {
               <table class="notices-table">
                 <thead><tr><th>Package</th><th>Version</th><th>License</th></tr></thead>
                 <tbody>
-                  <tr><td><a href="https://www.npmjs.com/package/vue" target="_blank">vue</a></td><td>3.5</td><td>MIT</td></tr>
-                  <tr><td><a href="https://www.npmjs.com/package/@vueuse/core" target="_blank">@vueuse/core</a></td><td>13.6</td><td>MIT</td></tr>
+                  <tr><td><a href="https://www.npmjs.com/package/vue" target="_blank">vue</a></td><td>3.5.18</td><td>MIT</td></tr>
+                  <tr><td><a href="https://www.npmjs.com/package/@vueuse/core" target="_blank">@vueuse/core</a></td><td>14.2.1</td><td>MIT</td></tr>
                   <tr><td><a href="https://www.npmjs.com/package/echarts" target="_blank">echarts</a></td><td>6.0</td><td>Apache-2.0</td></tr>
-                  <tr><td><a href="https://www.npmjs.com/package/vue-echarts" target="_blank">vue-echarts</a></td><td>8.0</td><td>MIT</td></tr>
+                  <tr><td><a href="https://www.npmjs.com/package/vue-echarts" target="_blank">vue-echarts</a></td><td>8.0.1</td><td>MIT</td></tr>
                   <tr><td><a href="https://www.npmjs.com/package/fzstd" target="_blank">fzstd</a></td><td>0.1</td><td>MIT</td></tr>
-                  <tr><td><a href="https://www.npmjs.com/package/vite" target="_blank">vite</a></td><td>6.3</td><td>MIT</td></tr>
-                  <tr><td><a href="https://www.npmjs.com/package/@vitejs/plugin-vue" target="_blank">@vitejs/plugin-vue</a></td><td>5.2</td><td>MIT</td></tr>
+                  <tr><td><a href="https://www.npmjs.com/package/vite" target="_blank">vite</a></td><td>6.4.1</td><td>MIT</td></tr>
+                  <tr><td><a href="https://www.npmjs.com/package/@vitejs/plugin-vue" target="_blank">@vitejs/plugin-vue</a></td><td>5.2.4</td><td>MIT</td></tr>
                 </tbody>
               </table>
             </div>
