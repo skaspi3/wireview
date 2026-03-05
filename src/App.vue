@@ -442,7 +442,7 @@ const downloadCapture = (name) => {
 .saved-captures-label {
   position: fixed;
   bottom: 2px;
-  right: calc(50% - 250px);
+  right: calc(50% - 280px);
   transform: translateX(50%);
   display: flex;
   align-items: center;
@@ -562,8 +562,8 @@ const downloadCapture = (name) => {
   color: #60a5fa;
 }
 .sc-sort-arrow {
-  font-size: 10px;
-  color: #6b7280;
+  font-size: 14px;
+  color: #9ca3af;
   margin-left: 4px;
 }
 .saved-captures-table tbody tr {
