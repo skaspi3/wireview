@@ -1,6 +1,6 @@
 <script setup>
 import { ref, useTemplateRef, computed, getCurrentInstance, watch } from 'vue';
-import { clearPackets, packets, allPackets, captureActive, displayFilter, filterLoading, filterProgress, cancelFilter, savedCapturesCount } from './globals';
+import { clearPackets, packets, allPackets, captureActive, stoppedCapture, displayFilter, filterLoading, filterProgress, cancelFilter, savedCapturesCount } from './globals';
 import { getSentryConsent, enableSentry, disableSentry } from './sentry';
 import './packetCache';  // Initialize packet cache (registers clearer callback)
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
@@ -83,6 +83,7 @@ const sortedFiles = computed(() => {
   return [...savedFiles.value].sort((a, b) => {
     let cmp = 0;
     if (col === 'name') cmp = a.name.localeCompare(b.name);
+    else if (col === 'packets') cmp = (a.packets || 0) - (b.packets || 0);
     else if (col === 'size') cmp = (a.size || 0) - (b.size || 0);
     else if (col === 'created') cmp = new Date(a.created || 0) - new Date(b.created || 0);
     return asc ? cmp : -cmp;
@@ -178,6 +179,36 @@ const downloadCapture = (name) => {
   a.download = name;
   a.click();
 };
+
+// Open Remotely
+const pendingOpenPath = ref(null);
+const showOpenConfirm = ref(false);
+
+const openCaptureRemotely = (filePath) => {
+  // If live capture is running (not stopped), warn user
+  if (captureActive.value && !stoppedCapture.value) {
+    pendingOpenPath.value = filePath;
+    showOpenConfirm.value = true;
+  } else {
+    doOpenCapture(filePath);
+  }
+};
+
+const doOpenCapture = (filePath) => {
+  showSavedCaptures.value = false;
+  showOpenConfirm.value = false;
+  iconRibbonRef.value?.loadPcapFile(filePath);
+};
+
+const confirmOpenYes = () => {
+  doOpenCapture(pendingOpenPath.value);
+  pendingOpenPath.value = null;
+};
+
+const confirmOpenNo = () => {
+  showOpenConfirm.value = false;
+  pendingOpenPath.value = null;
+};
 </script>
 
 <template>
@@ -259,6 +290,7 @@ const downloadCapture = (name) => {
             <thead>
               <tr>
                 <th class="sc-th-sort" @click="toggleSort('name')">File Name <span class="sc-sort-arrow">{{ sortColumn === 'name' ? (sortAsc ? '▲' : '▼') : '⇅' }}</span></th>
+                <th class="sc-th-sort" @click="toggleSort('packets')">#Packets <span class="sc-sort-arrow">{{ sortColumn === 'packets' ? (sortAsc ? '▲' : '▼') : '⇅' }}</span></th>
                 <th class="sc-th-sort" @click="toggleSort('size')">Size <span class="sc-sort-arrow">{{ sortColumn === 'size' ? (sortAsc ? '▲' : '▼') : '⇅' }}</span></th>
                 <th class="sc-th-sort" @click="toggleSort('created')">Time <span class="sc-sort-arrow">{{ sortColumn === 'created' ? (sortAsc ? '▲' : '▼') : '⇅' }}</span></th>
                 <th>Action</th>
@@ -281,10 +313,18 @@ const downloadCapture = (name) => {
                     <span class="saved-captures-name" :title="file.name">{{ file.name }}</span>
                   </template>
                 </td>
+                <td class="sc-td-packets">{{ file.packets ? file.packets.toLocaleString() : '—' }}</td>
                 <td class="sc-td-size">{{ formatFileSize(file.size) }}</td>
                 <td class="sc-td-time">{{ formatTimestamp(file.created) }}</td>
                 <td class="sc-td-action">
                   <div class="saved-captures-actions">
+                    <button class="sc-action-btn sc-open" title="Open Remotely" @click="openCaptureRemotely(file.path)">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                        <polyline points="15 3 21 3 21 9"/>
+                        <line x1="10" y1="14" x2="21" y2="3"/>
+                      </svg>
+                    </button>
                     <button class="sc-action-btn sc-download" title="Download" @click="downloadCapture(file.name)">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -309,6 +349,18 @@ const downloadCapture = (name) => {
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Open Remotely confirm dialog -->
+    <div v-if="showOpenConfirm" class="saved-captures-overlay" @click.self="confirmOpenNo">
+      <div class="open-confirm-dialog">
+        <div class="open-confirm-title">Open Capture</div>
+        <div class="open-confirm-msg">The current live capture will be lost (unsaved data). Continue?</div>
+        <div class="open-confirm-actions">
+          <button class="open-confirm-btn open-confirm-yes" @click="confirmOpenYes">Yes, Open</button>
+          <button class="open-confirm-btn open-confirm-no" @click="confirmOpenNo">Cancel</button>
         </div>
       </div>
     </div>
@@ -442,7 +494,7 @@ const downloadCapture = (name) => {
 .saved-captures-label {
   position: fixed;
   bottom: 2px;
-  right: calc(50% - 280px);
+  right: calc(50% - 310px);
   transform: translateX(50%);
   display: flex;
   align-items: center;
@@ -587,6 +639,12 @@ const downloadCapture = (name) => {
   white-space: nowrap;
   display: block;
 }
+.sc-td-packets {
+  color: #60a5fa;
+  font-size: 12px;
+  white-space: nowrap;
+  text-align: right;
+}
 .sc-td-size {
   color: #9ca3af;
   font-size: 12px;
@@ -639,6 +697,12 @@ const downloadCapture = (name) => {
 .sc-action-btn:active {
   transform: scale(0.95);
 }
+.sc-open {
+  color: #22c55e;
+}
+.sc-open:hover {
+  background: rgba(34, 197, 94, 0.15);
+}
 .sc-download {
   color: #3b82f6;
 }
@@ -656,6 +720,54 @@ const downloadCapture = (name) => {
 }
 .sc-delete:hover {
   background: rgba(239, 68, 68, 0.15);
+}
+
+/* Open confirm dialog */
+.open-confirm-dialog {
+  background: #1a1d23;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 380px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+.open-confirm-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f9fafb;
+  margin-bottom: 12px;
+}
+.open-confirm-msg {
+  color: #d1d5db;
+  font-size: 14px;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+.open-confirm-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+.open-confirm-btn {
+  padding: 8px 24px;
+  border-radius: 6px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.open-confirm-btn:hover {
+  filter: brightness(1.15);
+}
+.open-confirm-yes {
+  background: #3b82f6;
+  color: white;
+}
+.open-confirm-no {
+  background: #4b5563;
+  color: #d1d5db;
 }
 
 /* Sentry consent banner */

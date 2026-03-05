@@ -911,7 +911,7 @@ const onSaveConfirmYes = async () => {
     const response = await fetch('/api/save-pcap', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: filename, useCaptures: true })
+      body: JSON.stringify({ path: filename, useCaptures: true, packetCount: packets.value.length })
     });
 
     const text = await response.text();
@@ -950,9 +950,20 @@ const openFileBrowser = () => {
 const loadPcapFile = (filePath) => {
   if (!ws.value || !isConnected.value) return;
 
+  // Stop session capture if running
+  if (sessionId.value) {
+    try { sendMessage({ type: 'stopSession' }); } catch (e) {}
+    try { sendMessage({ type: 'leaveSession' }); } catch (e) {}
+  }
+  sessionId.value = null;
+  isSessionOwner.value = false;
+  sessionClientCount.value = 0;
+
   // Clear current state
   loadedPcapFile.value = null;
+  isCapturing.value = false;
   captureActive.value = false;
+  stoppedCapture.value = false;
   displayFilter.value = '';
   filterError.value = null;
 
