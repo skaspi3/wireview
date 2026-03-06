@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { packets, hostIP } from '../globals';
+import { packets, hostIP, apiFetch } from '../globals';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { PieChart, BarChart, LineChart, TreeChart, ChordChart } from 'echarts/charts';
@@ -57,7 +57,7 @@ const fetchStats = async () => {
     isLoading.value = true;
     error.value = null;
 
-    const response = await fetch('/api/stats');
+    const response = await apiFetch('/api/stats');
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -166,7 +166,7 @@ const fetchExpert = async () => {
   if (expertLoading.value) return;
   try {
     expertLoading.value = true;
-    const response = await fetch('/api/stats/expert');
+    const response = await apiFetch('/api/stats/expert');
     const data = await response.json();
     expert.value = data.expert;
   } catch (e) {
@@ -181,7 +181,7 @@ const fetchConversations = async () => {
   if (conversationsLoading.value) return;
   try {
     conversationsLoading.value = true;
-    const response = await fetch('/api/stats/conversations');
+    const response = await apiFetch('/api/stats/conversations');
     const data = await response.json();
     conversations.value = data.conversations || [];
   } catch (e) {
@@ -196,7 +196,7 @@ const fetchProtocolHierarchy = async () => {
   if (hierarchyLoading.value) return;
   try {
     hierarchyLoading.value = true;
-    const response = await fetch('/api/stats/protocols-hierarchy');
+    const response = await apiFetch('/api/stats/protocols-hierarchy');
     const data = await response.json();
     protocolHierarchy.value = data.hierarchy || [];
   } catch (e) {

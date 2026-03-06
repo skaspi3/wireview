@@ -1,6 +1,6 @@
 <script setup>
 import { ref, useTemplateRef, computed, getCurrentInstance, watch } from 'vue';
-import { clearPackets, packets, allPackets, captureActive, stoppedCapture, displayFilter, filterLoading, filterProgress, cancelFilter, savedCapturesCount } from './globals';
+import { clearPackets, packets, allPackets, captureActive, stoppedCapture, displayFilter, filterLoading, filterProgress, cancelFilter, savedCapturesCount, apiFetch, apiUrl } from './globals';
 import { getSentryConsent, enableSentry, disableSentry } from './sentry';
 import './packetCache';  // Initialize packet cache (registers clearer callback)
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
@@ -123,7 +123,7 @@ const renameInput = ref('');
 
 const openSavedCaptures = async () => {
   try {
-    const res = await fetch('/api/saved-captures');
+    const res = await apiFetch('/api/saved-captures');
     const data = await res.json();
     savedFiles.value = data.files || [];
   } catch (e) {
@@ -134,7 +134,7 @@ const openSavedCaptures = async () => {
 
 const refreshSavedCaptures = async () => {
   try {
-    const res = await fetch('/api/saved-captures');
+    const res = await apiFetch('/api/saved-captures');
     const data = await res.json();
     savedFiles.value = data.files || [];
     savedCapturesCount.value = savedFiles.value.length;
@@ -143,7 +143,7 @@ const refreshSavedCaptures = async () => {
 
 const deleteCapture = async (name) => {
   try {
-    await fetch('/api/saved-captures/delete', {
+    await apiFetch('/api/saved-captures/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name })
@@ -163,7 +163,7 @@ const confirmRename = async (oldName) => {
     return;
   }
   try {
-    await fetch('/api/saved-captures/rename', {
+    await apiFetch('/api/saved-captures/rename', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ oldName, newName: renameInput.value.trim() })
@@ -175,7 +175,7 @@ const confirmRename = async (oldName) => {
 
 const downloadCapture = (name) => {
   const a = document.createElement('a');
-  a.href = `/api/saved-captures/download/${encodeURIComponent(name)}`;
+  a.href = apiUrl(`/api/saved-captures/download/${encodeURIComponent(name)}`);
   a.download = name;
   a.click();
 };

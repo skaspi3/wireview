@@ -1,6 +1,6 @@
 <script setup>
 import { ref, useTemplateRef, computed, onMounted, onUnmounted } from 'vue';
-import { displayFilter, packets, stoppedCapture, allPackets, idleCountdownSeconds, cancelIdleCountdown, captureActive, linkSpeedMbps, hostIP } from '../globals';
+import { displayFilter, packets, stoppedCapture, allPackets, idleCountdownSeconds, cancelIdleCountdown, captureActive, linkSpeedMbps, hostIP, apiFetch } from '../globals';
 import LiveCapture from "./LiveCapture.vue";
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -111,7 +111,7 @@ const savePackets = async () => {
   saveError.value = null;
 
   try {
-    const response = await fetch('/api/save-filtered', {
+    const response = await apiFetch('/api/save-filtered', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ filename, frameNumbers })

@@ -101,6 +101,7 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import Sparkline from './Sparkline.vue'
+import { apiFetch } from '../globals'
 
 const props = defineProps({
   wsConnection: {
@@ -199,7 +200,7 @@ const fetchInterfaces = async () => {
   error.value = null
 
   try {
-    const response = await fetch('/api/interfaces')
+    const response = await apiFetch('/api/interfaces')
     if (!response.ok) throw new Error('Failed to fetch interfaces')
     const data = await response.json()
     interfaces.value = data.interfaces || []

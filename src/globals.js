@@ -1,5 +1,44 @@
 import { ref, shallowRef } from "vue";
 
+const CLIENT_ID_STORAGE_KEY = 'webpcap_client_id';
+const createClientId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+export const clientId = (() => {
+  try {
+    const existing = sessionStorage.getItem(CLIENT_ID_STORAGE_KEY);
+    if (existing) return existing;
+    const next = createClientId();
+    sessionStorage.setItem(CLIENT_ID_STORAGE_KEY, next);
+    return next;
+  } catch (e) {
+    return createClientId();
+  }
+})();
+
+export const apiUrl = (rawUrl) => {
+  const asString = String(rawUrl || '');
+  const isAbsolute = /^https?:\/\//i.test(asString);
+  const parsed = isAbsolute
+    ? new URL(asString)
+    : new URL(asString, window.location.origin);
+
+  if (parsed.pathname === '/api' || parsed.pathname.startsWith('/api/')) {
+    if (!parsed.searchParams.has('clientId')) {
+      parsed.searchParams.set('clientId', clientId);
+    }
+  }
+
+  if (isAbsolute) return parsed.toString();
+  return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+};
+
+export const apiFetch = (input, init) => fetch(apiUrl(input), init);
+
 // Packets array - holds packet summaries received from server
 export const packets = shallowRef([]);
 
@@ -137,7 +176,7 @@ fetch('/VERSION')
   .catch(() => {});
 
 // Fetch certificate info from Vite API
-fetch('/api/cert-info')
+apiFetch('/api/cert-info')
   .then(res => res.json())
   .then(data => { if (data) certInfo.value = data; })
   .catch(() => {});

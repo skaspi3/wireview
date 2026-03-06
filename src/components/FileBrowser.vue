@@ -71,6 +71,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
+import { apiFetch } from '../globals';
 
 const emit = defineEmits(['select', 'close']);
 
@@ -112,7 +113,7 @@ const loadDirectory = async (dirPath) => {
 
   try {
     const url = `/api/files?path=${encodeURIComponent(dirPath)}`;
-    const response = await fetch(url);
+    const response = await apiFetch(url);
     const data = await response.json();
 
     if (data.error) {
