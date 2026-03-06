@@ -33,3 +33,8 @@ wiregasm.*
 *.pcapng
 *.pcap.gz
 *.pcapng.gz
+
+# TLS certificates and keys (local/dev generated)
+*.key
+*.crt
+*.csr

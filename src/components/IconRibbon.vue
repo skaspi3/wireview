@@ -298,7 +298,15 @@ defineExpose({ loadPcapFile });
       @stop="() => emit('stop')"
       @openFileBrowser="() => emit('openFileBrowser')"
     />
-    <img v-if="!hideInsights" src="/webpcap-logo.png" alt="WebPCAP" class="ribbon-logo" />
+    <img
+      v-if="!hideInsights"
+      src="/webpcap-logo.png"
+      alt="WebPCAP"
+      class="ribbon-logo"
+      loading="eager"
+      fetchpriority="high"
+      decoding="sync"
+    />
     <!-- Bandwidth gauge badge -->
     <div v-if="captureActive" class="bw-badge" @mouseenter="onBwEnter" @mouseleave="onBwLeave">
       <svg class="bw-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

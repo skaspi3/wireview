@@ -219,6 +219,16 @@ const formatIfaceOption = (details) => {
 
 const error = ref(null);
 let pcapDirUsageInterval = null;
+const HEARTBEAT_INTERVAL_MS = 15000;
+const HEARTBEAT_TIMEOUT_MS = 10000;
+const WS_RECONNECT_BASE_DELAY_MS = 1000;
+const WS_RECONNECT_MAX_DELAY_MS = 30000;
+let heartbeatInterval = null;
+let heartbeatTimeout = null;
+let reconnectTimeout = null;
+let reconnectAttempts = 0;
+let allowReconnect = true;
+let isUnmounting = false;
 
 // Idle kill-switch
 const IDLE_TIMEOUT_S = 60;
@@ -390,7 +400,37 @@ const WS_URL = `wss://${window.location.host}/ws`;
 // Expose ws for packet details requests
 const getWebSocket = () => ws.value;
 
-const closeSocket = () => {
+const clearHeartbeatTimers = () => {
+  if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
+  if (heartbeatTimeout) { clearTimeout(heartbeatTimeout); heartbeatTimeout = null; }
+};
+
+const clearReconnectTimer = () => {
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = null;
+  }
+};
+
+const scheduleReconnect = () => {
+  if (!allowReconnect || isUnmounting || reconnectTimeout) return;
+
+  const delay = Math.min(WS_RECONNECT_BASE_DELAY_MS * (2 ** reconnectAttempts), WS_RECONNECT_MAX_DELAY_MS);
+  reconnectAttempts += 1;
+  backendStatus.value = 'reconnecting';
+
+  reconnectTimeout = setTimeout(() => {
+    reconnectTimeout = null;
+    connect({ isReconnect: true });
+  }, delay);
+};
+
+const closeSocket = ({ disableReconnect = false } = {}) => {
+  if (disableReconnect) {
+    allowReconnect = false;
+    clearReconnectTimer();
+  }
+  clearHeartbeatTimers();
   if (pcapDirUsageInterval) { clearInterval(pcapDirUsageInterval); pcapDirUsageInterval = null; }
   if (ws.value) {
     ws.value.onclose = null; // Prevent loops
@@ -408,19 +448,41 @@ const sendMessage = (data) => {
   ws.value.send(msg);
 };
 
-const connect = () => {
+const sendHeartbeat = () => {
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  sendMessage({ type: 'ping', ts: Date.now() });
+  if (heartbeatTimeout) clearTimeout(heartbeatTimeout);
+  heartbeatTimeout = setTimeout(() => {
+    if (ws.value && ws.value.readyState === WebSocket.OPEN) {
+      ws.value.close();
+    }
+  }, HEARTBEAT_TIMEOUT_MS);
+};
+
+const startHeartbeat = () => {
+  clearHeartbeatTimers();
+  heartbeatInterval = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+  sendHeartbeat();
+};
+
+const connect = ({ isReconnect = false } = {}) => {
+  allowReconnect = true;
+  clearReconnectTimer();
   closeSocket(); // Ensure no duplicates
   error.value = null;
-  backendStatus.value = 'connecting';
+  backendStatus.value = isReconnect ? 'reconnecting' : 'connecting';
   try {
     ws.value = new WebSocket(WS_URL);
     // Use arraybuffer for binary messages (more efficient than blob)
     ws.value.binaryType = 'arraybuffer';
 
     ws.value.onopen = () => {
+      reconnectAttempts = 0;
+      clearReconnectTimer();
       isConnected.value = true;
       backendStatus.value = 'connected';
       websocket.value = ws.value; // Store in global for filter requests
+      startHeartbeat();
 
       // Poll pcap dir usage every 3 seconds
       if (pcapDirUsageInterval) clearInterval(pcapDirUsageInterval);
@@ -448,6 +510,15 @@ const connect = () => {
         } else {
           // Plain JSON string (uncompressed)
           msg = JSON.parse(event.data);
+        }
+
+        if (heartbeatTimeout) {
+          clearTimeout(heartbeatTimeout);
+          heartbeatTimeout = null;
+        }
+
+        if (msg.type === 'pong') {
+          return;
         }
 
         // Dispatch responses to pending WebSocket requests (packet batches, field positions)
@@ -768,13 +839,21 @@ const connect = () => {
     };
 
     ws.value.onclose = () => {
+      clearHeartbeatTimers();
       isConnected.value = false;
       isCapturing.value = false;
-      backendStatus.value = 'disconnected';
+      websocket.value = null;
+      backendStatus.value = allowReconnect && !isUnmounting ? 'reconnecting' : 'disconnected';
+      if (allowReconnect && !isUnmounting) {
+        scheduleReconnect();
+      }
     };
   } catch (e) {
     error.value = e.message;
-    backendStatus.value = 'disconnected';
+    backendStatus.value = allowReconnect && !isUnmounting ? 'reconnecting' : 'disconnected';
+    if (allowReconnect && !isUnmounting) {
+      scheduleReconnect();
+    }
   }
 };
 
@@ -1025,9 +1104,12 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  isUnmounting = true;
+  clearReconnectTimer();
+  clearHeartbeatTimers();
   if (pcapDirUsageInterval) clearInterval(pcapDirUsageInterval);
   stopIdleDetection();
-  if (ws.value) ws.value.close();
+  closeSocket({ disableReconnect: true });
 });
 </script>
 
