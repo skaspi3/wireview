@@ -186,7 +186,7 @@
 
 <script setup>
 import { ref, triggerRef, onUnmounted, onMounted, computed, watch } from 'vue';
-import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, sessionId, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange, resolveWsRequest, clearPendingWsRequests, pcapDirUsage, idleCountdownSeconds, setCancelIdleCountdown, linkSpeedMbps, savedCapturesCount } from '../globals';
+import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, sessionId, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange, resolveWsRequest, clearPendingWsRequests, pcapDirUsage, idleCountdownSeconds, setCancelIdleCountdown, linkSpeedMbps, savedCapturesCount, addWsEvent } from '../globals';
 import { decompress as zstdDecompress } from 'fzstd';
 import ConfirmDialog from './ConfirmDialog.vue';
 import InterfaceSelector from './InterfaceSelector.vue';
@@ -415,7 +415,9 @@ const clearReconnectTimer = () => {
 const scheduleReconnect = () => {
   if (!allowReconnect || isUnmounting || reconnectTimeout) return;
 
+  const attempt = reconnectAttempts + 1;
   const delay = Math.min(WS_RECONNECT_BASE_DELAY_MS * (2 ** reconnectAttempts), WS_RECONNECT_MAX_DELAY_MS);
+  addWsEvent(`Reconnect scheduled in ${Math.round(delay / 1000)}s (attempt ${attempt})`);
   reconnectAttempts += 1;
   backendStatus.value = 'reconnecting';
 
@@ -454,6 +456,7 @@ const sendHeartbeat = () => {
   if (heartbeatTimeout) clearTimeout(heartbeatTimeout);
   heartbeatTimeout = setTimeout(() => {
     if (ws.value && ws.value.readyState === WebSocket.OPEN) {
+      addWsEvent('Heartbeat timeout (no pong in 10s), forcing reconnect');
       ws.value.close();
     }
   }, HEARTBEAT_TIMEOUT_MS);
@@ -471,6 +474,7 @@ const connect = ({ isReconnect = false } = {}) => {
   closeSocket(); // Ensure no duplicates
   error.value = null;
   backendStatus.value = isReconnect ? 'reconnecting' : 'connecting';
+  addWsEvent(isReconnect ? 'Attempting WebSocket reconnect' : 'Opening WebSocket connection');
   try {
     ws.value = new WebSocket(WS_URL);
     // Use arraybuffer for binary messages (more efficient than blob)
@@ -481,6 +485,7 @@ const connect = ({ isReconnect = false } = {}) => {
       clearReconnectTimer();
       isConnected.value = true;
       backendStatus.value = 'connected';
+      addWsEvent(isReconnect ? 'WebSocket reconnected' : 'WebSocket connected');
       websocket.value = ws.value; // Store in global for filter requests
       startHeartbeat();
 
@@ -836,6 +841,7 @@ const connect = ({ isReconnect = false } = {}) => {
       isConnected.value = false;
       isCapturing.value = false;
       backendStatus.value = 'disconnected';
+      addWsEvent('WebSocket error');
     };
 
     ws.value.onclose = () => {
@@ -843,6 +849,7 @@ const connect = ({ isReconnect = false } = {}) => {
       isConnected.value = false;
       isCapturing.value = false;
       websocket.value = null;
+      addWsEvent('WebSocket closed');
       backendStatus.value = allowReconnect && !isUnmounting ? 'reconnecting' : 'disconnected';
       if (allowReconnect && !isUnmounting) {
         scheduleReconnect();
@@ -850,6 +857,7 @@ const connect = ({ isReconnect = false } = {}) => {
     };
   } catch (e) {
     error.value = e.message;
+    addWsEvent(`WebSocket connect exception: ${e.message}`);
     backendStatus.value = allowReconnect && !isUnmounting ? 'reconnecting' : 'disconnected';
     if (allowReconnect && !isUnmounting) {
       scheduleReconnect();
@@ -1109,6 +1117,7 @@ onUnmounted(() => {
   clearHeartbeatTimers();
   if (pcapDirUsageInterval) clearInterval(pcapDirUsageInterval);
   stopIdleDetection();
+  addWsEvent('WebSocket shutdown (component unmounted)');
   closeSocket({ disableReconnect: true });
 });
 </script>

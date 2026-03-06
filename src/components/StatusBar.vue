@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from "vue";
-import { packets, allPackets, nodeVersion, tsharkLuaVersion, tsharkLibraries, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesFetched, pcapDirUsage, appVersion } from "../globals";
+import { packets, allPackets, nodeVersion, tsharkLuaVersion, tsharkLibraries, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesFetched, pcapDirUsage, appVersion, wsEventLog } from "../globals";
 import GitHubIcon from "./icons/GitHubIcon.vue";
 
 const showFilterPopup = ref(false);
@@ -11,6 +11,214 @@ const showFeedback = ref(false);
 const showBackendPopup = ref(false);
 const showLedPopup = ref(false);
 const showThinClientPopup = ref(false);
+const showWssPopup = ref(false);
+const cveScanState = ref('idle');
+const cveScanError = ref('');
+const cveScanReport = ref(null);
+const wssEvents = computed(() => wsEventLog.value);
+
+const OSV_QUERY_URL = 'https://api.osv.dev/v1/query';
+const NVD_CVE_URL = 'https://services.nvd.nist.gov/rest/json/cves/2.0';
+
+const backendNoticePackages = [
+  { name: 'ws', version: '8.18.3', license: 'MIT', url: 'https://www.npmjs.com/package/ws', ecosystem: 'npm' },
+  { name: '@mongodb-js/zstd', version: '7.0', license: 'Apache-2.0', url: 'https://www.npmjs.com/package/@mongodb-js/zstd', ecosystem: 'npm' },
+  { name: 'sql.js', version: '1.13', license: 'MIT', url: 'https://www.npmjs.com/package/sql.js', ecosystem: 'npm' },
+  { name: 'dotenv', version: '17.3.1', license: 'BSD-2-Clause', url: 'https://www.npmjs.com/package/dotenv', ecosystem: 'npm' },
+];
+
+const frontendNoticePackages = [
+  { name: 'vue', version: '3.5.18', license: 'MIT', url: 'https://www.npmjs.com/package/vue', ecosystem: 'npm' },
+  { name: '@vueuse/core', version: '14.2.1', license: 'MIT', url: 'https://www.npmjs.com/package/@vueuse/core', ecosystem: 'npm' },
+  { name: 'echarts', version: '6.0', license: 'Apache-2.0', url: 'https://www.npmjs.com/package/echarts', ecosystem: 'npm' },
+  { name: 'vue-echarts', version: '8.0.1', license: 'MIT', url: 'https://www.npmjs.com/package/vue-echarts', ecosystem: 'npm' },
+  { name: 'fzstd', version: '0.1', license: 'MIT', url: 'https://www.npmjs.com/package/fzstd', ecosystem: 'npm' },
+  { name: 'vite', version: '6.4.1', license: 'MIT', url: 'https://www.npmjs.com/package/vite', ecosystem: 'npm' },
+  { name: '@vitejs/plugin-vue', version: '5.2.4', license: 'MIT', url: 'https://www.npmjs.com/package/@vitejs/plugin-vue', ecosystem: 'npm' },
+];
+
+const allNoticePackages = computed(() => [...backendNoticePackages, ...frontendNoticePackages]);
+
+const withTimeoutFetch = async (url, init = {}, timeoutMs = 15000) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`HTTP ${response.status}: ${text.slice(0, 180)}`);
+    }
+    return await response.json();
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+const extractCveAliases = (osvVuln) => {
+  const aliases = Array.isArray(osvVuln.aliases) ? [...osvVuln.aliases] : [];
+  if (osvVuln.id && osvVuln.id.startsWith('CVE-') && !aliases.includes(osvVuln.id)) {
+    aliases.push(osvVuln.id);
+  }
+  return aliases.filter((id) => id.startsWith('CVE-'));
+};
+
+const pickNvdCvss = (nvdVuln) => {
+  const metrics = nvdVuln?.cve?.metrics || {};
+  return (
+    metrics.cvssMetricV31?.[0]?.cvssData ||
+    metrics.cvssMetricV30?.[0]?.cvssData ||
+    metrics.cvssMetricV2?.[0]?.cvssData ||
+    null
+  );
+};
+
+const queryOsv = async (pkg) => {
+  return await withTimeoutFetch(OSV_QUERY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      package: { ecosystem: pkg.ecosystem, name: pkg.name },
+      version: pkg.version,
+    }),
+  });
+};
+
+const queryNvdByCveId = async (cveId) => {
+  const data = await withTimeoutFetch(`${NVD_CVE_URL}?cveId=${encodeURIComponent(cveId)}`);
+  const vuln = Array.isArray(data.vulnerabilities) ? data.vulnerabilities[0] : null;
+  if (!vuln) return null;
+
+  const cvss = pickNvdCvss(vuln);
+  return {
+    cveId,
+    published: vuln.cve?.published || null,
+    severity: cvss?.baseSeverity || null,
+    score: cvss?.baseScore ?? null,
+  };
+};
+
+const formatScanDate = (isoDate) => {
+  if (!isoDate) return '';
+  try {
+    return new Date(isoDate).toLocaleString();
+  } catch {
+    return isoDate;
+  }
+};
+
+const packageScanStatus = (pkgResult) => {
+  if (pkgResult.error) return 'Error';
+  if ((pkgResult.cves?.length || 0) > 0 || (pkgResult.osvCount || 0) > 0) return 'Affected';
+  return 'No known CVEs';
+};
+
+const packageScanStatusClass = (pkgResult) => {
+  const status = packageScanStatus(pkgResult);
+  if (status === 'Affected') return 'affected';
+  if (status === 'Error') return 'error';
+  return 'ok';
+};
+
+const packageTopSeverity = (pkgResult) => {
+  if (pkgResult.error) return 'Error';
+  if (!pkgResult.nvd || pkgResult.nvd.length === 0) return '—';
+
+  const rank = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+  let top = null;
+  for (const finding of pkgResult.nvd) {
+    if (!finding || !finding.severity) continue;
+    if (!top || (rank[finding.severity] || 0) > (rank[top.severity] || 0)) {
+      top = finding;
+    }
+  }
+
+  if (!top) return 'No CVSS';
+  return top.score !== null ? `${top.severity} (${top.score})` : top.severity;
+};
+
+const downloadCveReport = () => {
+  if (!cveScanReport.value) return;
+  const content = JSON.stringify(cveScanReport.value, null, 2);
+  const blob = new Blob([content], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `client-cve-scan-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+};
+
+const runBrowserCveScan = async () => {
+  if (cveScanState.value === 'running') return;
+
+  cveScanState.value = 'running';
+  cveScanError.value = '';
+  cveScanReport.value = null;
+
+  const nvdCache = new Map();
+  const packageResults = [];
+
+  for (const pkg of allNoticePackages.value) {
+    try {
+      const osv = await queryOsv(pkg);
+      const osvVulns = Array.isArray(osv.vulns) ? osv.vulns : [];
+      const cves = [...new Set(osvVulns.flatMap(extractCveAliases))];
+      const nvd = [];
+
+      for (const cveId of cves) {
+        if (!nvdCache.has(cveId)) {
+          try {
+            nvdCache.set(cveId, await queryNvdByCveId(cveId));
+          } catch (e) {
+            nvdCache.set(cveId, { cveId, error: e.message, severity: null, score: null });
+          }
+        }
+        nvd.push(nvdCache.get(cveId));
+      }
+
+      packageResults.push({
+        name: pkg.name,
+        version: pkg.version,
+        osvCount: osvVulns.length,
+        osvIds: osvVulns.map((v) => v.id).filter(Boolean),
+        cves,
+        nvd,
+        error: null,
+      });
+    } catch (e) {
+      packageResults.push({
+        name: pkg.name,
+        version: pkg.version,
+        osvCount: 0,
+        osvIds: [],
+        cves: [],
+        nvd: [],
+        error: e.message,
+      });
+    }
+  }
+
+  const totals = {
+    packageCount: packageResults.length,
+    vulnerablePackages: packageResults.filter((pkg) => pkg.cves.length > 0 || pkg.osvCount > 0).length,
+    cveCount: packageResults.reduce((sum, pkg) => sum + pkg.cves.length, 0),
+    queryErrors: packageResults.filter((pkg) => Boolean(pkg.error)).length,
+  };
+
+  cveScanReport.value = {
+    generatedAt: new Date().toISOString(),
+    sources: { osv: OSV_QUERY_URL, nvd: NVD_CVE_URL },
+    totals,
+    packages: packageResults,
+  };
+
+  cveScanState.value = 'done';
+  if (totals.queryErrors > 0) {
+    cveScanError.value = 'Some API queries failed (network/CORS/rate-limit). See table rows marked Error.';
+  }
+};
 
 // Removed system stats - no longer needed for Go backend
 
@@ -200,19 +408,56 @@ const isCertValid = computed(() => {
       <div v-if="showNotices" class="release-overlay" @click.self="showNotices = false">
         <div class="notices-popup">
           <div class="release-header">
-            <span class="release-title">3rd-Party Software</span>
+            <span class="release-title">3-rd Party Libs</span>
             <button class="release-close" @click="showNotices = false">&times;</button>
           </div>
+          <div class="cve-scan-panel">
+            <div class="cve-scan-actions">
+              <button class="cve-scan-btn" :disabled="cveScanState === 'running'" @click="runBrowserCveScan">
+                {{ cveScanState === 'running' ? 'Scanning CVEs...' : 'Run CVE Scan (Browser)' }}
+              </button>
+              <button v-if="cveScanReport" class="cve-scan-btn secondary" @click="downloadCveReport">
+                Download JSON
+              </button>
+            </div>
+            <div class="cve-scan-meta">
+              Runs in your browser against OSV + NVD APIs (no backend proxy).
+            </div>
+            <div v-if="cveScanError" class="cve-scan-error">{{ cveScanError }}</div>
+            <div v-if="cveScanReport" class="cve-scan-summary">
+              <span>Scanned: {{ cveScanReport.totals.packageCount }}</span>
+              <span>Affected: {{ cveScanReport.totals.vulnerablePackages }}</span>
+              <span>CVEs: {{ cveScanReport.totals.cveCount }}</span>
+              <span>Errors: {{ cveScanReport.totals.queryErrors }}</span>
+              <span>At: {{ formatScanDate(cveScanReport.generatedAt) }}</span>
+            </div>
+          </div>
           <div class="notices-content">
+            <div v-if="cveScanReport" class="notices-section">
+              <div class="notices-section-title">Live CVE Scan Results</div>
+              <table class="notices-table cve-results-table">
+                <thead><tr><th>Package</th><th>Version</th><th>Status</th><th>CVEs</th><th>Top NVD Severity</th></tr></thead>
+                <tbody>
+                  <tr v-for="pkg in cveScanReport.packages" :key="`scan-${pkg.name}`">
+                    <td>{{ pkg.name }}</td>
+                    <td>{{ pkg.version }}</td>
+                    <td :class="['scan-status', packageScanStatusClass(pkg)]">{{ packageScanStatus(pkg) }}</td>
+                    <td>{{ pkg.cves.length > 0 ? pkg.cves.join(', ') : '—' }}</td>
+                    <td>{{ packageTopSeverity(pkg) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
             <div class="notices-section">
               <div class="notices-section-title">Backend (Node.js)</div>
               <table class="notices-table">
                 <thead><tr><th>Package</th><th>Version</th><th>License</th></tr></thead>
                 <tbody>
-                  <tr><td><a href="https://www.npmjs.com/package/ws" target="_blank">ws</a></td><td>8.18.3</td><td>MIT</td></tr>
-                  <tr><td><a href="https://www.npmjs.com/package/@mongodb-js/zstd" target="_blank">@mongodb-js/zstd</a></td><td>7.0</td><td>Apache-2.0</td></tr>
-                  <tr><td><a href="https://www.npmjs.com/package/sql.js" target="_blank">sql.js</a></td><td>1.13</td><td>MIT</td></tr>
-                  <tr><td><a href="https://www.npmjs.com/package/dotenv" target="_blank">dotenv</a></td><td>17.3.1</td><td>BSD-2-Clause</td></tr>
+                  <tr v-for="pkg in backendNoticePackages" :key="`backend-${pkg.name}`">
+                    <td><a :href="pkg.url" target="_blank">{{ pkg.name }}</a></td>
+                    <td>{{ pkg.version }}</td>
+                    <td>{{ pkg.license }}</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -221,13 +466,11 @@ const isCertValid = computed(() => {
               <table class="notices-table">
                 <thead><tr><th>Package</th><th>Version</th><th>License</th></tr></thead>
                 <tbody>
-                  <tr><td><a href="https://www.npmjs.com/package/vue" target="_blank">vue</a></td><td>3.5.18</td><td>MIT</td></tr>
-                  <tr><td><a href="https://www.npmjs.com/package/@vueuse/core" target="_blank">@vueuse/core</a></td><td>14.2.1</td><td>MIT</td></tr>
-                  <tr><td><a href="https://www.npmjs.com/package/echarts" target="_blank">echarts</a></td><td>6.0</td><td>Apache-2.0</td></tr>
-                  <tr><td><a href="https://www.npmjs.com/package/vue-echarts" target="_blank">vue-echarts</a></td><td>8.0.1</td><td>MIT</td></tr>
-                  <tr><td><a href="https://www.npmjs.com/package/fzstd" target="_blank">fzstd</a></td><td>0.1</td><td>MIT</td></tr>
-                  <tr><td><a href="https://www.npmjs.com/package/vite" target="_blank">vite</a></td><td>6.4.1</td><td>MIT</td></tr>
-                  <tr><td><a href="https://www.npmjs.com/package/@vitejs/plugin-vue" target="_blank">@vitejs/plugin-vue</a></td><td>5.2.4</td><td>MIT</td></tr>
+                  <tr v-for="pkg in frontendNoticePackages" :key="`frontend-${pkg.name}`">
+                    <td><a :href="pkg.url" target="_blank">{{ pkg.name }}</a></td>
+                    <td>{{ pkg.version }}</td>
+                    <td>{{ pkg.license }}</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -310,7 +553,35 @@ const isCertValid = computed(() => {
               {{ backendStatus === 'disconnected' ? 'Disconnected' : 'OK — Healthy' }}
             </div>
           </span>
-        | <span class="version-info wss-label">WSS:</span> <span class="lock-icon" :class="{ 'lock-valid': isCertValid, 'lock-warning': !isCertValid }" @mouseenter="showCertPopup = true" @mouseleave="showCertPopup = false">
+        | <span
+            class="version-info wss-label-wrap"
+            @mouseenter="showWssPopup = true"
+            @mouseleave="showWssPopup = false"
+          >
+            <span class="version-info wss-label">WSS:</span>
+            <div v-if="showWssPopup" class="wss-popup">
+              <div class="wss-popup-title">WSS Event Log</div>
+              <table class="wss-events-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Message</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-if="wssEvents.length === 0">
+                    <td>--:--:--</td>
+                    <td>No events yet</td>
+                  </tr>
+                  <tr v-for="(event, idx) in wssEvents" :key="`wss-event-${idx}-${event.time}`">
+                    <td>{{ event.time }}</td>
+                    <td>{{ event.message }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </span>
+          <span class="lock-icon" :class="{ 'lock-valid': isCertValid, 'lock-warning': !isCertValid }" @mouseenter="showCertPopup = true" @mouseleave="showCertPopup = false">
             🔒
             <div v-if="showCertPopup" class="cert-popup">
               <div class="cert-header">
@@ -366,9 +637,9 @@ const isCertValid = computed(() => {
     <div v-if="appVersion" class="app-version-group">
       <span class="app-version-link" @click="showFeedback = true">Feedback</span>
       <span class="app-version-sep">|</span>
-      <span class="app-version-link" @click="showReleaseNotes = true">{{ appVersion }}</span>
+      <span class="app-version-link" @click="showReleaseNotes = true">Changelog</span>
       <span class="app-version-sep">|</span>
-      <span class="app-version-link" @click="showNotices = true">Notices</span>
+      <span class="app-version-link" @click="showNotices = true">3-rd Party Libs</span>
     </div>
   </div>
 </template>
@@ -505,22 +776,92 @@ const isCertValid = computed(() => {
 .notices-popup {
   background: #1a1d23;
   border: 1px solid #374151;
-  border-radius: 12px;
-  padding: 24px 28px;
-  min-width: 520px;
-  max-width: 620px;
-  max-height: 80vh;
+  border-radius: 15px;
+  padding: 30px 35px;
+  min-width: 650px;
+  max-width: 775px;
+  max-height: 86vh;
   overflow-y: auto;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  font-size: 15.5px;
+}
+.notices-popup .release-title {
+  font-size: 22.5px;
+}
+.notices-popup .release-close {
+  font-size: 24.5px;
 }
 .notices-content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 25px;
+}
+.cve-scan-panel {
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 13px;
+  margin-bottom: 20px;
+}
+.cve-scan-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cve-scan-btn {
+  background: #2563eb;
+  border: 1px solid #1d4ed8;
+  color: #fff;
+  font-size: 14.5px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.cve-scan-btn:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+.cve-scan-btn:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+.cve-scan-btn.secondary {
+  background: transparent;
+  border-color: #4b5563;
+  color: #d1d5db;
+}
+.cve-scan-meta {
+  color: #9ca3af;
+  font-size: 14.5px;
+  margin-top: 8px;
+}
+.cve-scan-summary {
+  margin-top: 8px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: #cbd5e1;
+  font-size: 14.5px;
+}
+.cve-scan-error {
+  margin-top: 8px;
+  color: #fca5a5;
+  font-size: 14.5px;
+}
+.scan-status.ok {
+  color: #86efac;
+}
+.scan-status.affected {
+  color: #fca5a5;
+  font-weight: 600;
+}
+.scan-status.error {
+  color: #fbbf24;
+  font-weight: 600;
 }
 .notices-section-title {
   color: #9ca3af;
-  font-size: 11px;
+  font-size: 13.5px;
   text-transform: uppercase;
   letter-spacing: 1px;
   font-weight: 600;
@@ -529,20 +870,20 @@ const isCertValid = computed(() => {
 .notices-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 15.5px;
 }
 .notices-table th {
   text-align: left;
   color: #6b7280;
   font-weight: 600;
-  font-size: 11px;
+  font-size: 13.5px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  padding: 6px 10px;
+  padding: 9px 13px;
   border-bottom: 1px solid #374151;
 }
 .notices-table td {
-  padding: 7px 10px;
+  padding: 10px 13px;
   color: #d1d5db;
   border-bottom: 1px solid #1f2937;
 }
@@ -724,6 +1065,60 @@ const isCertValid = computed(() => {
   font-weight: bold;
   font-size: 14.5px;
 }
+.wss-label-wrap {
+  position: relative;
+  cursor: default;
+}
+.wss-popup {
+  position: absolute;
+  bottom: 24px;
+  right: -6px;
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 10px 12px;
+  min-width: 470px;
+  max-width: 620px;
+  max-height: 260px;
+  overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  color: #d1d5db;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.wss-popup-title {
+  color: #ffffff;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.wss-events-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.wss-events-table th {
+  text-align: left;
+  color: #93c5fd;
+  font-size: 11.5px;
+  padding: 5px 8px;
+  border-bottom: 1px solid #374151;
+}
+.wss-events-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid #2a3441;
+  vertical-align: top;
+}
+.wss-events-table td:first-child {
+  color: #9ca3af;
+  font-family: monospace;
+  white-space: nowrap;
+  width: 90px;
+}
+.wss-events-table td:last-child {
+  color: #d1d5db;
+  word-break: break-word;
+}
 .led-popup-red {
   color: #ef4444;
 }
@@ -746,6 +1141,11 @@ const isCertValid = computed(() => {
   color: #ef4444;
 }
 .led.connecting {
+  background-color: #f59e0b;
+  color: #f59e0b;
+  animation: pulse-led 1s infinite;
+}
+.led.reconnecting {
   background-color: #f59e0b;
   color: #f59e0b;
   animation: pulse-led 1s infinite;

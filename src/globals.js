@@ -42,6 +42,19 @@ export const hostIP = ref(null);
 // Backend connection status: 'disconnected' | 'connecting' | 'connected'
 export const backendStatus = ref('disconnected');
 
+// WebSocket event log for status-bar hover diagnostics
+const WS_EVENT_LOG_LIMIT = 200;
+export const wsEventLog = shallowRef([]);
+const formatWsEventTime = (date = new Date()) => date.toTimeString().slice(0, 8);
+export const addWsEvent = (message) => {
+  if (!message) return;
+  const next = [...wsEventLog.value, { time: formatWsEventTime(), message }];
+  if (next.length > WS_EVENT_LOG_LIMIT) {
+    next.splice(0, next.length - WS_EVENT_LOG_LIMIT);
+  }
+  wsEventLog.value = next;
+};
+
 // Capture state: true when live capture or file is actively being loaded/viewed
 export const captureActive = ref(false);
 
