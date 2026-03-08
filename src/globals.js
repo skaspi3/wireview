@@ -99,6 +99,8 @@ export const captureActive = ref(false);
 
 // True when user explicitly stopped a live capture (not when loading/closing files)
 export const stoppedCapture = ref(false);
+// Capture option: when true, port 443 is included in capture BPF
+export const captureIncludePort443 = ref(false);
 
 // Saved captures count (incremented on save complete, reset on new capture)
 export const savedCapturesCount = ref(0);

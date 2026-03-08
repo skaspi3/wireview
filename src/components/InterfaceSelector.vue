@@ -87,6 +87,24 @@
             </span>
           </div>
         </div>
+        <div class="inline-capture-options" @click.stop>
+          <label class="inline-opt">
+            <input
+              type="checkbox"
+              v-model="getCaptureOptions(iface.name).httpsCapture"
+              @click.stop
+            />
+            <span>HTTPS Capture</span>
+          </label>
+          <label class="inline-opt">
+            <input
+              type="checkbox"
+              v-model="getCaptureOptions(iface.name).addressResolution"
+              @click.stop
+            />
+            <span>Address Resolution</span>
+          </label>
+        </div>
       </div>
     </div>
 
@@ -120,6 +138,20 @@ const interfaces = ref([])
 const selectedInterface = ref('')
 const loading = ref(false)
 const error = ref(null)
+const interfaceCaptureOptions = reactive({})  // { [ifaceName]: { httpsCapture: boolean, addressResolution: boolean } }
+
+const ensureCaptureOptions = (ifaceName) => {
+  if (!ifaceName) return { httpsCapture: true, addressResolution: true };
+  if (!interfaceCaptureOptions[ifaceName]) {
+    interfaceCaptureOptions[ifaceName] = {
+      httpsCapture: true,
+      addressResolution: true
+    };
+  }
+  return interfaceCaptureOptions[ifaceName];
+}
+
+const getCaptureOptions = (ifaceName) => ensureCaptureOptions(ifaceName)
 
 // Active sessions
 const activeSessions = ref([])
@@ -205,6 +237,16 @@ const fetchInterfaces = async () => {
     const data = await response.json()
     interfaces.value = data.interfaces || []
 
+    const activeIfaces = new Set(interfaces.value.map((iface) => iface.name))
+    for (const ifaceName of activeIfaces) {
+      ensureCaptureOptions(ifaceName)
+    }
+    for (const ifaceName of Object.keys(interfaceCaptureOptions)) {
+      if (!activeIfaces.has(ifaceName)) {
+        delete interfaceCaptureOptions[ifaceName]
+      }
+    }
+
     // Initialize history for all interfaces
     for (const iface of interfaces.value) {
       initHistory(iface.name)
@@ -227,7 +269,12 @@ const selectInterface = (iface) => {
 // Start capture on selected interface
 const startCapture = () => {
   if (selectedInterface.value) {
-    emit('start-capture', selectedInterface.value)
+    const options = ensureCaptureOptions(selectedInterface.value)
+    emit('start-capture', {
+      interface: selectedInterface.value,
+      includePort443: options.httpsCapture,
+      resolvePublicIps: options.addressResolution
+    })
   }
 }
 
@@ -485,6 +532,30 @@ defineExpose({ fetchInterfaces })
   flex-direction: column;
   align-items: flex-end;
   gap: 2px;
+}
+
+.inline-capture-options {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 170px;
+  margin-left: 10px;
+}
+
+.inline-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #c7ccd2;
+  user-select: none;
+}
+
+.inline-opt input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
 }
 
 .rate-display {

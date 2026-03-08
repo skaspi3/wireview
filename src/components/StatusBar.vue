@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from "vue";
-import { packets, allPackets, nodeVersion, tsharkLuaVersion, tsharkLibraries, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesFetched, pcapDirUsage, appVersion, wsEventLog } from "../globals";
+import { packets, allPackets, nodeVersion, tsharkLuaVersion, tsharkLibraries, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesFetched, pcapDirUsage, appVersion, wsEventLog, captureIncludePort443 } from "../globals";
 import GitHubIcon from "./icons/GitHubIcon.vue";
 
 const showFilterPopup = ref(false);
@@ -12,6 +12,7 @@ const showBackendPopup = ref(false);
 const showLedPopup = ref(false);
 const showThinClientPopup = ref(false);
 const showWssPopup = ref(false);
+const showActionsMenu = ref(false);
 const cveScanState = ref('idle');
 const cveScanError = ref('');
 const cveScanReport = ref(null);
@@ -19,9 +20,8 @@ const wssEvents = computed(() => wsEventLog.value);
 
 const OSV_QUERY_URL = 'https://api.osv.dev/v1/query';
 const NVD_CVE_URL = 'https://services.nvd.nist.gov/rest/json/cves/2.0';
-const OPEN_FEEDBACK_EVENT = 'webpcap:open-feedback';
-const OPEN_CHANGELOG_EVENT = 'webpcap:open-changelog';
-const OPEN_THIRD_PARTY_EVENT = 'webpcap:open-third-party';
+const DONATE_URL = (import.meta.env.VITE_DONATE_URL || 'https://github.com/sponsors/skaspi3').trim();
+const DONATE_LABEL = (import.meta.env.VITE_DONATE_LABEL || 'Donate $5').trim();
 
 const backendNoticePackages = [
   { name: 'ws', version: '8.18.3', license: 'MIT', url: 'https://www.npmjs.com/package/ws', ecosystem: 'npm' },
@@ -241,17 +241,31 @@ const updateReductionRatio = () => {
   }
 };
 
-// BPF filter explanation (matches backend server.js filter)
-const bpfFilter = {
-  raw: "not port 3000 and not port 22 and not port 5173 and not port 443 and not net 169.254.0.0/16",
-  excluded: [
-    { port: 3000, description: "Backend WebSocket" },
+const backendCapturePort = computed(() => Number(backendPort.value) || 3000);
+
+// BPF filter explanation (matches backend/server.js)
+const bpfFilter = computed(() => {
+  const excluded = [
+    { port: backendCapturePort.value, description: "Backend WebSocket" },
     { port: 22, description: "SSH" },
-    { port: 5173, description: "Vite dev server" },
-    { port: 443, description: "HTTPS" },
-    { range: "169.254.0.0/16", description: "Link-local addresses" },
-  ]
-};
+  ];
+  if (!captureIncludePort443.value) {
+    excluded.push({ port: 443, description: "HTTPS" });
+  }
+  excluded.push({ range: "169.254.0.0/16", description: "Link-local addresses" });
+
+  const rawParts = [
+    `not port ${backendCapturePort.value}`,
+    'not port 22',
+    ...(captureIncludePort443.value ? [] : ['not port 443']),
+    'not net 169.254.0.0/16',
+  ];
+
+  return {
+    raw: rawParts.join(' and '),
+    excluded,
+  };
+});
 
 // Total packets count (from allPackets when filter is active, otherwise from packets)
 const totalPackets = computed(() => {
@@ -280,25 +294,35 @@ const displayedInfo = computed(() => {
 const reductionRatioRounded = computed(() => Math.round(reductionRatio.value * 10) / 10);
 const showThinClientBadge = computed(() => reductionRatioRounded.value > 0);
 
-const toggleFilterPopup = () => {
-  showFilterPopup.value = !showFilterPopup.value;
+const toggleActionsMenu = () => {
+  showActionsMenu.value = !showActionsMenu.value;
+};
+
+const closeActionsMenu = () => {
+  showActionsMenu.value = false;
 };
 
 const openFeedback = () => {
+  closeActionsMenu();
   showFeedback.value = true;
 };
 
 const openReleaseNotes = () => {
+  closeActionsMenu();
   showReleaseNotes.value = true;
 };
 
 const openNotices = () => {
+  closeActionsMenu();
   showNotices.value = true;
 };
 
-const onOpenFeedbackEvent = () => openFeedback();
-const onOpenChangelogEvent = () => openReleaseNotes();
-const onOpenThirdPartyEvent = () => openNotices();
+const openExcludedTraffic = () => {
+  closeActionsMenu();
+  showFilterPopup.value = true;
+};
+
+const onDocumentClick = () => closeActionsMenu();
 
 const totalCapturedBytes = computed(() => {
   const pkts = allPackets.value.length > 0 ? allPackets.value : packets.value;
@@ -318,16 +342,12 @@ const formatBytes = (bytes) => {
 onMounted(() => {
   updateReductionRatio();
   reductionRatioInterval = setInterval(updateReductionRatio, 1000);
-  window.addEventListener(OPEN_FEEDBACK_EVENT, onOpenFeedbackEvent);
-  window.addEventListener(OPEN_CHANGELOG_EVENT, onOpenChangelogEvent);
-  window.addEventListener(OPEN_THIRD_PARTY_EVENT, onOpenThirdPartyEvent);
+  document.addEventListener('click', onDocumentClick);
 });
 
 onUnmounted(() => {
   if (reductionRatioInterval) clearInterval(reductionRatioInterval);
-  window.removeEventListener(OPEN_FEEDBACK_EVENT, onOpenFeedbackEvent);
-  window.removeEventListener(OPEN_CHANGELOG_EVENT, onOpenChangelogEvent);
-  window.removeEventListener(OPEN_THIRD_PARTY_EVENT, onOpenThirdPartyEvent);
+  document.removeEventListener('click', onDocumentClick);
 });
 
 const statusTitle = computed(() => {
@@ -405,13 +425,44 @@ const isCertValid = computed(() => {
 <template>
   <div class="status-bar">
     <div class="left-section">
-      <div class="bpf-filter-link" @click="toggleFilterPopup">
-        Current BPF filter
+      <div class="app-actions-group" @click.stop>
+        <button
+          class="app-actions-trigger"
+          @click.stop="toggleActionsMenu"
+          aria-label="Open quick actions menu"
+          title="Quick Actions"
+        >
+          <svg class="app-actions-trigger-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="8.7" class="ring" />
+            <circle cx="12" cy="12" r="6.4" class="core" />
+            <path class="menu-line" d="M8.2 9.3h7.6" />
+            <path class="menu-line" d="M8.2 12h7.6" />
+            <path class="menu-line" d="M8.2 14.7h7.6" />
+          </svg>
+        </button>
+        <Transition name="actions-slide-up">
+          <div v-if="showActionsMenu" class="app-actions-menu" @click.stop>
+            <button class="app-actions-item" @click="openFeedback">Feedback</button>
+            <button class="app-actions-item" @click="openReleaseNotes">Changelog</button>
+            <button class="app-actions-item" @click="openNotices">3-rd Party Libs</button>
+            <button class="app-actions-item" @click="openExcludedTraffic">Excluded Traffic</button>
+            <a
+              class="app-actions-item donate"
+              :href="DONATE_URL"
+              :aria-label="DONATE_LABEL"
+              target="_blank"
+              rel="noopener noreferrer"
+              @click="closeActionsMenu"
+            >
+              {{ DONATE_LABEL }}
+            </a>
+          </div>
+        </Transition>
       </div>
 
       <!-- Release Notes Popup -->
       <div v-if="showReleaseNotes" class="release-overlay" @click.self="showReleaseNotes = false">
-        <div class="release-popup">
+        <div class="release-popup changelog-popup">
           <div class="release-header">
             <span class="release-title">WebPCAP</span>
             <span class="release-ver">{{ appVersion }}</span>
@@ -761,6 +812,21 @@ const isCertValid = computed(() => {
 .release-list li::marker {
   color: #60a5fa;
 }
+.changelog-popup {
+  font-size: 16.5px;
+}
+.changelog-popup .release-title {
+  font-size: 22.5px;
+}
+.changelog-popup .release-ver {
+  font-size: 16.5px;
+}
+.changelog-popup .release-close {
+  font-size: 24.5px;
+}
+.changelog-popup .release-list {
+  font-size: 16.5px;
+}
 .notices-link {
   margin-left: auto;
   margin-right: 8px;
@@ -897,14 +963,117 @@ const isCertValid = computed(() => {
 .notices-table a:hover {
   text-decoration: underline;
 }
-.bpf-filter-link {
-  color: #3b82f6;
-  cursor: pointer;
-  text-decoration: underline;
-  font-size: 14.5px;
+.app-actions-group {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  z-index: 80;
 }
-.bpf-filter-link:hover {
-  color: #60a5fa;
+.app-actions-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #67e8f9;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #1f3552 0%, #13263e 42%, #0b1524 100%);
+  color: #dbeafe;
+  cursor: pointer;
+  filter: brightness(1.06);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2), 0 5px 14px rgba(14, 165, 233, 0.34);
+  transition: transform 0.15s, filter 0.15s;
+}
+.app-actions-trigger:active {
+  transform: scale(0.98);
+}
+.app-actions-trigger::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  pointer-events: none;
+  border-radius: 50%;
+  border: 1px solid rgba(103, 232, 249, 0.65);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
+  opacity: 1;
+}
+.app-actions-trigger-icon {
+  width: 24px;
+  height: 24px;
+}
+.app-actions-trigger-icon .ring {
+  fill: none;
+  stroke: #a5f3fc;
+  stroke-width: 1.35;
+}
+.app-actions-trigger-icon .core {
+  fill: rgba(14, 116, 144, 0.22);
+}
+.app-actions-trigger-icon .menu-line {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 1.85;
+  stroke-linecap: round;
+}
+.app-actions-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  min-width: 210px;
+  padding: 8px;
+  border: 1px solid #374151;
+  border-radius: 10px;
+  background: #111827;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.app-actions-item {
+  display: block;
+  width: 100%;
+  background: #1f2937;
+  border: 1px solid #374151;
+  color: #d1d5db;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-family: monospace;
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.app-actions-item:hover {
+  background: #243244;
+  border-color: #4b5563;
+  color: #f3f4f6;
+}
+.app-actions-item.donate {
+  background: linear-gradient(180deg, #f59e0b, #d97706);
+  border-color: #7c2d12;
+  color: #111827;
+  font-weight: 700;
+}
+.app-actions-item.donate:hover {
+  filter: brightness(1.05);
+}
+.actions-slide-up-enter-active {
+  animation: actions-slide-up 0.2s ease-out;
+}
+.actions-slide-up-leave-active {
+  animation: actions-slide-up 0.16s ease-in reverse;
+}
+@keyframes actions-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .filter-popup {
   position: absolute;

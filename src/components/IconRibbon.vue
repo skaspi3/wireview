@@ -1,5 +1,5 @@
 <script setup>
-import { ref, useTemplateRef, computed, onMounted, onUnmounted } from 'vue';
+import { ref, useTemplateRef, computed } from 'vue';
 import { displayFilter, packets, stoppedCapture, allPackets, idleCountdownSeconds, cancelIdleCountdown, apiFetch } from '../globals';
 import LiveCapture from "./LiveCapture.vue";
 
@@ -29,14 +29,6 @@ const saveDialogMode = ref('all'); // 'all' or 'filtered'
 const saveFilename = ref('');
 const saveError = ref(null);
 const saveSaving = ref(false);
-const showActionsMenu = ref(false);
-
-const DONATE_URL = (import.meta.env.VITE_DONATE_URL || 'https://github.com/sponsors/skaspi3').trim();
-const DONATE_LABEL = (import.meta.env.VITE_DONATE_LABEL || 'Donate $5').trim();
-const OPEN_FEEDBACK_EVENT = 'webpcap:open-feedback';
-const OPEN_CHANGELOG_EVENT = 'webpcap:open-changelog';
-const OPEN_THIRD_PARTY_EVENT = 'webpcap:open-third-party';
-
 // Show save button when user clicked Stop and has packets (and no filter active)
 const showSaveButton = computed(() => {
   return stoppedCapture.value && packets.value.length > 0 && !displayFilter.value;
@@ -76,25 +68,6 @@ const closeSaveDialog = () => {
   showSaveDialog.value = false;
   saveError.value = null;
 };
-
-const toggleActionsMenu = () => {
-  showActionsMenu.value = !showActionsMenu.value;
-};
-
-const closeActionsMenu = () => {
-  showActionsMenu.value = false;
-};
-
-const dispatchStatusBarAction = (eventName) => {
-  closeActionsMenu();
-  window.dispatchEvent(new CustomEvent(eventName));
-};
-
-const openFeedback = () => dispatchStatusBarAction(OPEN_FEEDBACK_EVENT);
-const openChangelog = () => dispatchStatusBarAction(OPEN_CHANGELOG_EVENT);
-const openThirdParty = () => dispatchStatusBarAction(OPEN_THIRD_PARTY_EVENT);
-
-const onDocumentClick = () => closeActionsMenu();
 
 const savePackets = async () => {
   if (!saveFilename.value.trim()) {
@@ -154,14 +127,6 @@ const savePackets = async () => {
   }
 };
 
-onMounted(() => {
-  document.addEventListener('click', onDocumentClick);
-});
-
-onUnmounted(() => {
-  document.removeEventListener('click', onDocumentClick);
-});
-
 defineExpose({ loadPcapFile });
 </script>
 
@@ -205,39 +170,6 @@ defineExpose({ loadPcapFile });
         </svg>
         Insights
       </button>
-      <div class="app-actions-group">
-        <button
-          class="app-actions-trigger"
-          @click.stop="toggleActionsMenu"
-          aria-label="Open actions menu"
-          title="Quick Actions"
-        >
-          <svg class="app-actions-trigger-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="8.7" class="ring" />
-            <circle cx="12" cy="12" r="6.4" class="core" />
-            <path class="menu-line" d="M8.2 9.3h7.6" />
-            <path class="menu-line" d="M8.2 12h7.6" />
-            <path class="menu-line" d="M8.2 14.7h7.6" />
-          </svg>
-        </button>
-        <Transition name="actions-slide-down">
-          <div v-if="showActionsMenu" class="app-actions-menu" @click.stop>
-            <button class="app-actions-item" @click="openFeedback">Feedback</button>
-            <button class="app-actions-item" @click="openChangelog">Changelog</button>
-            <button class="app-actions-item" @click="openThirdParty">3-rd Party Libs</button>
-            <a
-              class="app-actions-item donate"
-              :href="DONATE_URL"
-              :aria-label="DONATE_LABEL"
-              target="_blank"
-              rel="noopener noreferrer"
-              @click="closeActionsMenu"
-            >
-              {{ DONATE_LABEL }}
-            </a>
-          </div>
-        </Transition>
-      </div>
       <!-- Save button - shown when capture stopped and has packets -->
       <button v-if="showSaveButton" class="save-btn" @click="openSaveAllDialog" title="Save capture">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -366,154 +298,6 @@ defineExpose({ loadPcapFile });
 .insights-btn svg {
   width: 16px;
   height: 16px;
-}
-
-.app-actions-group {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  margin-left: 8px;
-  z-index: 80;
-}
-
-.app-actions-trigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  width: 44px;
-  height: 44px;
-  border: 1px solid #2d4665;
-  border-radius: 50%;
-  background: radial-gradient(circle at 34% 30%, #1f3552 0%, #13263e 42%, #0b1524 100%);
-  color: #dbeafe;
-  cursor: pointer;
-  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.16), 0 2px 8px rgba(2, 6, 23, 0.55);
-  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s, filter 0.15s;
-}
-
-.app-actions-trigger:hover {
-  border-color: #67e8f9;
-  filter: brightness(1.06);
-  transform: translateY(-1px) scale(1.03);
-  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2), 0 5px 14px rgba(14, 165, 233, 0.34);
-}
-
-.app-actions-trigger:active {
-  transform: translateY(0) scale(0.98);
-}
-
-.app-actions-trigger::after {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  pointer-events: none;
-  border-radius: 50%;
-  border: 1px solid rgba(103, 232, 249, 0.65);
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
-  opacity: 0;
-  transition: opacity 0.16s ease-out;
-}
-
-.app-actions-trigger:hover::after {
-  opacity: 1;
-}
-
-.app-actions-trigger-icon {
-  width: 24px;
-  height: 24px;
-}
-
-.app-actions-trigger-icon .ring {
-  fill: none;
-  stroke: #7dd3fc;
-  stroke-width: 1.35;
-}
-
-.app-actions-trigger-icon .core {
-  fill: rgba(14, 116, 144, 0.22);
-}
-
-.app-actions-trigger-icon .menu-line {
-  fill: none;
-  stroke: #e0f2fe;
-  stroke-width: 1.85;
-  stroke-linecap: round;
-}
-
-.app-actions-trigger:hover .app-actions-trigger-icon .ring {
-  stroke: #a5f3fc;
-}
-
-.app-actions-trigger:hover .app-actions-trigger-icon .menu-line {
-  stroke: #ffffff;
-}
-
-.app-actions-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  min-width: 210px;
-  padding: 8px;
-  border: 1px solid #374151;
-  border-radius: 10px;
-  background: #111827;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.app-actions-item {
-  display: block;
-  width: 100%;
-  background: #1f2937;
-  border: 1px solid #374151;
-  color: #d1d5db;
-  border-radius: 6px;
-  padding: 7px 10px;
-  font-family: monospace;
-  font-size: 13px;
-  text-align: left;
-  text-decoration: none;
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
-}
-
-.app-actions-item:hover {
-  background: #243244;
-  border-color: #4b5563;
-  color: #f3f4f6;
-}
-
-.app-actions-item.donate {
-  background: linear-gradient(180deg, #f59e0b, #d97706);
-  border-color: #7c2d12;
-  color: #111827;
-  font-weight: 700;
-}
-
-.app-actions-item.donate:hover {
-  filter: brightness(1.05);
-}
-
-.actions-slide-down-enter-active {
-  animation: actions-slide-down 0.2s ease-out;
-}
-
-.actions-slide-down-leave-active {
-  animation: actions-slide-down 0.16s ease-in reverse;
-}
-
-@keyframes actions-slide-down {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .save-selected-btn {

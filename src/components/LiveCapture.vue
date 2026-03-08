@@ -186,7 +186,7 @@
 
 <script setup>
 import { ref, triggerRef, onUnmounted, onMounted, computed, watch } from 'vue';
-import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, sessionId, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange, resolveWsRequest, clearPendingWsRequests, pcapDirUsage, idleCountdownSeconds, setCancelIdleCountdown, linkSpeedMbps, savedCapturesCount, addWsEvent, clientId, apiFetch } from '../globals';
+import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, captureIncludePort443, sessionId, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange, resolveWsRequest, clearPendingWsRequests, pcapDirUsage, idleCountdownSeconds, setCancelIdleCountdown, linkSpeedMbps, savedCapturesCount, addWsEvent, clientId, apiFetch } from '../globals';
 import { decompress as zstdDecompress } from 'fzstd';
 import ConfirmDialog from './ConfirmDialog.vue';
 import InterfaceSelector from './InterfaceSelector.vue';
@@ -328,9 +328,15 @@ const rejectJoinRequest = (requestId) => {
 const onJoinApproved = (data) => {
   sessionId.value = data.sessionId;
   isSessionOwner.value = false;
+  globalIsSessionOwner.value = false;
+  followOwner.value = true;
   myViewerId.value = data.viewerId;
   selectedInterface.value = data.interface;
+  setIncludePort443(data.includePort443 === true);
+  setResolvePublicIps(data.resolvePublicIps !== false);
   isCapturing.value = data.isCapturing;
+  captureActive.value = data.isCapturing;
+  stoppedCapture.value = false;
   emit('clear');
 };
 
@@ -339,6 +345,15 @@ const isLoadingPcap = ref(false);
 const loadPcapProgress = ref(0);
 const loadedPcapFile = ref(null);
 const loadingPcapFilename = ref('');
+const includePort443 = ref(captureIncludePort443.value);
+const resolvePublicIps = ref(true);
+const setIncludePort443 = (value) => {
+  includePort443.value = value === true;
+  captureIncludePort443.value = includePort443.value;
+};
+const setResolvePublicIps = (value) => {
+  resolvePublicIps.value = value !== false;
+};
 
 const loadedPcapFilename = computed(() => {
   if (!loadedPcapFile.value) return '';
@@ -362,8 +377,16 @@ const onInterfaceSelect = (iface) => {
 };
 
 // Handle start capture from selector
-const onSelectorStartCapture = (ifaceName) => {
-  selectedInterface.value = ifaceName;
+const onSelectorStartCapture = (payload) => {
+  if (typeof payload === 'string') {
+    selectedInterface.value = payload;
+    setIncludePort443(false);
+    setResolvePublicIps(true);
+  } else {
+    selectedInterface.value = payload?.interface || '';
+    setIncludePort443(payload?.includePort443 === true);
+    setResolvePublicIps(payload?.resolvePublicIps !== false);
+  }
   startCapture();
 };
 
@@ -573,6 +596,8 @@ const connect = ({ isReconnect = false } = {}) => {
           sessionClientCount.value = 1;
           myViewerId.value = 'Owner';
           selectedInterface.value = msg.interface;
+          setIncludePort443(msg.includePort443 === true);
+          setResolvePublicIps(msg.resolvePublicIps !== false);
           isCapturing.value = true;
           captureActive.value = true;
           stoppedCapture.value = false;
@@ -591,6 +616,8 @@ const connect = ({ isReconnect = false } = {}) => {
           followOwner.value = true;  // Default to following owner
           myViewerId.value = msg.viewerId;
           selectedInterface.value = msg.interface;
+          setIncludePort443(msg.includePort443 === true);
+          setResolvePublicIps(msg.resolvePublicIps !== false);
           isCapturing.value = msg.isCapturing;
           captureActive.value = msg.isCapturing;
           stoppedCapture.value = false;
@@ -640,6 +667,8 @@ const connect = ({ isReconnect = false } = {}) => {
         // Session restarted - capture restarted
         if (msg.type === 'sessionRestarted') {
           selectedInterface.value = msg.interface;
+          setIncludePort443(msg.includePort443 === true);
+          setResolvePublicIps(msg.resolvePublicIps !== false);
           isCapturing.value = true;
           captureActive.value = true;
           stoppedCapture.value = false;
@@ -871,7 +900,9 @@ const startCapture = () => {
   // Always create a shared session for captures
   sendMessage({
     type: 'createSession',
-    interface: selectedInterface.value
+    interface: selectedInterface.value,
+    includePort443: includePort443.value,
+    resolvePublicIps: resolvePublicIps.value
   });
 
   // State will be updated when sessionCreated message is received
@@ -912,7 +943,9 @@ const resumeCaptureOnSameInterface = () => {
       if (ws.value && isConnected.value) {
         sendMessage({
           type: 'createSession',
-          interface: selectedInterface.value
+          interface: selectedInterface.value,
+          includePort443: includePort443.value,
+          resolvePublicIps: resolvePublicIps.value
         });
       }
     }, 200);
@@ -966,7 +999,9 @@ const restartCapture = () => {
         if (ws.value && isConnected.value) {
           sendMessage({
             type: 'start',
-            interface: selectedInterface.value
+            interface: selectedInterface.value,
+            includePort443: includePort443.value,
+            resolvePublicIps: resolvePublicIps.value
           });
           isCapturing.value = true;
         }
