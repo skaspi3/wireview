@@ -170,7 +170,7 @@ export const trackFetched = (bytes) => {
 
 // App version
 export const appVersion = ref('');
-fetch('/VERSION')
+fetch('/VERSION', { cache: 'no-store' })
   .then(res => res.text())
   .then(text => { const build = text.trim(); if (build) appVersion.value = `v1.0.${build}`; })
   .catch(() => {});

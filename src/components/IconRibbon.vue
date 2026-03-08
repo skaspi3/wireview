@@ -1,14 +1,7 @@
 <script setup>
 import { ref, useTemplateRef, computed, onMounted, onUnmounted } from 'vue';
-import { displayFilter, packets, stoppedCapture, allPackets, idleCountdownSeconds, cancelIdleCountdown, captureActive, linkSpeedMbps, hostIP, apiFetch } from '../globals';
+import { displayFilter, packets, stoppedCapture, allPackets, idleCountdownSeconds, cancelIdleCountdown, apiFetch } from '../globals';
 import LiveCapture from "./LiveCapture.vue";
-import { use } from 'echarts/core';
-import { CanvasRenderer } from 'echarts/renderers';
-import { GaugeChart } from 'echarts/charts';
-import { TitleComponent } from 'echarts/components';
-import VChart from 'vue-echarts';
-
-use([CanvasRenderer, GaugeChart, TitleComponent]);
 
 const props = defineProps({
   hideInsights: {
@@ -36,6 +29,13 @@ const saveDialogMode = ref('all'); // 'all' or 'filtered'
 const saveFilename = ref('');
 const saveError = ref(null);
 const saveSaving = ref(false);
+const showActionsMenu = ref(false);
+
+const DONATE_URL = (import.meta.env.VITE_DONATE_URL || 'https://github.com/sponsors/skaspi3').trim();
+const DONATE_LABEL = (import.meta.env.VITE_DONATE_LABEL || 'Donate $5').trim();
+const OPEN_FEEDBACK_EVENT = 'webpcap:open-feedback';
+const OPEN_CHANGELOG_EVENT = 'webpcap:open-changelog';
+const OPEN_THIRD_PARTY_EVENT = 'webpcap:open-third-party';
 
 // Show save button when user clicked Stop and has packets (and no filter active)
 const showSaveButton = computed(() => {
@@ -76,6 +76,25 @@ const closeSaveDialog = () => {
   showSaveDialog.value = false;
   saveError.value = null;
 };
+
+const toggleActionsMenu = () => {
+  showActionsMenu.value = !showActionsMenu.value;
+};
+
+const closeActionsMenu = () => {
+  showActionsMenu.value = false;
+};
+
+const dispatchStatusBarAction = (eventName) => {
+  closeActionsMenu();
+  window.dispatchEvent(new CustomEvent(eventName));
+};
+
+const openFeedback = () => dispatchStatusBarAction(OPEN_FEEDBACK_EVENT);
+const openChangelog = () => dispatchStatusBarAction(OPEN_CHANGELOG_EVENT);
+const openThirdParty = () => dispatchStatusBarAction(OPEN_THIRD_PARTY_EVENT);
+
+const onDocumentClick = () => closeActionsMenu();
 
 const savePackets = async () => {
   if (!saveFilename.value.trim()) {
@@ -135,156 +154,12 @@ const savePackets = async () => {
   }
 };
 
-// Bandwidth gauge
-const showBwPopup = ref(false);
-let bwPopupLeaveTimer = null;
-const onBwEnter = () => {
-  if (bwPopupLeaveTimer) { clearTimeout(bwPopupLeaveTimer); bwPopupLeaveTimer = null; }
-  showBwPopup.value = true;
-};
-const onBwLeave = () => {
-  bwPopupLeaveTimer = setTimeout(() => { showBwPopup.value = false; }, 150);
-};
-const downRate = ref(0); // bytes/s
-const upRate = ref(0);   // bytes/s
-let prevPacketCount = 0;
-let prevDownBytes = 0;
-let prevUpBytes = 0;
-let bwInterval = null;
-
-const formatRate = (bytesPerSec) => {
-  const bits = bytesPerSec * 8;
-  if (bits < 1000) return bits.toFixed(0) + ' bps';
-  if (bits < 1000000) return (bits / 1000).toFixed(1) + ' Kbps';
-  if (bits < 1000000000) return (bits / 1000000).toFixed(2) + ' Mbps';
-  return (bits / 1000000000).toFixed(2) + ' Gbps';
-};
-
-// Link capacity in bytes/s (from Mbps)
-const linkCapacityBps = computed(() => {
-  const mbps = linkSpeedMbps.value;
-  if (mbps > 0) return mbps * 1000000 / 8; // Mbps -> bytes/s
-  return 125000000; // default 1Gbps
-});
-
-const linkSpeedLabel = computed(() => {
-  const mbps = linkSpeedMbps.value || 1000;
-  if (mbps >= 1000) return `${mbps / 1000}G`;
-  return `${mbps}M`;
-});
-
-const makeGaugeOption = (value, label, color) => {
-  const maxVal = linkCapacityBps.value;
-  const pct = maxVal > 0 ? (value / maxVal * 100) : 0;
-  return {
-    series: [{
-      type: 'gauge',
-      startAngle: 210,
-      endAngle: -30,
-      center: ['50%', '60%'],
-      radius: '90%',
-      min: 0,
-      max: 100,
-      splitNumber: 5,
-      axisLine: {
-        lineStyle: {
-          width: 8,
-          color: [
-            [0.3, '#67e0e3'],
-            [0.7, color],
-            [1, '#fd666d']
-          ]
-        }
-      },
-      pointer: {
-        icon: 'path://M12.8,0.7l12,40.1H0.7L12.8,0.7z',
-        length: '55%',
-        width: 8,
-        offsetCenter: [0, '-10%'],
-        itemStyle: { color: 'auto' }
-      },
-      axisTick: {
-        length: 6,
-        lineStyle: { color: 'auto', width: 1 }
-      },
-      splitLine: {
-        length: 12,
-        lineStyle: { color: 'auto', width: 2 }
-      },
-      axisLabel: {
-        color: '#999',
-        fontSize: 12,
-        distance: -40,
-        rotate: 'tangential',
-        formatter: (v) => {
-          if (v === 0) return '';
-          const mbps = linkSpeedMbps.value || 1000;
-          const val = v / 100 * mbps;
-          if (val >= 1000) return (val / 1000).toFixed(0) + 'G';
-          return val.toFixed(0) + 'M';
-        }
-      },
-      title: {
-        offsetCenter: [0, '28%'],
-        fontSize: 13,
-        color: '#ccc',
-        fontWeight: 'bold'
-      },
-      detail: {
-        fontSize: 12,
-        offsetCenter: [0, '52%'],
-        valueAnimation: true,
-        formatter: () => formatRate(value),
-        color: 'inherit'
-      },
-      data: [{ value: Math.min(pct, 100), name: `${label} (${linkSpeedLabel.value})` }]
-    }]
-  };
-};
-
-const downGaugeOption = computed(() => {
-  return makeGaugeOption(downRate.value, 'DOWN', '#37a2da');
-});
-
-const upGaugeOption = computed(() => {
-  return makeGaugeOption(upRate.value, 'UP', '#ffa726');
-});
-
 onMounted(() => {
-  const pkts = allPackets.value.length > 0 ? allPackets.value : packets.value;
-  prevPacketCount = pkts.length;
-  // Compute cumulative bytes so far
-  const hip = hostIP.value;
-  let db = 0, ub = 0;
-  for (const pkt of pkts) {
-    const len = pkt.length || 0;
-    if (hip && pkt.src === hip) ub += len;
-    else db += len;
-  }
-  prevDownBytes = db;
-  prevUpBytes = ub;
-
-  bwInterval = setInterval(() => {
-    const curPkts = allPackets.value.length > 0 ? allPackets.value : packets.value;
-    const hip = hostIP.value;
-    // Only process new packets since last tick
-    let db = prevDownBytes, ub = prevUpBytes;
-    for (let i = prevPacketCount; i < curPkts.length; i++) {
-      const pkt = curPkts[i];
-      const len = pkt.length || 0;
-      if (hip && pkt.src === hip) ub += len;
-      else db += len;
-    }
-    downRate.value = Math.max(0, db - prevDownBytes);
-    upRate.value = Math.max(0, ub - prevUpBytes);
-    prevDownBytes = db;
-    prevUpBytes = ub;
-    prevPacketCount = curPkts.length;
-  }, 1000);
+  document.addEventListener('click', onDocumentClick);
 });
 
 onUnmounted(() => {
-  if (bwInterval) clearInterval(bwInterval);
+  document.removeEventListener('click', onDocumentClick);
 });
 
 defineExpose({ loadPcapFile });
@@ -307,22 +182,6 @@ defineExpose({ loadPcapFile });
       fetchpriority="high"
       decoding="sync"
     />
-    <!-- Bandwidth gauge badge -->
-    <div v-if="captureActive" class="bw-badge" @mouseenter="onBwEnter" @mouseleave="onBwLeave">
-      <svg class="bw-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-      </svg>
-      <span class="bw-label">BW</span>
-      <Transition name="bw-dropdown">
-        <div v-if="showBwPopup" class="bw-popup">
-          <div class="bw-popup-title">Bandwidth Monitor</div>
-          <div class="bw-gauges">
-            <v-chart class="bw-gauge" :option="downGaugeOption" autoresize />
-            <v-chart class="bw-gauge" :option="upGaugeOption" autoresize />
-          </div>
-        </div>
-      </Transition>
-    </div>
     <!-- Idle countdown warning -->
     <div v-if="idleCountdownSeconds > 0 && !stoppedCapture" class="idle-countdown">
       <div class="idle-countdown-inner">
@@ -346,6 +205,39 @@ defineExpose({ loadPcapFile });
         </svg>
         Insights
       </button>
+      <div class="app-actions-group">
+        <button
+          class="app-actions-trigger"
+          @click.stop="toggleActionsMenu"
+          aria-label="Open actions menu"
+          title="Quick Actions"
+        >
+          <svg class="app-actions-trigger-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="8.7" class="ring" />
+            <circle cx="12" cy="12" r="6.4" class="core" />
+            <path class="menu-line" d="M8.2 9.3h7.6" />
+            <path class="menu-line" d="M8.2 12h7.6" />
+            <path class="menu-line" d="M8.2 14.7h7.6" />
+          </svg>
+        </button>
+        <Transition name="actions-slide-down">
+          <div v-if="showActionsMenu" class="app-actions-menu" @click.stop>
+            <button class="app-actions-item" @click="openFeedback">Feedback</button>
+            <button class="app-actions-item" @click="openChangelog">Changelog</button>
+            <button class="app-actions-item" @click="openThirdParty">3-rd Party Libs</button>
+            <a
+              class="app-actions-item donate"
+              :href="DONATE_URL"
+              :aria-label="DONATE_LABEL"
+              target="_blank"
+              rel="noopener noreferrer"
+              @click="closeActionsMenu"
+            >
+              {{ DONATE_LABEL }}
+            </a>
+          </div>
+        </Transition>
+      </div>
       <!-- Save button - shown when capture stopped and has packets -->
       <button v-if="showSaveButton" class="save-btn" @click="openSaveAllDialog" title="Save capture">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -474,6 +366,154 @@ defineExpose({ loadPcapFile });
 .insights-btn svg {
   width: 16px;
   height: 16px;
+}
+
+.app-actions-group {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  z-index: 80;
+}
+
+.app-actions-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #2d4665;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #1f3552 0%, #13263e 42%, #0b1524 100%);
+  color: #dbeafe;
+  cursor: pointer;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.16), 0 2px 8px rgba(2, 6, 23, 0.55);
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s, filter 0.15s;
+}
+
+.app-actions-trigger:hover {
+  border-color: #67e8f9;
+  filter: brightness(1.06);
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2), 0 5px 14px rgba(14, 165, 233, 0.34);
+}
+
+.app-actions-trigger:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.app-actions-trigger::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  pointer-events: none;
+  border-radius: 50%;
+  border: 1px solid rgba(103, 232, 249, 0.65);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
+  opacity: 0;
+  transition: opacity 0.16s ease-out;
+}
+
+.app-actions-trigger:hover::after {
+  opacity: 1;
+}
+
+.app-actions-trigger-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.app-actions-trigger-icon .ring {
+  fill: none;
+  stroke: #7dd3fc;
+  stroke-width: 1.35;
+}
+
+.app-actions-trigger-icon .core {
+  fill: rgba(14, 116, 144, 0.22);
+}
+
+.app-actions-trigger-icon .menu-line {
+  fill: none;
+  stroke: #e0f2fe;
+  stroke-width: 1.85;
+  stroke-linecap: round;
+}
+
+.app-actions-trigger:hover .app-actions-trigger-icon .ring {
+  stroke: #a5f3fc;
+}
+
+.app-actions-trigger:hover .app-actions-trigger-icon .menu-line {
+  stroke: #ffffff;
+}
+
+.app-actions-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 210px;
+  padding: 8px;
+  border: 1px solid #374151;
+  border-radius: 10px;
+  background: #111827;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.app-actions-item {
+  display: block;
+  width: 100%;
+  background: #1f2937;
+  border: 1px solid #374151;
+  color: #d1d5db;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-family: monospace;
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.app-actions-item:hover {
+  background: #243244;
+  border-color: #4b5563;
+  color: #f3f4f6;
+}
+
+.app-actions-item.donate {
+  background: linear-gradient(180deg, #f59e0b, #d97706);
+  border-color: #7c2d12;
+  color: #111827;
+  font-weight: 700;
+}
+
+.app-actions-item.donate:hover {
+  filter: brightness(1.05);
+}
+
+.actions-slide-down-enter-active {
+  animation: actions-slide-down 0.2s ease-out;
+}
+
+.actions-slide-down-leave-active {
+  animation: actions-slide-down 0.16s ease-in reverse;
+}
+
+@keyframes actions-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .save-selected-btn {
@@ -712,116 +752,6 @@ defineExpose({ loadPcapFile });
 }
 .idle-resume-btn:active {
   transform: scale(0.95);
-}
-
-/* Bandwidth gauge badge */
-.bw-badge {
-  position: absolute;
-  left: calc(50% + 130px);
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 12px;
-  cursor: pointer;
-  z-index: 10;
-  background: linear-gradient(90deg,
-    rgba(55, 162, 218, 0.15) 0%,
-    rgba(103, 224, 227, 0.25) 25%,
-    rgba(255, 167, 38, 0.2) 50%,
-    rgba(103, 224, 227, 0.25) 75%,
-    rgba(55, 162, 218, 0.15) 100%
-  );
-  background-size: 200% 100%;
-  animation: bw-shimmer 3s linear infinite;
-  border: 1px solid rgba(103, 224, 227, 0.3);
-  transition: border-color 0.3s, box-shadow 0.3s;
-}
-.bw-badge:hover {
-  border-color: rgba(103, 224, 227, 0.7);
-  box-shadow: 0 0 12px rgba(103, 224, 227, 0.3);
-}
-@keyframes bw-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-.bw-icon {
-  width: 18px;
-  height: 18px;
-  color: #67e0e3;
-  filter: drop-shadow(0 0 3px rgba(103, 224, 227, 0.5));
-}
-.bw-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: #67e0e3;
-  letter-spacing: 1px;
-  text-shadow: 0 0 6px rgba(103, 224, 227, 0.4);
-}
-
-/* Dropdown popup */
-.bw-popup {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: linear-gradient(180deg, #1a1d23, #111318);
-  border: 1px solid rgba(103, 224, 227, 0.3);
-  border-radius: 12px;
-  padding: 14px 18px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 16px rgba(103, 224, 227, 0.1);
-  z-index: 2000;
-  width: 580px;
-}
-.bw-popup::before {
-  content: '';
-  position: absolute;
-  top: -7px;
-  left: 50%;
-  transform: translateX(-50%) rotate(45deg);
-  width: 12px;
-  height: 12px;
-  background: #1a1d23;
-  border-left: 1px solid rgba(103, 224, 227, 0.3);
-  border-top: 1px solid rgba(103, 224, 227, 0.3);
-}
-.bw-popup-title {
-  color: #67e0e3;
-  font-size: 13px;
-  font-weight: 600;
-  text-align: center;
-  margin-bottom: 8px;
-  letter-spacing: 0.5px;
-}
-.bw-gauges {
-  display: flex;
-  gap: 8px;
-}
-.bw-gauge {
-  width: 270px;
-  height: 220px;
-}
-
-/* Slide-down transition */
-.bw-dropdown-enter-active {
-  animation: bw-slide-down 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.bw-dropdown-leave-active {
-  animation: bw-slide-down 0.25s cubic-bezier(0.16, 1, 0.3, 1) reverse;
-}
-@keyframes bw-slide-down {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-8px);
-    clip-path: inset(0 0 100% 0);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-    clip-path: inset(0 0 0 0);
-  }
 }
 
 

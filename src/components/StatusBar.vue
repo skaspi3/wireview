@@ -19,6 +19,9 @@ const wssEvents = computed(() => wsEventLog.value);
 
 const OSV_QUERY_URL = 'https://api.osv.dev/v1/query';
 const NVD_CVE_URL = 'https://services.nvd.nist.gov/rest/json/cves/2.0';
+const OPEN_FEEDBACK_EVENT = 'webpcap:open-feedback';
+const OPEN_CHANGELOG_EVENT = 'webpcap:open-changelog';
+const OPEN_THIRD_PARTY_EVENT = 'webpcap:open-third-party';
 
 const backendNoticePackages = [
   { name: 'ws', version: '8.18.3', license: 'MIT', url: 'https://www.npmjs.com/package/ws', ecosystem: 'npm' },
@@ -274,9 +277,28 @@ const displayedInfo = computed(() => {
   return `Displayed: ${displayedPackets.value.toLocaleString()}`;
 });
 
+const reductionRatioRounded = computed(() => Math.round(reductionRatio.value * 10) / 10);
+const showThinClientBadge = computed(() => reductionRatioRounded.value > 0);
+
 const toggleFilterPopup = () => {
   showFilterPopup.value = !showFilterPopup.value;
 };
+
+const openFeedback = () => {
+  showFeedback.value = true;
+};
+
+const openReleaseNotes = () => {
+  showReleaseNotes.value = true;
+};
+
+const openNotices = () => {
+  showNotices.value = true;
+};
+
+const onOpenFeedbackEvent = () => openFeedback();
+const onOpenChangelogEvent = () => openReleaseNotes();
+const onOpenThirdPartyEvent = () => openNotices();
 
 const totalCapturedBytes = computed(() => {
   const pkts = allPackets.value.length > 0 ? allPackets.value : packets.value;
@@ -296,10 +318,16 @@ const formatBytes = (bytes) => {
 onMounted(() => {
   updateReductionRatio();
   reductionRatioInterval = setInterval(updateReductionRatio, 1000);
+  window.addEventListener(OPEN_FEEDBACK_EVENT, onOpenFeedbackEvent);
+  window.addEventListener(OPEN_CHANGELOG_EVENT, onOpenChangelogEvent);
+  window.addEventListener(OPEN_THIRD_PARTY_EVENT, onOpenThirdPartyEvent);
 });
 
 onUnmounted(() => {
   if (reductionRatioInterval) clearInterval(reductionRatioInterval);
+  window.removeEventListener(OPEN_FEEDBACK_EVENT, onOpenFeedbackEvent);
+  window.removeEventListener(OPEN_CHANGELOG_EVENT, onOpenChangelogEvent);
+  window.removeEventListener(OPEN_THIRD_PARTY_EVENT, onOpenThirdPartyEvent);
 });
 
 const statusTitle = computed(() => {
@@ -511,13 +539,14 @@ const isCertValid = computed(() => {
     <!-- Right section -->
     <div class="right-section">
       <span
+        v-if="showThinClientBadge"
         class="version-info thin-client-badge"
         @mouseenter="showThinClientPopup = true"
         @mouseleave="showThinClientPopup = false"
       >
         Thin Client
         <div v-if="showThinClientPopup" class="thin-client-popup">
-          <div class="popup-row reduction-row">Reduction Ratio: {{ reductionRatio.toFixed(1) }}%</div>
+          <div class="popup-row reduction-row">Reduction Ratio: {{ reductionRatioRounded.toFixed(1) }}%</div>
           <div class="popup-row">Captured on interface: {{ formatBytes(totalCapturedBytes) }}</div>
           <div class="popup-row">Sent to browser: {{ formatBytes(bytesReceived + bytesFetched) }}</div>
         </div>
@@ -630,16 +659,10 @@ const isCertValid = computed(() => {
         href="https://github.com/skaspi3/webpcap"
         aria-label="Visit the WebPCAP project page on GitHub"
         target="_blank"
+        rel="noopener noreferrer"
       >
         <GitHubIcon />
       </a>
-    </div>
-    <div v-if="appVersion" class="app-version-group">
-      <span class="app-version-link" @click="showFeedback = true">Feedback</span>
-      <span class="app-version-sep">|</span>
-      <span class="app-version-link" @click="showReleaseNotes = true">Changelog</span>
-      <span class="app-version-sep">|</span>
-      <span class="app-version-link" @click="showNotices = true">3-rd Party Libs</span>
     </div>
   </div>
 </template>
@@ -669,29 +692,6 @@ const isCertValid = computed(() => {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-}
-.app-version-group {
-  position: absolute;
-  left: 25%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family: monospace;
-  font-size: 14.5px;
-}
-.app-version-link {
-  color: #60a5fa;
-  cursor: pointer;
-  transition: color 0.15s;
-}
-.app-version-link:hover {
-  color: #93c5fd;
-  text-decoration: underline;
-}
-.app-version-sep {
-  color: #4b5563;
-  user-select: none;
 }
 .release-overlay {
   position: fixed;
