@@ -76,6 +76,26 @@ const savedFiles = ref([]);
 const savedCapturesGlow = ref(false);
 const sortColumn = ref('created'); // 'name', 'size', 'created'
 const sortAsc = ref(false);
+const localClientHint = ref(null);
+
+const isLoopbackHostname = () => {
+  const hostname = String(window.location.hostname || '').toLowerCase();
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]';
+};
+
+const disableSavedCaptureDownload = computed(() => {
+  if (typeof localClientHint.value === 'boolean') return localClientHint.value;
+  return isLoopbackHostname();
+});
+
+const displayCaptureName = (name) => String(name || '').replace(/\.zst$/i, '');
+
+const applySavedCapturesPayload = (data) => {
+  savedFiles.value = data?.files || [];
+  if (typeof data?.isLocalClient === 'boolean') {
+    localClientHint.value = data.isLocalClient;
+  }
+};
 
 const sortedFiles = computed(() => {
   const col = sortColumn.value;
@@ -125,7 +145,7 @@ const openSavedCaptures = async () => {
   try {
     const res = await apiFetch('/api/saved-captures');
     const data = await res.json();
-    savedFiles.value = data.files || [];
+    applySavedCapturesPayload(data);
   } catch (e) {
     savedFiles.value = [];
   }
@@ -136,7 +156,7 @@ const refreshSavedCaptures = async () => {
   try {
     const res = await apiFetch('/api/saved-captures');
     const data = await res.json();
-    savedFiles.value = data.files || [];
+    applySavedCapturesPayload(data);
     savedCapturesCount.value = savedFiles.value.length;
   } catch (e) {}
 };
@@ -180,7 +200,7 @@ const downloadCapture = (name) => {
   a.click();
 };
 
-// Open Remotely
+// Open in Browser
 const pendingOpenPath = ref(null);
 const showOpenConfirm = ref(false);
 
@@ -310,7 +330,7 @@ const confirmOpenNo = () => {
                     />
                   </template>
                   <template v-else>
-                    <span class="saved-captures-name" :title="file.name">{{ file.name }}</span>
+                    <span class="saved-captures-name" :title="displayCaptureName(file.name)">{{ displayCaptureName(file.name) }}</span>
                   </template>
                 </td>
                 <td class="sc-td-packets">{{ file.packets ? file.packets.toLocaleString() : '—' }}</td>
@@ -318,14 +338,20 @@ const confirmOpenNo = () => {
                 <td class="sc-td-time">{{ formatTimestamp(file.created) }}</td>
                 <td class="sc-td-action">
                   <div class="saved-captures-actions">
-                    <button class="sc-action-btn sc-open" title="Open Remotely" @click="openCaptureRemotely(file.path)">
+                    <button class="sc-action-btn sc-open" title="Open in Browser" @click="openCaptureRemotely(file.path)">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                         <polyline points="15 3 21 3 21 9"/>
                         <line x1="10" y1="14" x2="21" y2="3"/>
                       </svg>
                     </button>
-                    <button class="sc-action-btn sc-download" title="Download" @click="downloadCapture(file.name)">
+                    <button
+                      class="sc-action-btn sc-download"
+                      :class="{ 'sc-action-disabled': disableSavedCaptureDownload }"
+                      :title="disableSavedCaptureDownload ? 'Local client: download not needed' : 'Download'"
+                      :disabled="disableSavedCaptureDownload"
+                      @click="downloadCapture(file.name)"
+                    >
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                         <polyline points="7 10 12 15 17 10"/>
@@ -353,7 +379,7 @@ const confirmOpenNo = () => {
       </div>
     </div>
 
-    <!-- Open Remotely confirm dialog -->
+    <!-- Open in Browser confirm dialog -->
     <div v-if="showOpenConfirm" class="saved-captures-overlay" @click.self="confirmOpenNo">
       <div class="open-confirm-dialog">
         <div class="open-confirm-title">Open Capture</div>
@@ -542,9 +568,13 @@ const confirmOpenNo = () => {
   background: #1a1d23;
   border: 1px solid #374151;
   border-radius: 12px;
-  padding: 20px 24px;
-  min-width: 520px;
-  max-width: 640px;
+  padding: 24px 28px;
+  width: min(94vw, 1080px);
+  min-width: 760px;
+  max-width: 1080px;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 .saved-captures-header {
@@ -556,12 +586,12 @@ const confirmOpenNo = () => {
   border-bottom: 1px solid #374151;
 }
 .saved-captures-title {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
   color: #f9fafb;
 }
 .saved-captures-count {
-  font-size: 13px;
+  font-size: 15px;
   color: #6b7280;
   font-family: monospace;
 }
@@ -570,7 +600,7 @@ const confirmOpenNo = () => {
   background: none;
   border: none;
   color: #6b7280;
-  font-size: 22px;
+  font-size: 24px;
   cursor: pointer;
   padding: 0 4px;
   line-height: 1;
@@ -580,25 +610,25 @@ const confirmOpenNo = () => {
 }
 .saved-captures-empty {
   color: #6b7280;
-  font-size: 14px;
+  font-size: 16px;
   text-align: center;
   padding: 24px 0;
   font-style: italic;
 }
 .saved-captures-table-wrap {
-  max-height: 400px;
+  max-height: 62vh;
   overflow-y: auto;
 }
 .saved-captures-table {
   width: 100%;
   border-collapse: collapse;
   font-family: monospace;
-  font-size: 13px;
+  font-size: 15px;
 }
 .saved-captures-table thead th {
   text-align: left;
   color: #d1d5db;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -614,7 +644,7 @@ const confirmOpenNo = () => {
   color: #60a5fa;
 }
 .sc-sort-arrow {
-  font-size: 14px;
+  font-size: 16px;
   color: #9ca3af;
   margin-left: 4px;
 }
@@ -625,12 +655,12 @@ const confirmOpenNo = () => {
   background: #1f2937;
 }
 .saved-captures-table td {
-  padding: 7px 10px;
+  padding: 9px 12px;
   border-bottom: 1px solid #1f2937;
   vertical-align: middle;
 }
 .sc-td-name {
-  max-width: 300px;
+  max-width: 520px;
 }
 .saved-captures-name {
   color: #e5e7eb;
@@ -641,18 +671,18 @@ const confirmOpenNo = () => {
 }
 .sc-td-packets {
   color: #60a5fa;
-  font-size: 12px;
+  font-size: 14px;
   white-space: nowrap;
   text-align: right;
 }
 .sc-td-size {
   color: #9ca3af;
-  font-size: 12px;
+  font-size: 14px;
   white-space: nowrap;
 }
 .sc-td-time {
   color: #9ca3af;
-  font-size: 12px;
+  font-size: 14px;
   white-space: nowrap;
 }
 .sc-td-action {
@@ -663,10 +693,10 @@ const confirmOpenNo = () => {
   background: #1f2937;
   border: 1px solid #3b82f6;
   border-radius: 4px;
-  padding: 3px 8px;
+  padding: 5px 10px;
   color: #e5e7eb;
   font-family: monospace;
-  font-size: 13px;
+  font-size: 15px;
   outline: none;
   box-sizing: border-box;
 }
@@ -679,8 +709,8 @@ const confirmOpenNo = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -688,14 +718,23 @@ const confirmOpenNo = () => {
   transition: background 0.15s, transform 0.1s;
 }
 .sc-action-btn svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 .sc-action-btn:hover {
   transform: scale(1.1);
 }
 .sc-action-btn:active {
   transform: scale(0.95);
+}
+.sc-action-btn:disabled,
+.sc-action-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none !important;
+}
+.sc-action-btn:disabled:hover {
+  background: transparent !important;
 }
 .sc-open {
   color: #22c55e;
