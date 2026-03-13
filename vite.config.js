@@ -4,7 +4,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { createHash } from 'crypto'
-import { execSync } from 'child_process'
+import { execSync, execFileSync } from 'child_process'
 
 // Get the IP address of the interface connected to default gateway
 const getDefaultGatewayIP = () => {
@@ -146,10 +146,10 @@ const setSecurityHeaders = (req, res) => {
 // Read TLS certificate info
 const getCertInfo = (certPath) => {
   try {
-    const subject = execSync(`openssl x509 -noout -subject -in "${certPath}"`, { encoding: 'utf8' }).trim().replace('subject=', '');
-    const issuer = execSync(`openssl x509 -noout -issuer -in "${certPath}"`, { encoding: 'utf8' }).trim().replace('issuer=', '');
-    const dates = execSync(`openssl x509 -noout -dates -in "${certPath}"`, { encoding: 'utf8' }).trim();
-    const fingerprint = execSync(`openssl x509 -noout -fingerprint -sha256 -in "${certPath}"`, { encoding: 'utf8' }).trim().replace('sha256 Fingerprint=', '').replace('SHA256 Fingerprint=', '');
+    const subject = execFileSync('openssl', ['x509', '-noout', '-subject', '-in', certPath], { encoding: 'utf8' }).trim().replace('subject=', '');
+    const issuer = execFileSync('openssl', ['x509', '-noout', '-issuer', '-in', certPath], { encoding: 'utf8' }).trim().replace('issuer=', '');
+    const dates = execFileSync('openssl', ['x509', '-noout', '-dates', '-in', certPath], { encoding: 'utf8' }).trim();
+    const fingerprint = execFileSync('openssl', ['x509', '-noout', '-fingerprint', '-sha256', '-in', certPath], { encoding: 'utf8' }).trim().replace('sha256 Fingerprint=', '').replace('SHA256 Fingerprint=', '');
 
     const validFrom = dates.match(/notBefore=(.+)/)?.[1] || '';
     const validTo = dates.match(/notAfter=(.+)/)?.[1] || '';

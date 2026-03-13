@@ -732,10 +732,19 @@ const connect = ({ isReconnect = false } = {}) => {
           if (!displayFilter.value) {
             packets.value.push(msg.data);
             allPackets.value.push(msg.data);
+            if (packets.value.length > 101000) {
+              packets.value.splice(0, packets.value.length - 100000);
+            }
+            if (allPackets.value.length > 101000) {
+              allPackets.value.splice(0, allPackets.value.length - 100000);
+            }
             scheduleUpdate();
             scheduleAllPacketsUpdate();  // Also trigger allPackets for live count
           } else {
             allPackets.value.push(msg.data);
+            if (allPackets.value.length > 101000) {
+              allPackets.value.splice(0, allPackets.value.length - 100000);
+            }
             scheduleAllPacketsUpdate();  // Trigger reactivity for live packet count
           }
         }
@@ -835,6 +844,12 @@ const connect = ({ isReconnect = false } = {}) => {
           // Append batch to packets array
           packets.value.push(...msg.packets);
           allPackets.value.push(...msg.packets);
+          if (packets.value.length > 101000) {
+            packets.value.splice(0, packets.value.length - 100000);
+          }
+          if (allPackets.value.length > 101000) {
+            allPackets.value.splice(0, allPackets.value.length - 100000);
+          }
           loadPcapProgress.value = msg.total;
           triggerRef(packets);
         }
