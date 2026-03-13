@@ -11,7 +11,6 @@ import IconRibbon from './components/IconRibbon.vue';
 import DisplayFilter from './components/DisplayFilter.vue';
 import StatusBar from './components/StatusBar.vue';
 import FileBrowser from './components/FileBrowser.vue';
-import InsightsPanel from './components/InsightsPanel.vue';
 
 // Show landing page when no packets and not actively using the app
 const showLandingPage = computed(() => packets.value.length === 0 && allPackets.value.length === 0);
@@ -22,9 +21,6 @@ const rowHeight = ref(20);
 // References for file browser
 const fileBrowserRef = useTemplateRef('file-browser');
 const iconRibbonRef = useTemplateRef('icon-ribbon');
-
-// Insights panel visibility
-const showInsights = ref(false);
 
 const handleClear = () => {
   clearPackets();
@@ -43,7 +39,10 @@ const handleFileSelect = (filePath) => {
 };
 
 const handleOpenInsights = () => {
-  showInsights.value = true;
+  const insightsWindow = window.open('/insights/', '_blank', 'noopener');
+  if (insightsWindow && typeof insightsWindow.focus === 'function') {
+    insightsWindow.focus();
+  }
 };
 
 // Total packet count (from allPackets when filter is active, otherwise from packets)
@@ -247,9 +246,6 @@ const confirmOpenNo = () => {
 
     <!-- File Browser Modal -->
     <FileBrowser ref="file-browser" @select="handleFileSelect" />
-
-    <!-- Insights Panel Modal -->
-    <InsightsPanel v-if="showInsights" @close="showInsights = false" />
 
     <!-- Main UI -->
     <div class="main-content">

@@ -104,6 +104,14 @@
             />
             <span>Address Resolution</span>
           </label>
+          <label class="inline-opt">
+            <input
+              type="checkbox"
+              v-model="getCaptureOptions(iface.name).ntopngAnalyze"
+              @click.stop
+            />
+            <span>ntopng Analyze</span>
+          </label>
         </div>
       </div>
     </div>
@@ -117,7 +125,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
 import Sparkline from './Sparkline.vue'
 import { apiFetch } from '../globals'
 
@@ -138,15 +146,18 @@ const interfaces = ref([])
 const selectedInterface = ref('')
 const loading = ref(false)
 const error = ref(null)
-const interfaceCaptureOptions = reactive({})  // { [ifaceName]: { httpsCapture: boolean, addressResolution: boolean } }
+const interfaceCaptureOptions = reactive({})  // { [ifaceName]: { httpsCapture, addressResolution, ntopngAnalyze } }
 
-const ensureCaptureOptions = (ifaceName) => {
-  if (!ifaceName) return { httpsCapture: true, addressResolution: true };
+const ensureCaptureOptions = (ifaceName, defaults = {}) => {
+  if (!ifaceName) return { httpsCapture: true, addressResolution: true, ntopngAnalyze: false };
   if (!interfaceCaptureOptions[ifaceName]) {
     interfaceCaptureOptions[ifaceName] = {
       httpsCapture: true,
-      addressResolution: true
+      addressResolution: true,
+      ntopngAnalyze: defaults.ntopngAnalyze === true
     };
+  } else if (defaults.ntopngAnalyze === true) {
+    interfaceCaptureOptions[ifaceName].ntopngAnalyze = true;
   }
   return interfaceCaptureOptions[ifaceName];
 }
@@ -236,10 +247,17 @@ const fetchInterfaces = async () => {
     if (!response.ok) throw new Error('Failed to fetch interfaces')
     const data = await response.json()
     interfaces.value = data.interfaces || []
+    const enabledNtopngInterfaces = new Set(
+      (data.ntopngEnabledInterfaces || [])
+        .map((ifaceName) => String(ifaceName || '').trim())
+        .filter(Boolean)
+    )
 
     const activeIfaces = new Set(interfaces.value.map((iface) => iface.name))
     for (const ifaceName of activeIfaces) {
-      ensureCaptureOptions(ifaceName)
+      ensureCaptureOptions(ifaceName, {
+        ntopngAnalyze: enabledNtopngInterfaces.has(ifaceName)
+      })
     }
     for (const ifaceName of Object.keys(interfaceCaptureOptions)) {
       if (!activeIfaces.has(ifaceName)) {
@@ -273,7 +291,8 @@ const startCapture = () => {
     emit('start-capture', {
       interface: selectedInterface.value,
       includePort443: options.httpsCapture,
-      resolvePublicIps: options.addressResolution
+      resolvePublicIps: options.addressResolution,
+      enableNtopng: options.ntopngAnalyze
     })
   }
 }
@@ -376,7 +395,6 @@ onUnmounted(() => {
 })
 
 // Watch for wsConnection changes
-import { watch } from 'vue'
 watch(() => props.wsConnection, (newWs, oldWs) => {
   if (oldWs) {
     oldWs.removeEventListener('message', handleWsMessage)

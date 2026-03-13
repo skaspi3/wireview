@@ -26,7 +26,6 @@ const DONATE_LABEL = (import.meta.env.VITE_DONATE_LABEL || 'Donate $5').trim();
 const backendNoticePackages = [
   { name: 'ws', version: '8.18.3', license: 'MIT', url: 'https://www.npmjs.com/package/ws', ecosystem: 'npm' },
   { name: '@mongodb-js/zstd', version: '7.0', license: 'Apache-2.0', url: 'https://www.npmjs.com/package/@mongodb-js/zstd', ecosystem: 'npm' },
-  { name: 'sql.js', version: '1.13', license: 'MIT', url: 'https://www.npmjs.com/package/sql.js', ecosystem: 'npm' },
   { name: 'dotenv', version: '17.3.1', license: 'BSD-2-Clause', url: 'https://www.npmjs.com/package/dotenv', ecosystem: 'npm' },
 ];
 
@@ -473,7 +472,7 @@ const isCertValid = computed(() => {
             <li>Thin Client architecture — zstd-compressed packet delivery with up to 95% bandwidth reduction</li>
             <li>Display filters — apply Wireshark-compatible filters during live or stopped capture</li>
             <li>Session sharing — invite viewers to watch your capture in real-time</li>
-            <li>Capture Insights — protocol hierarchy, top talkers, traffic timeline charts</li>
+            <li>Capture Insights — proxied ntopng visibility for interfaces started with ntopng Analyze</li>
             <li>Save &amp; export — pcapng with optional zstd compression, filtered or full capture</li>
             <li>RAM-backed storage — pcap files written to tmpfs for minimal disk I/O</li>
             <li>Idle kill-switch — auto-stops capture after inactivity to protect system resources</li>

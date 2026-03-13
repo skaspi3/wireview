@@ -163,7 +163,7 @@ defineExpose({ loadPcapFile });
     </div>
     <template v-if="!hideInsights">
       <div class="separator"></div>
-      <button class="insights-btn" @click="emit('openInsights')" title="Capture Insights">
+      <button class="insights-btn" @click="emit('openInsights')" title="Open ntopng Insights">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 3v18h18"/>
           <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>

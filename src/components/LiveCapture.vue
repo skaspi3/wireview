@@ -334,6 +334,7 @@ const onJoinApproved = (data) => {
   selectedInterface.value = data.interface;
   setIncludePort443(data.includePort443 === true);
   setResolvePublicIps(data.resolvePublicIps !== false);
+  setEnableNtopng(data.enableNtopng === true);
   isCapturing.value = data.isCapturing;
   captureActive.value = data.isCapturing;
   stoppedCapture.value = false;
@@ -347,12 +348,16 @@ const loadedPcapFile = ref(null);
 const loadingPcapFilename = ref('');
 const includePort443 = ref(captureIncludePort443.value);
 const resolvePublicIps = ref(true);
+const enableNtopng = ref(false);
 const setIncludePort443 = (value) => {
   includePort443.value = value === true;
   captureIncludePort443.value = includePort443.value;
 };
 const setResolvePublicIps = (value) => {
   resolvePublicIps.value = value !== false;
+};
+const setEnableNtopng = (value) => {
+  enableNtopng.value = value === true;
 };
 
 const loadedPcapFilename = computed(() => {
@@ -382,10 +387,12 @@ const onSelectorStartCapture = (payload) => {
     selectedInterface.value = payload;
     setIncludePort443(false);
     setResolvePublicIps(true);
+    setEnableNtopng(false);
   } else {
     selectedInterface.value = payload?.interface || '';
     setIncludePort443(payload?.includePort443 === true);
     setResolvePublicIps(payload?.resolvePublicIps !== false);
+    setEnableNtopng(payload?.enableNtopng === true);
   }
   startCapture();
 };
@@ -598,6 +605,7 @@ const connect = ({ isReconnect = false } = {}) => {
           selectedInterface.value = msg.interface;
           setIncludePort443(msg.includePort443 === true);
           setResolvePublicIps(msg.resolvePublicIps !== false);
+          setEnableNtopng(msg.enableNtopng === true);
           isCapturing.value = true;
           captureActive.value = true;
           stoppedCapture.value = false;
@@ -618,6 +626,7 @@ const connect = ({ isReconnect = false } = {}) => {
           selectedInterface.value = msg.interface;
           setIncludePort443(msg.includePort443 === true);
           setResolvePublicIps(msg.resolvePublicIps !== false);
+          setEnableNtopng(msg.enableNtopng === true);
           isCapturing.value = msg.isCapturing;
           captureActive.value = msg.isCapturing;
           stoppedCapture.value = false;
@@ -669,6 +678,7 @@ const connect = ({ isReconnect = false } = {}) => {
           selectedInterface.value = msg.interface;
           setIncludePort443(msg.includePort443 === true);
           setResolvePublicIps(msg.resolvePublicIps !== false);
+          setEnableNtopng(msg.enableNtopng === true);
           isCapturing.value = true;
           captureActive.value = true;
           stoppedCapture.value = false;
@@ -902,7 +912,8 @@ const startCapture = () => {
     type: 'createSession',
     interface: selectedInterface.value,
     includePort443: includePort443.value,
-    resolvePublicIps: resolvePublicIps.value
+    resolvePublicIps: resolvePublicIps.value,
+    enableNtopng: enableNtopng.value
   });
 
   // State will be updated when sessionCreated message is received
@@ -945,7 +956,8 @@ const resumeCaptureOnSameInterface = () => {
           type: 'createSession',
           interface: selectedInterface.value,
           includePort443: includePort443.value,
-          resolvePublicIps: resolvePublicIps.value
+          resolvePublicIps: resolvePublicIps.value,
+          enableNtopng: enableNtopng.value
         });
       }
     }, 200);
@@ -1001,7 +1013,8 @@ const restartCapture = () => {
             type: 'start',
             interface: selectedInterface.value,
             includePort443: includePort443.value,
-            resolvePublicIps: resolvePublicIps.value
+            resolvePublicIps: resolvePublicIps.value,
+            enableNtopng: enableNtopng.value
           });
           isCapturing.value = true;
         }
