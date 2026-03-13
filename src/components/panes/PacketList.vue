@@ -21,7 +21,7 @@ const sortColumn = ref(null);  // 'number', 'time', 'src', 'srcPort', 'dst', 'ds
 const sortAscending = ref(true);
 
 // Get sorted packets - returns sorted copy only when sorting is active
-const getSortedPackets = () => {
+const sortedPackets = computed(() => {
   if (!sortColumn.value || packets.value.length === 0) {
     return packets.value;
   }
@@ -76,7 +76,7 @@ const getSortedPackets = () => {
   });
 
   return sorted;
-};
+});
 
 // Handle column sort click
 const handleSort = (column) => {
@@ -130,7 +130,7 @@ const visiblePackets = computed(() => {
   const start = firstRowIndex.value;
   const end = start + visibleRowCount.value + 1;
   // Apply sorting only when displaying
-  const displayPackets = getSortedPackets();
+  const displayPackets = sortedPackets.value;
   return displayPackets.slice(start, end);
 });
 
@@ -170,7 +170,7 @@ const handleWheel = (event) => {
 
 // Select packet - find original index in packets array
 const selectPacket = (sortedIndex) => {
-  const sorted = getSortedPackets();
+  const sorted = sortedPackets.value;
   const pkt = sorted[sortedIndex];
   if (!pkt) return;
 
@@ -189,13 +189,13 @@ const selectPacket = (sortedIndex) => {
 const getCurrentSortedIndex = () => {
   if (activePacketIndex.value === null) return -1;
   const selectedNumber = packets.value[activePacketIndex.value]?.number;
-  const sorted = getSortedPackets();
+  const sorted = sortedPackets.value;
   return sorted.findIndex(p => p.number === selectedNumber);
 };
 
 // Helper: select packet by sorted index
 const selectBySortedIndex = (sortedIdx) => {
-  const sorted = getSortedPackets();
+  const sorted = sortedPackets.value;
   if (sortedIdx < 0 || sortedIdx >= sorted.length) return;
   const pkt = sorted[sortedIdx];
   const originalIdx = packets.value.findIndex(p => p.number === pkt.number);
@@ -213,7 +213,7 @@ const handleKeydown = (event) => {
   if (packets.value.length === 0) return;
 
   const currentSortedIdx = getCurrentSortedIndex();
-  const sorted = getSortedPackets();
+  const sorted = sortedPackets.value;
 
   if (event.key === 'ArrowDown') {
     event.preventDefault();
