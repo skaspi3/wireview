@@ -32,8 +32,6 @@ const backendNoticePackages = [
 const frontendNoticePackages = [
   { name: 'vue', version: '3.5.18', license: 'MIT', url: 'https://www.npmjs.com/package/vue', ecosystem: 'npm' },
   { name: '@vueuse/core', version: '14.2.1', license: 'MIT', url: 'https://www.npmjs.com/package/@vueuse/core', ecosystem: 'npm' },
-  { name: 'echarts', version: '6.0', license: 'Apache-2.0', url: 'https://www.npmjs.com/package/echarts', ecosystem: 'npm' },
-  { name: 'vue-echarts', version: '8.0.1', license: 'MIT', url: 'https://www.npmjs.com/package/vue-echarts', ecosystem: 'npm' },
   { name: 'fzstd', version: '0.1', license: 'MIT', url: 'https://www.npmjs.com/package/fzstd', ecosystem: 'npm' },
   { name: 'vite', version: '6.4.1', license: 'MIT', url: 'https://www.npmjs.com/package/vite', ecosystem: 'npm' },
   { name: '@vitejs/plugin-vue', version: '5.2.4', license: 'MIT', url: 'https://www.npmjs.com/package/@vitejs/plugin-vue', ecosystem: 'npm' },
