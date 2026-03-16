@@ -164,10 +164,7 @@ defineExpose({ loadPcapFile });
     <template v-if="!hideInsights">
       <div class="separator"></div>
       <button class="insights-btn" @click="emit('openInsights')" title="Open ntopng Insights">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 3v18h18"/>
-          <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>
-        </svg>
+        <img src="/ntopng-insights-icon.svg" alt="" class="insights-btn__icon" />
         Insights
       </button>
       <!-- Save button - shown when capture stopped and has packets -->
@@ -274,20 +271,23 @@ defineExpose({ loadPcapFile });
 .insights-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-  color: #fff;
-  border: none;
-  border-radius: 4px;
+  gap: 8px;
+  padding: 3px 10px 3px 4px;
+  background: linear-gradient(180deg, #232a35, #171c24);
+  color: #f3f4f6;
+  border: 1px solid #364152;
+  border-radius: 8px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: background 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 
 .insights-btn:hover {
-  background: linear-gradient(135deg, #60a5fa, #3b82f6);
+  background: linear-gradient(180deg, #2b3442, #1e2530);
+  border-color: #4b5563;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
   transform: translateY(-1px);
 }
 
@@ -295,9 +295,12 @@ defineExpose({ loadPcapFile });
   transform: translateY(0);
 }
 
-.insights-btn svg {
-  width: 16px;
-  height: 16px;
+.insights-btn__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  flex: 0 0 auto;
+  display: block;
 }
 
 .save-selected-btn {
