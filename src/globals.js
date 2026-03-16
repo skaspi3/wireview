@@ -144,8 +144,8 @@ export const notifyOwnerStateChange = (state) => {
 // TLS certificate info
 export const certInfo = ref(null);
 
-// Pcap temp directory usage stats
-export const pcapDirUsage = ref(null); // { used, total, fsType }
+// Pcap live-capture buffer usage stats
+export const pcapDirUsage = ref(null); // { used, total, free, fsType, usagePercent, level, startAllowed, shouldAutoStop, ... }
 
 // Active interface link speed (Mbps), 0 = unknown
 export const linkSpeedMbps = ref(0);

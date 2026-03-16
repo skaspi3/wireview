@@ -692,7 +692,9 @@ const connect = ({ isReconnect = false } = {}) => {
           isCapturing.value = false;
           captureActive.value = false;
           stoppedCapture.value = true;
-          if (!isSessionOwner.value) {
+          if (msg.reason === 'pcapStorageFull') {
+            showSessionNotification('Capture stopped because the live RAM buffer is full', 5000);
+          } else if (!isSessionOwner.value) {
             showSessionNotification('Session owner stopped the capture', 5000);
           }
           emit('stop');
@@ -758,11 +760,15 @@ const connect = ({ isReconnect = false } = {}) => {
         }
 
         if (msg.type === 'stopped') {
-          // Capture stopped by server
+          isCapturing.value = false;
+          captureActive.value = false;
+          stoppedCapture.value = true;
+          emit('stop');
         }
 
         if (msg.type === 'pcapDirUsage') {
-          pcapDirUsage.value = { used: msg.used, total: msg.total, fsType: msg.fsType };
+          const { type, ...usage } = msg;
+          pcapDirUsage.value = usage;
         }
 
         // Handle filter validation response
@@ -882,7 +888,9 @@ const connect = ({ isReconnect = false } = {}) => {
 
         if (msg.type === 'error') {
           error.value = msg.message;
-          stopCapture();
+          if (isCapturing.value) {
+            stopCapture();
+          }
         }
       } catch (e) {
         console.warn("Protocol error:", e);

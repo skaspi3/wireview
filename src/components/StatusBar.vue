@@ -336,6 +336,29 @@ const formatBytes = (bytes) => {
   return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
 };
 
+const pcapDirUsageRowClass = computed(() => {
+  const level = pcapDirUsage.value?.level || 'ok';
+  if (level === 'exhausted' || level === 'critical') return 'pcap-dir-critical';
+  if (level === 'warning') return 'pcap-dir-warning';
+  return '';
+});
+
+const pcapDirUsageHint = computed(() => {
+  const usage = pcapDirUsage.value;
+  if (!usage) return '';
+  if (usage.level === 'exhausted') return 'capture auto-stop threshold reached';
+  if (usage.level === 'critical') return 'new captures blocked';
+  if (usage.level === 'warning') return 'capture RAM running high';
+  return '';
+});
+
+const pcapDirBadgeClass = computed(() => {
+  const level = pcapDirUsage.value?.level || 'ok';
+  if (level === 'exhausted' || level === 'critical') return 'pcap-dir-badge-critical';
+  if (level === 'warning') return 'pcap-dir-badge-warning';
+  return '';
+});
+
 onMounted(() => {
   updateReductionRatio();
   reductionRatioInterval = setInterval(updateReductionRatio, 1000);
@@ -615,8 +638,8 @@ const isCertValid = computed(() => {
                 </div>
               </div>
               <div v-else class="popup-row">tshark Lua: {{ tsharkLuaVersion || 'N/A' }}</div>
-              <div v-if="pcapDirUsage" class="popup-row pcap-dir-row">
-                {{ pcapDirUsage.fsType === 'tmpfs' ? 'RAM' : 'Disk' }}: {{ formatBytes(pcapDirUsage.used) }} / {{ formatBytes(pcapDirUsage.total) }}
+              <div v-if="pcapDirUsage" :class="['popup-row', 'pcap-dir-row', pcapDirUsageRowClass]">
+                {{ pcapDirUsage.fsType === 'tmpfs' ? 'RAM' : 'Disk' }}: {{ formatBytes(pcapDirUsage.used) }} / {{ formatBytes(pcapDirUsage.total) }} <span v-if="pcapDirUsage.usagePercent !== undefined">({{ pcapDirUsage.usagePercent.toFixed(1) }}%)</span><span v-if="pcapDirUsageHint"> — {{ pcapDirUsageHint }}</span>
               </div>
             </div>
           </span>
@@ -629,6 +652,12 @@ const isCertValid = computed(() => {
             <div v-if="showLedPopup" class="led-popup" :class="{ 'led-popup-red': backendStatus === 'disconnected' }">
               {{ backendStatus === 'disconnected' ? 'Disconnected' : 'OK — Healthy' }}
             </div>
+          </span>
+        <span
+            v-if="pcapDirUsage && pcapDirUsage.level !== 'ok'"
+            :class="['version-info', 'pcap-dir-badge', pcapDirBadgeClass]"
+          >
+            {{ pcapDirUsage.fsType === 'tmpfs' ? 'RAM' : 'Capture' }} {{ Math.round(pcapDirUsage.usagePercent || 0) }}%
           </span>
         | <span
             class="version-info wss-label-wrap"
@@ -1345,6 +1374,34 @@ const isCertValid = computed(() => {
 }
 .popup-row {
   margin: 2px 0;
+}
+.pcap-dir-row.pcap-dir-warning {
+  color: #fbbf24;
+}
+.pcap-dir-row.pcap-dir-critical {
+  color: #f87171;
+  font-weight: 700;
+}
+.pcap-dir-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: monospace;
+  letter-spacing: 0.2px;
+}
+.pcap-dir-badge-warning {
+  background: rgba(251, 191, 36, 0.18);
+  border: 1px solid rgba(251, 191, 36, 0.38);
+  color: #fbbf24;
+}
+.pcap-dir-badge-critical {
+  background: rgba(248, 113, 113, 0.18);
+  border: 1px solid rgba(248, 113, 113, 0.38);
+  color: #fca5a5;
 }
 .libs-section {
   margin-top: 4px;
