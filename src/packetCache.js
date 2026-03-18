@@ -15,9 +15,8 @@ const cache = new Map();
 // Loading state for UI feedback
 export const isFetchingBatch = ref(false);
 
-// Pending fetch promise to avoid duplicate requests
-let pendingFetch = null;
-let pendingFetchRange = null;
+// Pending fetches keyed by requested frame range to avoid duplicate requests
+const pendingFetches = new Map();
 
 // Get packet from cache
 export const getCachedPacket = (frameNumber) => {
@@ -65,8 +64,8 @@ const evictOldest = (count) => {
 // Clear cache (call when capture restarts or pcap file changes)
 export const clearPacketCache = () => {
   cache.clear();
-  pendingFetch = null;
-  pendingFetchRange = null;
+  pendingFetches.clear();
+  isFetchingBatch.value = false;
 };
 
 // Calculate the range of frames that should be fetched
@@ -92,14 +91,13 @@ const fetchBatch = async (startFrame, endFrame) => {
   const rangeKey = `${startFrame}-${endFrame}`;
 
   // If same range is already being fetched, return existing promise
-  if (pendingFetch && pendingFetchRange === rangeKey) {
-    return pendingFetch;
+  if (pendingFetches.has(rangeKey)) {
+    return pendingFetches.get(rangeKey);
   }
 
   isFetchingBatch.value = true;
 
-  pendingFetchRange = rangeKey;
-  pendingFetch = wsRequest('getPacketsBatch', { start: startFrame, end: endFrame })
+  const request = wsRequest('getPacketsBatch', { start: startFrame, end: endFrame })
     .then((data) => {
       if (data.error) {
         throw new Error(data.error);
@@ -110,12 +108,14 @@ const fetchBatch = async (startFrame, endFrame) => {
       return data;
     })
     .finally(() => {
-      isFetchingBatch.value = false;
-      pendingFetch = null;
-      pendingFetchRange = null;
+      if (pendingFetches.get(rangeKey) === request) {
+        pendingFetches.delete(rangeKey);
+      }
+      isFetchingBatch.value = pendingFetches.size > 0;
     });
 
-  return pendingFetch;
+  pendingFetches.set(rangeKey, request);
+  return request;
 };
 
 // Main function: Get packet with prefetch

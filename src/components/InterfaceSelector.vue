@@ -87,11 +87,11 @@
             </span>
           </div>
         </div>
-        <div class="inline-capture-options" @click.stop>
+        <div class="inline-capture-options" @click.stop v-if="interfaceCaptureOptions[iface.name]">
           <label class="inline-opt">
             <input
               type="checkbox"
-              v-model="getCaptureOptions(iface.name).httpsCapture"
+              v-model="interfaceCaptureOptions[iface.name].httpsCapture"
               @click.stop
             />
             <span>HTTPS Capture</span>
@@ -99,7 +99,7 @@
           <label class="inline-opt">
             <input
               type="checkbox"
-              v-model="getCaptureOptions(iface.name).addressResolution"
+              v-model="interfaceCaptureOptions[iface.name].addressResolution"
               @click.stop
             />
             <span>Address Resolution</span>
@@ -107,7 +107,7 @@
           <label class="inline-opt">
             <input
               type="checkbox"
-              v-model="getCaptureOptions(iface.name).ntopngAnalyze"
+              v-model="interfaceCaptureOptions[iface.name].ntopngAnalyze"
               @click.stop
             />
             <span>ntopng Analyze</span>

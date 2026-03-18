@@ -95,9 +95,9 @@ const handleSort = (column) => {
   }
 };
 
-// Clear sort when packets change significantly (new capture)
+// Clear sort when new packets arrive or on capture reset to prevent UI freezing
 watch(() => packets.value.length, (newLen, oldLen) => {
-  if (newLen === 0 || (oldLen > 0 && newLen < oldLen / 2)) {
+  if (newLen !== oldLen) {
     sortColumn.value = null;
     sortAscending.value = true;
   }

@@ -83,6 +83,7 @@ const files = ref([]);
 const selectedFile = ref(null);
 const loading = ref(false);
 const error = ref(null);
+let directoryLoadSeq = 0;
 
 const selectedIsDirectory = computed(() => {
   const file = files.value.find(f => f.path === selectedFile.value);
@@ -102,11 +103,14 @@ const open = () => {
 };
 
 const close = () => {
+  directoryLoadSeq += 1;
+  loading.value = false;
   isOpen.value = false;
   emit('close');
 };
 
 const loadDirectory = async (dirPath) => {
+  const requestSeq = ++directoryLoadSeq;
   loading.value = true;
   error.value = null;
   selectedFile.value = null;
@@ -115,6 +119,7 @@ const loadDirectory = async (dirPath) => {
     const url = `/api/files?path=${encodeURIComponent(dirPath)}`;
     const response = await apiFetch(url);
     const data = await response.json();
+    if (requestSeq !== directoryLoadSeq) return;
 
     if (data.error) {
       error.value = data.error;
@@ -126,9 +131,12 @@ const loadDirectory = async (dirPath) => {
     parentPath.value = data.parent;
     files.value = data.files;
   } catch (e) {
+    if (requestSeq !== directoryLoadSeq) return;
     error.value = e.message;
   } finally {
-    loading.value = false;
+    if (requestSeq === directoryLoadSeq) {
+      loading.value = false;
+    }
   }
 };
 
