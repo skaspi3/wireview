@@ -129,8 +129,11 @@ const firstRowIndex = computed(() => {
 const visiblePackets = computed(() => {
   const start = firstRowIndex.value;
   const end = start + visibleRowCount.value + 1;
-  // Apply sorting only when displaying
-  const displayPackets = sortedPackets.value;
+  // Read packets.value directly: when not sorting, sortedPackets returns the
+  // same array reference (shallowRef mutated in-place via .push()), so Vue's
+  // computed caching won't propagate the change to this computed.  Accessing
+  // the shallowRef here ensures triggerRef(packets) invalidates us directly.
+  const displayPackets = sortColumn.value ? sortedPackets.value : packets.value;
   return displayPackets.slice(start, end);
 });
 
