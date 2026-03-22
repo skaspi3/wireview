@@ -243,6 +243,11 @@ export default defineConfig(({ mode }) => {
           ws: true,
           changeOrigin: true
         },
+        // Auth endpoints
+        '/api/auth': {
+          target: 'http://127.0.0.1:3000',
+          changeOrigin: true,
+        },
         // Thin-client API endpoints
         '/api/packet': {
           target: 'http://127.0.0.1:3000',

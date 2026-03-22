@@ -1,6 +1,6 @@
 <script setup>
-import { ref, useTemplateRef, computed, getCurrentInstance, watch } from 'vue';
-import { clearPackets, packets, allPackets, captureActive, stoppedCapture, displayFilter, filterLoading, filterProgress, cancelFilter, savedCapturesCount, apiFetch, apiUrl } from './globals';
+import { ref, useTemplateRef, computed, getCurrentInstance, watch, onMounted } from 'vue';
+import { clearPackets, packets, allPackets, captureActive, stoppedCapture, displayFilter, filterLoading, filterProgress, cancelFilter, savedCapturesCount, apiFetch, apiUrl, fetchInitialData } from './globals';
 import { getSentryConsent, enableSentry, disableSentry } from './sentry';
 import './packetCache';  // Initialize packet cache (registers clearer callback)
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
@@ -11,6 +11,39 @@ import IconRibbon from './components/IconRibbon.vue';
 import DisplayFilter from './components/DisplayFilter.vue';
 import StatusBar from './components/StatusBar.vue';
 import FileBrowser from './components/FileBrowser.vue';
+import LoginPage from './components/LoginPage.vue';
+import ChangePasswordDialog from './components/ChangePasswordDialog.vue';
+
+// Auth state
+const authChecked = ref(false);
+const isAuthenticated = ref(false);
+const mustChangePassword = ref(false);
+
+onMounted(async () => {
+  try {
+    const res = await fetch('/api/auth/status');
+    const data = await res.json();
+    isAuthenticated.value = !!data.authenticated;
+    mustChangePassword.value = !!data.mustChangePassword;
+  } catch {
+    isAuthenticated.value = false;
+  }
+  authChecked.value = true;
+  if (isAuthenticated.value && !mustChangePassword.value) {
+    fetchInitialData();
+  }
+});
+
+const onLoginSuccess = ({ mustChangePassword: mustChange }) => {
+  isAuthenticated.value = true;
+  mustChangePassword.value = mustChange;
+  if (!mustChange) fetchInitialData();
+};
+
+const onPasswordChanged = () => {
+  mustChangePassword.value = false;
+  fetchInitialData();
+};
 
 // Show landing page when no packets and not actively using the app
 const showLandingPage = computed(() => packets.value.length === 0 && allPackets.value.length === 0);
@@ -232,6 +265,12 @@ const confirmOpenNo = () => {
 
 <template>
   <div class="app-layout">
+    <!-- Auth gate -->
+    <template v-if="!authChecked" />
+    <LoginPage v-else-if="!isAuthenticated" @login-success="onLoginSuccess" />
+    <ChangePasswordDialog v-else-if="mustChangePassword" :first-run="mustChangePassword" @password-changed="onPasswordChanged" />
+    <template v-else>
+
     <!-- Filter Loading Overlay -->
     <div v-if="filterLoading" class="filter-loading-overlay">
       <div class="filter-loading-popup">
@@ -388,6 +427,8 @@ const confirmOpenNo = () => {
     </div>
 
     <StatusBar v-if="!showLandingPage" />
+
+    </template><!-- end auth gate -->
   </div>
 </template>
 

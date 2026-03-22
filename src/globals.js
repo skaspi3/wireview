@@ -177,11 +177,13 @@ fetch('/VERSION', { cache: 'no-store' })
   .then(text => { const build = text.trim(); if (build) appVersion.value = `v1.0.${build}`; })
   .catch(() => {});
 
-// Fetch certificate info from Vite API
-apiFetch('/api/cert-info')
-  .then(res => res.json())
-  .then(data => { if (data) certInfo.value = data; })
-  .catch(() => {});
+// Fetch certificate info and other initial data (called after auth succeeds)
+export const fetchInitialData = () => {
+  apiFetch('/api/cert-info')
+    .then(res => res.json())
+    .then(data => { if (data && !data.error) certInfo.value = data; })
+    .catch(() => {});
+};
 
 // WebSocket request/response dispatcher
 // Sends a message with a unique reqId, returns a promise that resolves when the response arrives
