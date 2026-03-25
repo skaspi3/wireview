@@ -110,6 +110,26 @@ pf-label {
   --pf-c-label--FontSize: 12px;
 }
 
+pf-clipboard-copy {
+  --pf-c-clipboard-copy--BackgroundColor: #111827;
+  --pf-c-clipboard-copy--BorderColor: #374151;
+  --pf-c-clipboard-copy__text--Color: #e5e7eb;
+  --pf-c-clipboard-copy__text--BackgroundColor: #111827;
+  --pf-c-clipboard-copy__group-copy--BackgroundColor: #374151;
+  --pf-c-clipboard-copy__group-copy--Color: #ccc;
+  --pf-c-clipboard-copy__group-copy--BorderColor: #374151;
+}
+
+pf-text-input {
+  --pf-c-form-control--BackgroundColor: #2d2d30;
+  --pf-c-form-control--BorderTopColor: #3e3e42;
+  --pf-c-form-control--BorderRightColor: #3e3e42;
+  --pf-c-form-control--BorderBottomColor: #3e3e42;
+  --pf-c-form-control--BorderLeftColor: #3e3e42;
+  --pf-c-form-control--Color: #ccc;
+  --pf-c-form-control--FontSize: 13px;
+}
+
 pf-modal {
   --pf-c-modal-box--BackgroundColor: #1e1e1e;
   --pf-c-modal-box--Color: #ccc;

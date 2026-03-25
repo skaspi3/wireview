@@ -17,12 +17,12 @@
             ↻
           </pf-button>
         </pf-tooltip>
-        <input
-          type="text"
-          v-model="pathInput"
+        <pf-text-input
+          :value="pathInput"
+          @input="pathInput = $event.target.value"
           @keydown.enter="navigateTo(pathInput)"
           class="path-input"
-        />
+        ></pf-text-input>
         <pf-button variant="control" class="nav-btn" @click="navigateTo(pathInput)">
           Go
         </pf-button>
@@ -75,6 +75,7 @@
 <script setup>
 import '@patternfly/elements/pf-button/pf-button.js';
 import '@patternfly/elements/pf-tooltip/pf-tooltip.js';
+import '@patternfly/elements/pf-text-input/pf-text-input.js';
 import { ref, computed, watch } from 'vue';
 import { apiFetch } from '../globals';
 
@@ -258,13 +259,7 @@ defineExpose({ open, close });
 
 .path-input {
   flex: 1;
-  background: #2d2d30;
-  border: 1px solid #3e3e42;
-  color: #ccc;
-  padding: 6px 10px;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 12px;
+  --pf-c-form-control--FontFamily: monospace;
 }
 
 .loading, .error {

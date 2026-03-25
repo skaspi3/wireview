@@ -139,10 +139,7 @@
       <div class="share-dialog">
         <h3>Share Capture Session</h3>
         <p>Others can view this live capture by opening this link:</p>
-        <div class="share-url-container">
-          <input type="text" :value="getShareUrl()" readonly class="share-url-input" />
-          <pf-button @click="copyShareUrl">Copy</pf-button>
-        </div>
+        <pf-clipboard-copy :value="getShareUrl()" readonly click-tip="Copied!" hover-tip="Copy" @copy="showShareDialog = false"></pf-clipboard-copy>
         <p class="share-note">Session ID: <code>{{ sessionId }}</code></p>
         <pf-button variant="secondary" @click="showShareDialog = false">Close</pf-button>
       </div>
@@ -197,6 +194,7 @@ import '@patternfly/elements/pf-button/pf-button.js';
 import '@patternfly/elements/pf-tooltip/pf-tooltip.js';
 import '@patternfly/elements/pf-badge/pf-badge.js';
 import '@patternfly/elements/pf-label/pf-label.js';
+import '@patternfly/elements/pf-clipboard-copy/pf-clipboard-copy.js';
 import { ref, triggerRef, onUnmounted, onMounted, computed, watch } from 'vue';
 import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, captureIncludePort443, sessionId, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange, resolveWsRequest, clearPendingWsRequests, pcapDirUsage, idleCountdownSeconds, setCancelIdleCountdown, linkSpeedMbps, savedCapturesCount, addWsEvent, clientId, apiFetch } from '../globals';
 import { decompress as zstdDecompress } from 'fzstd';
@@ -1014,14 +1012,6 @@ const getShareUrl = () => {
   return `${window.location.origin}${window.location.pathname}?session=${sessionId.value}`;
 };
 
-// Copy share URL to clipboard
-const copyShareUrl = () => {
-  const url = getShareUrl();
-  navigator.clipboard.writeText(url).then(() => {
-    // Show brief feedback
-    showShareDialog.value = false;
-  });
-};
 
 const restartCapture = () => {
   // Clear any active filter
@@ -1648,26 +1638,8 @@ onUnmounted(() => {
   font-size: 0.95em;
 }
 
-.share-url-container {
-  display: flex;
-  gap: 8px;
+.share-dialog pf-clipboard-copy {
   margin-bottom: 16px;
-}
-
-.share-url-input {
-  flex: 1;
-  background: #111827;
-  border: 1px solid #374151;
-  border-radius: 6px;
-  padding: 10px 12px;
-  color: #e5e7eb;
-  font-family: monospace;
-  font-size: 0.9em;
-}
-
-.share-url-input:focus {
-  outline: none;
-  border-color: #6366f1;
 }
 
 .share-note {
