@@ -1,4 +1,8 @@
 <script setup>
+import '@patternfly/elements/pf-button/pf-button.js';
+import '@patternfly/elements/pf-tooltip/pf-tooltip.js';
+import '@patternfly/elements/pf-badge/pf-badge.js';
+import '@patternfly/elements/pf-label/pf-label.js';
 import { computed, ref, onMounted, onUnmounted } from "vue";
 import { packets, allPackets, nodeVersion, tsharkLuaVersion, tsharkLibraries, backendStatus, backendPort, certInfo, displayFilter, bytesReceived, bytesFetched, pcapDirUsage, appVersion, wsEventLog, captureIncludePort443 } from "../globals";
 import GitHubIcon from "./icons/GitHubIcon.vue";
@@ -117,6 +121,13 @@ const packageScanStatusClass = (pkgResult) => {
   if (status === 'Affected') return 'affected';
   if (status === 'Error') return 'error';
   return 'ok';
+};
+
+const packageScanLabelColor = (pkgResult) => {
+  const status = packageScanStatus(pkgResult);
+  if (status === 'Affected') return 'red';
+  if (status === 'Error') return 'orange';
+  return 'green';
 };
 
 const packageTopSeverity = (pkgResult) => {
@@ -446,20 +457,21 @@ const isCertValid = computed(() => {
   <div class="status-bar">
     <div class="left-section">
       <div class="app-actions-group" @click.stop>
-        <button
-          class="app-actions-trigger"
-          @click.stop="toggleActionsMenu"
-          aria-label="Open quick actions menu"
-          title="Quick Actions"
-        >
-          <svg class="app-actions-trigger-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="8.7" class="ring" />
-            <circle cx="12" cy="12" r="6.4" class="core" />
-            <path class="menu-line" d="M8.2 9.3h7.6" />
-            <path class="menu-line" d="M8.2 12h7.6" />
-            <path class="menu-line" d="M8.2 14.7h7.6" />
-          </svg>
-        </button>
+        <pf-tooltip content="Quick Actions">
+          <button
+            class="app-actions-trigger"
+            @click.stop="toggleActionsMenu"
+            aria-label="Open quick actions menu"
+          >
+            <svg class="app-actions-trigger-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="8.7" class="ring" />
+              <circle cx="12" cy="12" r="6.4" class="core" />
+              <path class="menu-line" d="M8.2 9.3h7.6" />
+              <path class="menu-line" d="M8.2 12h7.6" />
+              <path class="menu-line" d="M8.2 14.7h7.6" />
+            </svg>
+          </button>
+        </pf-tooltip>
         <Transition name="actions-slide-up">
           <div v-if="showActionsMenu" class="app-actions-menu" @click.stop>
             <button class="app-actions-item" @click="openFeedback">Feedback</button>
@@ -512,22 +524,22 @@ const isCertValid = computed(() => {
           </div>
           <div class="cve-scan-panel">
             <div class="cve-scan-actions">
-              <button class="cve-scan-btn" :disabled="cveScanState === 'running'" @click="runBrowserCveScan">
+              <pf-button class="cve-scan-btn" :disabled="cveScanState === 'running' || undefined" :loading="cveScanState === 'running' || undefined" @click="runBrowserCveScan">
                 {{ cveScanState === 'running' ? 'Scanning CVEs...' : 'Run CVE Scan (Browser)' }}
-              </button>
-              <button v-if="cveScanReport" class="cve-scan-btn secondary" @click="downloadCveReport">
+              </pf-button>
+              <pf-button v-if="cveScanReport" variant="secondary" @click="downloadCveReport">
                 Download JSON
-              </button>
+              </pf-button>
             </div>
             <div class="cve-scan-meta">
               Runs in your browser against OSV + NVD APIs (no backend proxy).
             </div>
             <div v-if="cveScanError" class="cve-scan-error">{{ cveScanError }}</div>
             <div v-if="cveScanReport" class="cve-scan-summary">
-              <span>Scanned: {{ cveScanReport.totals.packageCount }}</span>
-              <span>Affected: {{ cveScanReport.totals.vulnerablePackages }}</span>
-              <span>CVEs: {{ cveScanReport.totals.cveCount }}</span>
-              <span>Errors: {{ cveScanReport.totals.queryErrors }}</span>
+              <span>Scanned: <pf-badge :number="cveScanReport.totals.packageCount"></pf-badge></span>
+              <span>Affected: <pf-badge :number="cveScanReport.totals.vulnerablePackages"></pf-badge></span>
+              <span>CVEs: <pf-badge :number="cveScanReport.totals.cveCount"></pf-badge></span>
+              <span>Errors: <pf-badge :number="cveScanReport.totals.queryErrors"></pf-badge></span>
               <span>At: {{ formatScanDate(cveScanReport.generatedAt) }}</span>
             </div>
           </div>
@@ -540,7 +552,7 @@ const isCertValid = computed(() => {
                   <tr v-for="pkg in cveScanReport.packages" :key="`scan-${pkg.name}`">
                     <td>{{ pkg.name }}</td>
                     <td>{{ pkg.version }}</td>
-                    <td :class="['scan-status', packageScanStatusClass(pkg)]">{{ packageScanStatus(pkg) }}</td>
+                    <td><pf-label :color="packageScanLabelColor(pkg)" compact>{{ packageScanStatus(pkg) }}</pf-label></td>
                     <td>{{ pkg.cves.length > 0 ? pkg.cves.join(', ') : '—' }}</td>
                     <td>{{ packageTopSeverity(pkg) }}</td>
                   </tr>
@@ -692,7 +704,7 @@ const isCertValid = computed(() => {
             <div v-if="showCertPopup" class="cert-popup">
               <div class="cert-header">
                 <span class="cert-title">WSS Certificate</span>
-                <span v-if="isSelfSigned" class="cert-self-signed">Self-Signed</span>
+                <pf-label v-if="isSelfSigned" color="orange" compact>Self-Signed</pf-label>
               </div>
               <template v-if="certInfo">
                 <div class="cert-section">
@@ -902,25 +914,7 @@ const isCertValid = computed(() => {
   flex-wrap: wrap;
 }
 .cve-scan-btn {
-  background: #2563eb;
-  border: 1px solid #1d4ed8;
-  color: #fff;
-  font-size: 14.5px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.cve-scan-btn:hover:not(:disabled) {
-  background: #1d4ed8;
-}
-.cve-scan-btn:disabled {
-  cursor: default;
-  opacity: 0.65;
-}
-.cve-scan-btn.secondary {
-  background: transparent;
-  border-color: #4b5563;
-  color: #d1d5db;
+  --pf-c-button--FontSize: 14.5px;
 }
 .cve-scan-meta {
   color: #9ca3af;

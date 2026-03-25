@@ -60,6 +60,67 @@ body {
   flex-direction: column;
 }
 
+/* PatternFly Elements – Dark Theme Overrides */
+pf-button {
+  --pf-c-button--m-primary--BackgroundColor: #3b82f6;
+  --pf-c-button--m-primary--Color: #fff;
+  --pf-c-button--m-primary--hover--BackgroundColor: #2563eb;
+  --pf-c-button--m-primary--focus--BackgroundColor: #2563eb;
+  --pf-c-button--m-primary--active--BackgroundColor: #1d4ed8;
+  --pf-c-button--m-secondary--BackgroundColor: #4b5563;
+  --pf-c-button--m-secondary--Color: #fff;
+  --pf-c-button--m-secondary--after--BorderColor: #4b5563;
+  --pf-c-button--m-secondary--hover--BackgroundColor: #6b7280;
+  --pf-c-button--m-tertiary--Color: #9ca3af;
+  --pf-c-button--m-tertiary--after--BorderColor: #4b5563;
+  --pf-c-button--m-control--BackgroundColor: #374151;
+  --pf-c-button--m-control--Color: #ccc;
+  --pf-c-button--m-control--after--BorderWidth: 1px;
+  --pf-c-button--m-control--after--BorderColor: #4b5563;
+  --pf-c-button--m-danger--BackgroundColor: #ef4444;
+  --pf-c-button--m-danger--Color: #fff;
+  --pf-c-button--m-danger--hover--BackgroundColor: #dc2626;
+  --pf-c-button--m-link--Color: #60a5fa;
+  --pf-c-button--m-link--hover--Color: #93bbfd;
+  --pf-c-button--disabled--BackgroundColor: #374151;
+  --pf-c-button--disabled--Color: #6b7280;
+  --pf-c-button--FontSize: 13px;
+}
+
+pf-tooltip {
+  --pf-c-tooltip__content--BackgroundColor: #1e1e1e;
+  --pf-c-tooltip__content--Color: #ccc;
+  --pf-c-tooltip--MaxWidth: 300px;
+}
+
+pf-badge {
+  --pf-c-badge--m-unread--BackgroundColor: #3b82f6;
+  --pf-c-badge--m-unread--Color: #fff;
+  --pf-c-badge--m-read--BackgroundColor: #4b5563;
+  --pf-c-badge--m-read--Color: #d1d5db;
+  --pf-c-badge--FontSize: 12px;
+  --pf-c-badge--MinWidth: 1.5em;
+  --pf-c-badge--PaddingLeft: 6px;
+  --pf-c-badge--PaddingRight: 6px;
+}
+
+pf-label {
+  --pf-c-label--BackgroundColor: #374151;
+  --pf-c-label--Color: #d1d5db;
+  --pf-c-label--FontSize: 12px;
+}
+
+pf-modal {
+  --pf-c-modal-box--BackgroundColor: #1e1e1e;
+  --pf-c-modal-box--Color: #ccc;
+  --pf-c-backdrop--BackgroundColor: rgba(0, 0, 0, 0.6);
+  --pf-c-modal-box__header--last-child--PaddingBottom: 0;
+  --pf-c-modal-box__title--Color: #fff;
+  --pf-c-modal-box__close--Color: #888;
+  --pf-c-modal-box__footer--BorderTopColor: #3e3e42;
+  --pf-c-modal-box__header--BorderBottomColor: #3e3e42;
+}
+
 /* Scrollbar Styling for Dark Mode */
 ::-webkit-scrollbar {
   width: 14px;

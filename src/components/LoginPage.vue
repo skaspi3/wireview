@@ -1,4 +1,5 @@
 <script setup>
+import '@patternfly/elements/pf-button/pf-button.js';
 import { ref } from 'vue';
 
 const emit = defineEmits(['login-success']);
@@ -61,9 +62,9 @@ const login = async () => {
           />
         </div>
         <div v-if="error" class="login-error">{{ error }}</div>
-        <button type="submit" class="login-btn" :disabled="loading">
+        <pf-button type="submit" class="login-btn" :disabled="loading || undefined" :loading="loading || undefined" block>
           {{ loading ? 'Signing in...' : 'Sign In' }}
-        </button>
+        </pf-button>
       </form>
     </div>
   </div>
@@ -131,21 +132,7 @@ const login = async () => {
 }
 .login-btn {
   margin-top: 6px;
-  padding: 10px 0;
-  background: #3b82f6;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: filter 0.15s;
-}
-.login-btn:hover:not(:disabled) {
-  filter: brightness(1.15);
-}
-.login-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  --pf-c-button--FontSize: 15px;
+  --pf-c-button--FontWeight: 600;
 }
 </style>

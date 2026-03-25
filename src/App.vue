@@ -1,4 +1,6 @@
 <script setup>
+import '@patternfly/elements/pf-button/pf-button.js';
+import '@patternfly/elements/pf-tooltip/pf-tooltip.js';
 import { ref, useTemplateRef, computed, getCurrentInstance, watch, onMounted } from 'vue';
 import { clearPackets, packets, allPackets, captureActive, stoppedCapture, displayFilter, filterLoading, filterProgress, cancelFilter, savedCapturesCount, apiFetch, apiUrl, fetchInitialData } from './globals';
 import { getSentryConsent, enableSentry, disableSentry } from './sentry';
@@ -279,7 +281,7 @@ const confirmOpenNo = () => {
         <div v-if="filterProgress > 0" class="filter-progress">
           {{ filterProgress }} packets found
         </div>
-        <button class="filter-cancel-btn" @click="cancelFilter">Cancel</button>
+        <pf-button variant="secondary" class="filter-cancel-btn" @click="cancelFilter">Cancel</pf-button>
       </div>
     </div>
 
@@ -298,8 +300,8 @@ const confirmOpenNo = () => {
         <!-- Sentry consent banner -->
         <div v-if="showSentryBanner && showLandingPage" class="sentry-banner">
           <span class="sentry-banner-text">Help improve WebPCAP — automatically send crash reports to help fix bugs. No personal data is collected.</span>
-          <button class="sentry-btn sentry-enable" @click="onSentryEnable">Enable</button>
-          <button class="sentry-btn sentry-dismiss" @click="onSentryDismiss">No thanks</button>
+          <pf-button class="sentry-btn" size="small" @click="onSentryEnable">Enable</pf-button>
+          <pf-button variant="secondary" class="sentry-btn" size="small" @click="onSentryDismiss">No thanks</pf-button>
         </div>
       </div>
 
@@ -373,38 +375,45 @@ const confirmOpenNo = () => {
                 <td class="sc-td-time">{{ formatTimestamp(file.created) }}</td>
                 <td class="sc-td-action">
                   <div class="saved-captures-actions">
-                    <button class="sc-action-btn sc-open" title="Open in Browser" @click="openCaptureRemotely(file.path)">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                        <polyline points="15 3 21 3 21 9"/>
-                        <line x1="10" y1="14" x2="21" y2="3"/>
-                      </svg>
-                    </button>
-                    <button
-                      class="sc-action-btn sc-download"
-                      :class="{ 'sc-action-disabled': disableSavedCaptureDownload }"
-                      :title="disableSavedCaptureDownload ? 'Local client: download not needed' : 'Download'"
-                      :disabled="disableSavedCaptureDownload"
-                      @click="downloadCapture(file.name)"
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                        <polyline points="7 10 12 15 17 10"/>
-                        <line x1="12" y1="15" x2="12" y2="3"/>
-                      </svg>
-                    </button>
-                    <button class="sc-action-btn sc-rename" title="Rename" @click="startRename(file)">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                      </svg>
-                    </button>
-                    <button class="sc-action-btn sc-delete" title="Delete" @click="deleteCapture(file.name)">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"/>
-                        <line x1="6" y1="6" x2="18" y2="18"/>
-                      </svg>
-                    </button>
+                    <pf-tooltip content="Open in Browser">
+                      <button class="sc-action-btn sc-open" @click="openCaptureRemotely(file.path)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                          <polyline points="15 3 21 3 21 9"/>
+                          <line x1="10" y1="14" x2="21" y2="3"/>
+                        </svg>
+                      </button>
+                    </pf-tooltip>
+                    <pf-tooltip :content="disableSavedCaptureDownload ? 'Local client: download not needed' : 'Download'">
+                      <button
+                        class="sc-action-btn sc-download"
+                        :class="{ 'sc-action-disabled': disableSavedCaptureDownload }"
+                        :disabled="disableSavedCaptureDownload"
+                        @click="downloadCapture(file.name)"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                          <polyline points="7 10 12 15 17 10"/>
+                          <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                      </button>
+                    </pf-tooltip>
+                    <pf-tooltip content="Rename">
+                      <button class="sc-action-btn sc-rename" @click="startRename(file)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                      </button>
+                    </pf-tooltip>
+                    <pf-tooltip content="Delete">
+                      <button class="sc-action-btn sc-delete" @click="deleteCapture(file.name)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18"/>
+                          <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                      </button>
+                    </pf-tooltip>
                   </div>
                 </td>
               </tr>
@@ -420,8 +429,8 @@ const confirmOpenNo = () => {
         <div class="open-confirm-title">Open Capture</div>
         <div class="open-confirm-msg">The current live capture will be lost (unsaved data). Continue?</div>
         <div class="open-confirm-actions">
-          <button class="open-confirm-btn open-confirm-yes" @click="confirmOpenYes">Yes, Open</button>
-          <button class="open-confirm-btn open-confirm-no" @click="confirmOpenNo">Cancel</button>
+          <pf-button class="open-confirm-btn" @click="confirmOpenYes">Yes, Open</pf-button>
+          <pf-button variant="secondary" class="open-confirm-btn" @click="confirmOpenNo">Cancel</pf-button>
         </div>
       </div>
     </div>
@@ -518,17 +527,7 @@ const confirmOpenNo = () => {
 }
 .filter-cancel-btn {
   margin-top: 10px;
-  padding: 8px 24px;
-  background: #4b5563;
-  color: #e5e7eb;
-  border: 1px solid #6b7280;
-  border-radius: 6px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.filter-cancel-btn:hover {
-  background: #6b7280;
+  --pf-c-button--FontSize: 14px;
 }
 @keyframes spin {
   0% { transform: rotate(0deg); }
@@ -826,24 +825,8 @@ const confirmOpenNo = () => {
   gap: 12px;
 }
 .open-confirm-btn {
-  padding: 8px 24px;
-  border-radius: 6px;
-  border: none;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: filter 0.15s;
-}
-.open-confirm-btn:hover {
-  filter: brightness(1.15);
-}
-.open-confirm-yes {
-  background: #3b82f6;
-  color: white;
-}
-.open-confirm-no {
-  background: #4b5563;
-  color: #d1d5db;
+  --pf-c-button--FontSize: 14px;
+  --pf-c-button--FontWeight: 600;
 }
 
 /* Sentry consent banner */
@@ -869,24 +852,8 @@ const confirmOpenNo = () => {
   line-height: 1.4;
 }
 .sentry-btn {
-  border: none;
-  border-radius: 6px;
-  padding: 6px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
+  --pf-c-button--FontSize: 12px;
+  --pf-c-button--FontWeight: 600;
   white-space: nowrap;
-  transition: filter 0.15s;
-}
-.sentry-btn:hover {
-  filter: brightness(1.15);
-}
-.sentry-enable {
-  background: #3b82f6;
-  color: white;
-}
-.sentry-dismiss {
-  background: #4b5563;
-  color: #d1d5db;
 }
 </style>

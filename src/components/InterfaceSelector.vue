@@ -2,10 +2,9 @@
   <div class="interface-selector">
     <div class="header">
       <h3>Network Interfaces</h3>
-      <button class="refresh-btn" @click="fetchInterfaces" :disabled="loading">
-        <span v-if="loading">...</span>
-        <span v-else>Refresh</span>
-      </button>
+      <pf-button variant="secondary" class="refresh-btn" @click="fetchInterfaces" :disabled="loading || undefined">
+        {{ loading ? '...' : 'Refresh' }}
+      </pf-button>
     </div>
 
     <div v-if="error" class="error">{{ error }}</div>
@@ -80,9 +79,9 @@
     </div>
 
     <div v-if="selectedInterface" class="actions">
-      <button class="start-capture-btn" @click="startCapture">
+      <pf-button class="start-capture-btn" @click="startCapture">
         Start Capture on {{ selectedInterface }}
-      </button>
+      </pf-button>
     </div>
   </div>
 </template>
@@ -90,6 +89,7 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
 import '@patternfly/elements/pf-switch/pf-switch.js'
+import '@patternfly/elements/pf-button/pf-button.js'
 import Sparkline from './Sparkline.vue'
 import { apiFetch } from '../globals'
 
@@ -331,23 +331,8 @@ defineExpose({ fetchInterfaces })
 }
 
 .refresh-btn {
-  background: #333;
-  border: 1px solid #444;
-  color: #aaa;
-  padding: 4px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.refresh-btn:hover:not(:disabled) {
-  background: #444;
-  color: #fff;
-}
-
-.refresh-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  --pf-c-button--PaddingTop: 4px;
+  --pf-c-button--PaddingBottom: 4px;
 }
 
 .error {
@@ -503,19 +488,11 @@ defineExpose({ fetchInterfaces })
 }
 
 .start-capture-btn {
-  background: #4fc3f7;
-  color: #000;
-  border: none;
-  padding: 10px 24px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-  font-size: 14px;
-  transition: background 0.15s ease;
-}
-
-.start-capture-btn:hover {
-  background: #81d4fa;
+  --pf-c-button--m-primary--BackgroundColor: #4fc3f7;
+  --pf-c-button--m-primary--Color: #000;
+  --pf-c-button--m-primary--hover--BackgroundColor: #81d4fa;
+  --pf-c-button--FontSize: 14px;
+  --pf-c-button--FontWeight: 500;
 }
 
 /* Active Sessions Styles */

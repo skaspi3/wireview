@@ -3,9 +3,9 @@
     <!-- Connecting State (in header bar) -->
     <div v-if="!isCapturing && !isLoadingPcap && !loadedPcapFile && !showInterfaceSelector && !showStoppedBar" class="controls">
       <div v-if="!isConnected">
-        <button @click="connect" class="btn btn-secondary">
+        <pf-button variant="secondary" @click="connect">
           Connecting to backend...
-        </button>
+        </pf-button>
       </div>
 
       <div v-else class="selection-group">
@@ -14,12 +14,12 @@
             {{ iface }}
           </option>
         </select>
-        <button @click="startCapture" class="btn btn-primary">
+        <pf-button @click="startCapture">
           <span class="icon">●</span> Start
-        </button>
-        <button @click="openFileBrowser" class="btn btn-file" title="Open capture file">
+        </pf-button>
+        <pf-button class="btn-file" @click="openFileBrowser" title="Open capture file">
           📂 Open
-        </button>
+        </pf-button>
       </div>
     </div>
 
@@ -35,9 +35,9 @@
         />
         <div class="open-file-section">
           <span class="or-text">or</span>
-          <button @click="openFileBrowser" class="btn btn-file-large" title="Open capture file">
+          <pf-button class="btn-file-large" @click="openFileBrowser" title="Open capture file">
             📂 Open Capture File
-          </button>
+          </pf-button>
         </div>
       </div>
     </Teleport>
@@ -57,19 +57,19 @@
     <div v-else-if="loadedPcapFile" class="status-bar loaded-pcap">
       <span class="file-indicator">📄 {{ loadedPcapFilename }}</span>
       <span class="packet-count">{{ packets.length.toLocaleString() }} packets</span>
-      <button @click="closePcapFile" class="btn btn-secondary" title="Close file">
+      <pf-button variant="secondary" @click="closePcapFile" title="Close file">
         Close
-      </button>
-      <button @click="openFileBrowser" class="btn btn-file" title="Open another file">
+      </pf-button>
+      <pf-button class="btn-file" @click="openFileBrowser" title="Open another file">
         📂 Open
-      </button>
+      </pf-button>
     </div>
 
     <!-- Capturing State -->
     <div v-else-if="isCapturing" class="status-bar">
       <span class="recording-indicator">● Capture</span>
       <span class="interface-tag-wrapper" @mouseenter="showIfaceTooltip = true" @mouseleave="showIfaceTooltip = false">
-        <span class="interface-tag">on {{ selectedInterface }}</span>
+        <pf-label color="cyan" compact>on {{ selectedInterface }}</pf-label>
         <div v-if="showIfaceTooltip && activeIfaceDetails" class="iface-tooltip">
           <div class="iface-tooltip-row" v-if="activeIfaceDetails.driver"><span class="iface-tooltip-label">Driver:</span> {{ activeIfaceDetails.driver }}</div>
           <div class="iface-tooltip-row" v-if="activeIfaceDetails.mac"><span class="iface-tooltip-label">MAC:</span> {{ activeIfaceDetails.mac }}</div>
@@ -80,21 +80,25 @@
       </span>
 
       <div v-if="isSessionOwner || !sessionId" class="capture-controls">
-        <button @click="confirmRestartCapture" class="ctrl-btn ctrl-restart" title="Restart Capture">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="1 4 1 10 7 10"/>
-            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-          </svg>
-        </button>
-        <button @click="stopCapture" class="ctrl-btn ctrl-stop" title="Stop Capture">
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <rect x="4" y="4" width="16" height="16" rx="2"/>
-          </svg>
-        </button>
+        <pf-tooltip content="Restart Capture">
+          <button @click="confirmRestartCapture" class="ctrl-btn ctrl-restart">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="1 4 1 10 7 10"/>
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+            </svg>
+          </button>
+        </pf-tooltip>
+        <pf-tooltip content="Stop Capture">
+          <button @click="stopCapture" class="ctrl-btn ctrl-stop">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <rect x="4" y="4" width="16" height="16" rx="2"/>
+            </svg>
+          </button>
+        </pf-tooltip>
       </div>
-      <button v-else @click="stopCapture" class="btn btn-secondary">
+      <pf-button v-else variant="secondary" @click="stopCapture">
         Leave
-      </button>
+      </pf-button>
     </div>
 
     <!-- Stopped Capture State -->
@@ -105,21 +109,25 @@
         </option>
       </select>
       <div class="capture-controls">
-        <button @click="resumeCaptureOnSameInterface" class="ctrl-btn ctrl-play" title="Start">
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <polygon points="6,3 20,12 6,21"/>
-          </svg>
-          Start
-        </button>
+        <pf-tooltip content="Start Capture">
+          <button @click="resumeCaptureOnSameInterface" class="ctrl-btn ctrl-play">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="6,3 20,12 6,21"/>
+            </svg>
+            Start
+          </button>
+        </pf-tooltip>
       </div>
     </div>
 
     <!-- Session info (top-right corner) -->
     <span v-if="isCapturing && sessionId" class="session-info" :title="'Session: ' + sessionId">
-      <span class="session-badge">{{ sessionClientCount }} viewer{{ sessionClientCount !== 1 ? 's' : '' }}</span>
-      <button v-if="isSessionOwner" @click="showShareDialog = true" class="btn btn-share" title="Share capture session">
-        🔗 Share
-      </button>
+      <span class="session-badge"><pf-badge :number="sessionClientCount"></pf-badge> viewer{{ sessionClientCount !== 1 ? 's' : '' }}</span>
+      <pf-tooltip v-if="isSessionOwner" content="Share capture session">
+        <pf-button class="btn-share" @click="showShareDialog = true">
+          🔗 Share
+        </pf-button>
+      </pf-tooltip>
       <label v-if="!isSessionOwner" class="follow-toggle" title="Follow owner's view (selected packet, scroll, filter)">
         <input type="checkbox" v-model="followOwner" />
         <span class="follow-label">Follow</span>
@@ -133,10 +141,10 @@
         <p>Others can view this live capture by opening this link:</p>
         <div class="share-url-container">
           <input type="text" :value="getShareUrl()" readonly class="share-url-input" />
-          <button @click="copyShareUrl" class="btn btn-primary">Copy</button>
+          <pf-button @click="copyShareUrl">Copy</pf-button>
         </div>
         <p class="share-note">Session ID: <code>{{ sessionId }}</code></p>
-        <button @click="showShareDialog = false" class="btn btn-secondary">Close</button>
+        <pf-button variant="secondary" @click="showShareDialog = false">Close</pf-button>
       </div>
     </div>
 
@@ -145,8 +153,8 @@
       <div v-for="req in pendingJoinRequests" :key="req.requestId" class="join-request-item">
         <span class="request-text">Someone wants to join your session</span>
         <div class="request-actions">
-          <button @click="approveJoinRequest(req.requestId)" class="btn btn-approve">Approve</button>
-          <button @click="rejectJoinRequest(req.requestId)" class="btn btn-reject">Reject</button>
+          <pf-button class="btn-approve" @click="approveJoinRequest(req.requestId)">Approve</pf-button>
+          <pf-button danger class="btn-reject" @click="rejectJoinRequest(req.requestId)">Reject</pf-button>
         </div>
       </div>
     </div>
@@ -185,6 +193,10 @@
 </template>
 
 <script setup>
+import '@patternfly/elements/pf-button/pf-button.js';
+import '@patternfly/elements/pf-tooltip/pf-tooltip.js';
+import '@patternfly/elements/pf-badge/pf-badge.js';
+import '@patternfly/elements/pf-label/pf-label.js';
 import { ref, triggerRef, onUnmounted, onMounted, computed, watch } from 'vue';
 import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, captureIncludePort443, sessionId, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange, resolveWsRequest, clearPendingWsRequests, pcapDirUsage, idleCountdownSeconds, setCancelIdleCountdown, linkSpeedMbps, savedCapturesCount, addWsEvent, clientId, apiFetch } from '../globals';
 import { decompress as zstdDecompress } from 'fzstd';
@@ -1224,23 +1236,20 @@ onUnmounted(() => {
   font-family: monospace;
 }
 
-.btn {
-  padding: 6px 12px;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.9em;
+.controls pf-button, .status-bar pf-button {
+  --pf-c-button--FontWeight: bold;
+  --pf-c-button--FontSize: 0.9em;
 }
 
-.btn-primary { background-color: #3b82f6; color: white; }
-.btn-secondary { background-color: #4b5563; color: white; }
-.btn-danger { background-color: #ef4444; color: white; margin-left: 10px; padding: 8px 16px; font-size: 1.0em; }
-.btn-warning { background-color: #f59e0b; color: white; margin-left: 10px; padding: 8px 14px; font-size: 1.1em; }
-.btn-file { background-color: #6366f1; color: white; }
+.btn-file {
+  --pf-c-button--m-primary--BackgroundColor: #6366f1;
+  --pf-c-button--m-primary--hover--BackgroundColor: #818cf8;
+}
+
+.btn-approve {
+  --pf-c-button--m-primary--BackgroundColor: #22c55e;
+  --pf-c-button--m-primary--hover--BackgroundColor: #16a34a;
+}
 
 /* Combined capture control button */
 .capture-controls {
@@ -1544,19 +1553,10 @@ onUnmounted(() => {
 }
 
 .btn-file-large {
-  background: #6366f1;
-  color: white;
-  border: none;
-  padding: 12px 24px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 15px;
-  font-weight: 500;
-  transition: background 0.15s ease;
-}
-
-.btn-file-large:hover {
-  background: #818cf8;
+  --pf-c-button--m-primary--BackgroundColor: #6366f1;
+  --pf-c-button--m-primary--hover--BackgroundColor: #818cf8;
+  --pf-c-button--FontSize: 15px;
+  --pf-c-button--FontWeight: 500;
 }
 
 /* Session sharing styles */
@@ -1580,14 +1580,11 @@ onUnmounted(() => {
 }
 
 .btn-share {
-  background: #8b5cf6;
-  color: white;
-  padding: 4.6px 11.5px;
-  font-size: 1.08em;
-}
-
-.btn-share:hover {
-  background: #a78bfa;
+  --pf-c-button--m-primary--BackgroundColor: #8b5cf6;
+  --pf-c-button--m-primary--hover--BackgroundColor: #a78bfa;
+  --pf-c-button--FontSize: 1.08em;
+  --pf-c-button--PaddingTop: 4px;
+  --pf-c-button--PaddingBottom: 4px;
 }
 
 /* Follow Owner toggle */
@@ -1765,25 +1762,7 @@ onUnmounted(() => {
   gap: 8px;
 }
 
-.btn-approve {
-  background: #22c55e;
-  color: white;
-  padding: 6px 14px;
-  font-size: 13px;
-}
-
-.btn-approve:hover {
-  background: #16a34a;
-}
-
-.btn-reject {
-  background: #ef4444;
-  color: white;
-  padding: 6px 14px;
-  font-size: 13px;
-}
-
-.btn-reject:hover {
-  background: #dc2626;
+.request-actions pf-button {
+  --pf-c-button--FontSize: 13px;
 }
 </style>

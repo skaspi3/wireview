@@ -7,21 +7,25 @@
       </div>
 
       <div class="path-bar">
-        <button class="nav-btn" @click="goUp" :disabled="!canGoUp" title="Go up">
-          ↑
-        </button>
-        <button class="nav-btn" @click="refresh" title="Refresh">
-          ↻
-        </button>
+        <pf-tooltip content="Go up">
+          <pf-button variant="control" class="nav-btn" @click="goUp" :disabled="!canGoUp || undefined">
+            ↑
+          </pf-button>
+        </pf-tooltip>
+        <pf-tooltip content="Refresh">
+          <pf-button variant="control" class="nav-btn" @click="refresh">
+            ↻
+          </pf-button>
+        </pf-tooltip>
         <input
           type="text"
           v-model="pathInput"
           @keydown.enter="navigateTo(pathInput)"
           class="path-input"
         />
-        <button class="nav-btn" @click="navigateTo(pathInput)">
+        <pf-button variant="control" class="nav-btn" @click="navigateTo(pathInput)">
           Go
-        </button>
+        </pf-button>
       </div>
 
       <div v-if="loading" class="loading">
@@ -55,14 +59,13 @@
       <div class="modal-footer">
         <span class="selected-path" v-if="selectedFile">{{ selectedFile }}</span>
         <div class="buttons">
-          <button class="btn btn-secondary" @click="close">Cancel</button>
-          <button
-            class="btn btn-primary"
+          <pf-button variant="secondary" @click="close">Cancel</pf-button>
+          <pf-button
             @click="openSelected"
-            :disabled="!selectedFile || selectedIsDirectory"
+            :disabled="!selectedFile || selectedIsDirectory || undefined"
           >
             Open
-          </button>
+          </pf-button>
         </div>
       </div>
     </div>
@@ -70,6 +73,8 @@
 </template>
 
 <script setup>
+import '@patternfly/elements/pf-button/pf-button.js';
+import '@patternfly/elements/pf-tooltip/pf-tooltip.js';
 import { ref, computed, watch } from 'vue';
 import { apiFetch } from '../globals';
 
@@ -247,21 +252,8 @@ defineExpose({ open, close });
 }
 
 .nav-btn {
-  background: #374151;
-  border: 1px solid #4b5563;
-  color: #ccc;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.nav-btn:hover:not(:disabled) {
-  background: #4b5563;
-}
-
-.nav-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  --pf-c-button--PaddingTop: 6px;
+  --pf-c-button--PaddingBottom: 6px;
 }
 
 .path-input {
@@ -378,35 +370,7 @@ defineExpose({ open, close });
   gap: 8px;
 }
 
-.btn {
-  padding: 8px 16px;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  font-weight: bold;
-  font-size: 13px;
-}
-
-.btn-primary {
-  background: #3b82f6;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #2563eb;
-}
-
-.btn-primary:disabled {
-  background: #4b5563;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: #4b5563;
-  color: white;
-}
-
-.btn-secondary:hover {
-  background: #6b7280;
+.buttons pf-button {
+  --pf-c-button--FontWeight: bold;
 }
 </style>

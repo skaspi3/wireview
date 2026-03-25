@@ -1,4 +1,5 @@
 <script setup>
+import '@patternfly/elements/pf-button/pf-button.js';
 import { ref } from 'vue';
 
 const props = defineProps({
@@ -78,9 +79,9 @@ const submit = async () => {
           <input id="cpw-confirm" v-model="confirmPassword" type="password" autocomplete="new-password" @keyup.enter="submit" />
         </div>
         <div v-if="error" class="cpw-error">{{ error }}</div>
-        <button type="submit" class="cpw-btn" :disabled="loading">
+        <pf-button type="submit" class="cpw-btn" :disabled="loading || undefined" :loading="loading || undefined" block>
           {{ loading ? 'Saving...' : 'Set Password' }}
-        </button>
+        </pf-button>
       </form>
     </div>
   </div>
@@ -160,21 +161,7 @@ const submit = async () => {
 }
 .cpw-btn {
   margin-top: 4px;
-  padding: 10px 0;
-  background: #3b82f6;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: filter 0.15s;
-}
-.cpw-btn:hover:not(:disabled) {
-  filter: brightness(1.15);
-}
-.cpw-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  --pf-c-button--FontSize: 15px;
+  --pf-c-button--FontWeight: 600;
 }
 </style>

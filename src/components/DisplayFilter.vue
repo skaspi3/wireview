@@ -1,4 +1,5 @@
 <script setup>
+import '@patternfly/elements/pf-tooltip/pf-tooltip.js';
 import { ref, watch, computed, onBeforeUnmount, onMounted, useTemplateRef, nextTick } from "vue";
 import { displayFilter, filterError, applyDisplayFilter, websocket } from "../globals";
 import FilterApplyIcon from "./icons/FilterApplyIcon.vue";
@@ -677,23 +678,25 @@ onBeforeUnmount(() => document.body.removeEventListener("keydown", handleGlobalK
           </div>
         </div>
       </div>
-      <button
-        type="button"
-        class="clear-filter"
-        title="Clear display filter"
-        v-if="displayFilterInput || displayFilter"
-        @click="clearFilter"
-      >
-        ✕
-      </button>
-      <button
-        type="submit"
-        class="apply-filter"
-        title="Apply display filter"
-        :disabled="displayFilter === displayFilterInput.trim() || validationResult === false"
-      >
-        <FilterApplyIcon />
-      </button>
+      <pf-tooltip content="Clear display filter">
+        <button
+          type="button"
+          class="clear-filter"
+          v-if="displayFilterInput || displayFilter"
+          @click="clearFilter"
+        >
+          ✕
+        </button>
+      </pf-tooltip>
+      <pf-tooltip content="Apply display filter">
+        <button
+          type="submit"
+          class="apply-filter"
+          :disabled="displayFilter === displayFilterInput.trim() || validationResult === false"
+        >
+          <FilterApplyIcon />
+        </button>
+      </pf-tooltip>
     </form>
     <div v-if="filterError" class="filter-error" :title="filterError">
       {{ filterError }}

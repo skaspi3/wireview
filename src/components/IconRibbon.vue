@@ -1,4 +1,6 @@
 <script setup>
+import '@patternfly/elements/pf-button/pf-button.js';
+import '@patternfly/elements/pf-tooltip/pf-tooltip.js';
 import { ref, useTemplateRef, computed } from 'vue';
 import { displayFilter, packets, stoppedCapture, allPackets, idleCountdownSeconds, cancelIdleCountdown, apiFetch } from '../globals';
 import LiveCapture from "./LiveCapture.vue";
@@ -163,28 +165,34 @@ defineExpose({ loadPcapFile });
     </div>
     <template v-if="!hideInsights">
       <div class="separator"></div>
-      <button class="insights-btn" @click="emit('openInsights')" title="Open ntopng Insights">
-        <img src="/ntopng-insights-icon.svg" alt="" class="insights-btn__icon" />
-        Insights
-      </button>
+      <pf-tooltip content="Open ntopng Insights">
+        <button class="insights-btn" @click="emit('openInsights')">
+          <img src="/ntopng-insights-icon.svg" alt="" class="insights-btn__icon" />
+          Insights
+        </button>
+      </pf-tooltip>
       <!-- Save button - shown when capture stopped and has packets -->
-      <button v-if="showSaveButton" class="save-btn" @click="openSaveAllDialog" title="Save capture">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-          <polyline points="17 21 17 13 7 13 7 21"/>
-          <polyline points="7 3 7 8 15 8"/>
-        </svg>
-        Save
-      </button>
+      <pf-tooltip v-if="showSaveButton" content="Save capture">
+        <button class="save-btn" @click="openSaveAllDialog">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/>
+            <polyline points="7 3 7 8 15 8"/>
+          </svg>
+          Save
+        </button>
+      </pf-tooltip>
       <!-- Save Selected button - shown when filter is active -->
-      <button v-if="displayFilter" class="save-selected-btn" @click="openSaveFilteredDialog" title="Save filtered packets">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-          <polyline points="17 21 17 13 7 13 7 21"/>
-          <polyline points="7 3 7 8 15 8"/>
-        </svg>
-        Save Selected
-      </button>
+      <pf-tooltip v-if="displayFilter" content="Save filtered packets">
+        <button class="save-selected-btn" @click="openSaveFilteredDialog">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/>
+            <polyline points="7 3 7 8 15 8"/>
+          </svg>
+          Save Selected
+        </button>
+      </pf-tooltip>
     </template>
 
     <!-- Save Dialog -->
@@ -204,10 +212,10 @@ defineExpose({ loadPcapFile });
         </div>
         <div v-if="saveError" class="save-error">{{ saveError }}</div>
         <div class="save-actions">
-          <button @click="savePackets" class="btn btn-save" :disabled="saveSaving">
+          <pf-button class="btn-save" @click="savePackets" :disabled="saveSaving || undefined" :loading="saveSaving || undefined">
             {{ saveSaving ? 'Saving...' : 'Save' }}
-          </button>
-          <button @click="closeSaveDialog" class="btn btn-cancel">Cancel</button>
+          </pf-button>
+          <pf-button variant="secondary" @click="closeSaveDialog">Cancel</pf-button>
         </div>
       </div>
     </div>
@@ -438,36 +446,14 @@ defineExpose({ loadPcapFile });
   margin-top: 16px;
 }
 
-.save-dialog .btn {
-  padding: 8px 20px;
-  border-radius: 6px;
-  border: none;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
+.save-actions pf-button {
+  --pf-c-button--FontSize: 14px;
+  --pf-c-button--FontWeight: 500;
 }
 
 .btn-save {
-  background: #22c55e;
-  color: white;
-}
-
-.btn-save:hover:not(:disabled) {
-  background: #16a34a;
-}
-
-.btn-save:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-cancel {
-  background: #4b5563;
-  color: #e5e7eb;
-}
-
-.btn-cancel:hover {
-  background: #6b7280;
+  --pf-c-button--m-primary--BackgroundColor: #22c55e;
+  --pf-c-button--m-primary--hover--BackgroundColor: #16a34a;
 }
 
 /* Idle kill-switch countdown */
