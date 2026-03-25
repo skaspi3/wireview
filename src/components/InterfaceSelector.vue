@@ -51,30 +51,30 @@
           </div>
         </div>
         <div class="inline-capture-options" @click.stop v-if="interfaceCaptureOptions[iface.name]">
-          <label class="inline-opt">
-            <input
-              type="checkbox"
-              v-model="interfaceCaptureOptions[iface.name].httpsCapture"
-              @click.stop
-            />
+          <span class="inline-opt">
+            <pf-switch
+              :checked.prop="interfaceCaptureOptions[iface.name].httpsCapture"
+              @change="interfaceCaptureOptions[iface.name].httpsCapture = $event.target.checked"
+              show-check-icon
+            ></pf-switch>
             <span>HTTPS Capture</span>
-          </label>
-          <label class="inline-opt">
-            <input
-              type="checkbox"
-              v-model="interfaceCaptureOptions[iface.name].addressResolution"
-              @click.stop
-            />
+          </span>
+          <span class="inline-opt">
+            <pf-switch
+              :checked.prop="interfaceCaptureOptions[iface.name].addressResolution"
+              @change="interfaceCaptureOptions[iface.name].addressResolution = $event.target.checked"
+              show-check-icon
+            ></pf-switch>
             <span>Address Resolution</span>
-          </label>
-          <label class="inline-opt">
-            <input
-              type="checkbox"
-              v-model="interfaceCaptureOptions[iface.name].ntopngAnalyze"
-              @click.stop
-            />
+          </span>
+          <span class="inline-opt">
+            <pf-switch
+              :checked.prop="interfaceCaptureOptions[iface.name].ntopngAnalyze"
+              @change="interfaceCaptureOptions[iface.name].ntopngAnalyze = $event.target.checked"
+              show-check-icon
+            ></pf-switch>
             <span>ntopng Analyze</span>
-          </label>
+          </span>
         </div>
       </div>
     </div>
@@ -89,6 +89,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
+import '@patternfly/elements/pf-switch/pf-switch.js'
 import Sparkline from './Sparkline.vue'
 import { apiFetch } from '../globals'
 
@@ -466,9 +467,9 @@ defineExpose({ fetchInterfaces })
   user-select: none;
 }
 
-.inline-opt input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
+.inline-opt pf-switch {
+  --pf-c-switch__toggle--Height: 18px;
+  --pf-c-switch__toggle--Width: 34px;
   cursor: pointer;
 }
 
