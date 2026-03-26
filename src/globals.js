@@ -178,7 +178,7 @@ fetch('/VERSION', { cache: 'no-store' })
   .catch(() => {});
 
 // Auth user state (populated by App.vue after login)
-export const authUser = ref(null); // { userId, shortId, username, email }
+export const authUser = ref(null); // { username: 'webpcap' }
 
 // Fetch certificate info and other initial data (called after auth succeeds)
 export const fetchInitialData = () => {

@@ -23,15 +23,19 @@ const submit = async () => {
     error.value = 'All fields are required';
     return;
   }
-  if (newPassword.value.length < 4) {
-    error.value = 'New password must be at least 4 characters';
+  if (newPassword.value.length < 6) {
+    error.value = 'Password must be at least 6 characters';
+    return;
+  }
+  if (newPassword.value.length > 12) {
+    error.value = 'Password must be at most 12 characters';
     return;
   }
   if (newPassword.value !== confirmPassword.value) {
     error.value = 'Passwords do not match';
     return;
   }
-  if (newPassword.value === '1234') {
+  if (newPassword.value === 'root1234') {
     error.value = 'New password must differ from the default';
     return;
   }
@@ -72,7 +76,7 @@ const submit = async () => {
         </div>
         <div class="cpw-field">
           <label for="cpw-new">New Password</label>
-          <input id="cpw-new" v-model="newPassword" type="password" autocomplete="new-password" :autofocus="firstRun" />
+          <input id="cpw-new" v-model="newPassword" type="password" autocomplete="new-password" :autofocus="firstRun" placeholder="6–12 characters" />
         </div>
         <div class="cpw-field">
           <label for="cpw-confirm">Confirm Password</label>

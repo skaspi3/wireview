@@ -14,10 +14,12 @@ import DisplayFilter from './components/DisplayFilter.vue';
 import StatusBar from './components/StatusBar.vue';
 import FileBrowser from './components/FileBrowser.vue';
 import LoginPage from './components/LoginPage.vue';
+import ChangePasswordDialog from './components/ChangePasswordDialog.vue';
 
 // Auth state
 const authChecked = ref(false);
 const isAuthenticated = ref(false);
+const passwordChanged = ref(true); // true = password already changed (no forced change needed)
 
 onMounted(async () => {
   try {
@@ -25,25 +27,35 @@ onMounted(async () => {
     const data = await res.json();
     isAuthenticated.value = !!data.authenticated;
     if (data.authenticated) {
-      authUser.value = { userId: data.userId, shortId: data.shortId, username: data.username, email: data.email };
+      authUser.value = { username: data.username || 'webpcap' };
+      passwordChanged.value = !!data.passwordChanged;
     }
   } catch {
     isAuthenticated.value = false;
   }
   authChecked.value = true;
-  if (isAuthenticated.value) {
+  if (isAuthenticated.value && passwordChanged.value) {
     fetchInitialData();
   }
 });
 
-const onLoginSuccess = ({ user }) => {
+const onLoginSuccess = ({ user, passwordChanged: pwChanged }) => {
   isAuthenticated.value = true;
-  if (user) authUser.value = { userId: user.userId, shortId: user.shortId, username: user.username, email: user.email };
+  authUser.value = { username: user?.username || 'webpcap' };
+  passwordChanged.value = !!pwChanged;
+  if (pwChanged) {
+    fetchInitialData();
+  }
+};
+
+const onPasswordChanged = () => {
+  passwordChanged.value = true;
   fetchInitialData();
 };
 
 const onSignOut = () => {
   isAuthenticated.value = false;
+  passwordChanged.value = true;
   authUser.value = null;
   clearPackets();
 };
@@ -271,6 +283,7 @@ const confirmOpenNo = () => {
     <!-- Auth gate -->
     <template v-if="!authChecked" />
     <LoginPage v-else-if="!isAuthenticated" @login-success="onLoginSuccess" />
+    <ChangePasswordDialog v-else-if="!passwordChanged" :first-run="true" @password-changed="onPasswordChanged" />
     <template v-else>
 
     <!-- Filter Loading Overlay -->

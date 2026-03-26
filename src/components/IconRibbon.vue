@@ -1,8 +1,8 @@
 <script setup>
 import '@patternfly/elements/pf-button/pf-button.js';
 import '@patternfly/elements/pf-tooltip/pf-tooltip.js';
-import { ref, useTemplateRef, computed, onMounted, onUnmounted } from 'vue';
-import { displayFilter, packets, stoppedCapture, allPackets, idleCountdownSeconds, cancelIdleCountdown, apiFetch, authUser } from '../globals';
+import { ref, useTemplateRef, computed } from 'vue';
+import { displayFilter, packets, stoppedCapture, allPackets, idleCountdownSeconds, cancelIdleCountdown, apiFetch } from '../globals';
 import LiveCapture from "./LiveCapture.vue";
 
 const props = defineProps({
@@ -129,25 +129,7 @@ const savePackets = async () => {
   }
 };
 
-// User avatar menu
-const showAvatarMenu = ref(false);
-const avatarMenuRef = ref(null);
-const userInitial = computed(() => {
-  const name = authUser.value?.username || '?';
-  return name.charAt(0).toUpperCase();
-});
-
-const toggleAvatarMenu = () => { showAvatarMenu.value = !showAvatarMenu.value; };
-const closeAvatarMenu = (e) => {
-  if (avatarMenuRef.value && !avatarMenuRef.value.contains(e.target)) {
-    showAvatarMenu.value = false;
-  }
-};
-onMounted(() => document.addEventListener('click', closeAvatarMenu));
-onUnmounted(() => document.removeEventListener('click', closeAvatarMenu));
-
 const signOut = async () => {
-  showAvatarMenu.value = false;
   try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
   emit('signOut');
 };
@@ -243,21 +225,16 @@ defineExpose({ loadPcapFile });
       </div>
     </div>
 
-    <!-- User Avatar + Name -->
-    <div v-if="authUser" ref="avatarMenuRef" class="avatar-container">
-      <button class="avatar-trigger" @click.stop="toggleAvatarMenu">
-        <span class="avatar-name">{{ authUser.username }}</span>
-        <span class="avatar-btn">{{ userInitial }}</span>
+    <!-- Sign Out -->
+    <pf-tooltip content="Sign Out">
+      <button class="signout-btn" @click="signOut">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
       </button>
-      <div v-if="showAvatarMenu" class="avatar-menu">
-        <div class="avatar-menu-header">
-          <div class="avatar-menu-name">{{ authUser.username }}</div>
-          <div class="avatar-menu-email">{{ authUser.email }}</div>
-        </div>
-        <div class="avatar-menu-sep"></div>
-        <button class="avatar-menu-item avatar-menu-signout" @click="signOut">Sign Out</button>
-      </div>
-    </div>
+    </pf-tooltip>
   </div>
 </template>
 
@@ -566,102 +543,31 @@ defineExpose({ loadPcapFile });
   transform: scale(0.95);
 }
 
-/* User Avatar */
-.avatar-container {
+/* Sign Out button */
+.signout-btn {
   position: absolute;
-  right: 8px;
+  right: 10px;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 5000;
-}
-.avatar-trigger {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 2px;
-}
-.avatar-name {
-  color: #d1d5db;
-  font-size: 13px;
-  font-weight: 500;
-  max-width: 80px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.avatar-btn {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  border: 2px solid #4b5563;
-  background: #374151;
-  color: #e5e7eb;
-  font-size: 13px;
-  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  transition: border-color 0.15s, background 0.15s;
-}
-.avatar-trigger:hover .avatar-btn {
-  border-color: #6b7280;
-  background: #4b5563;
-}
-.avatar-trigger:hover .avatar-name {
-  color: #f9fafb;
-}
-.avatar-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  background: #1a1d23;
-  border: 1px solid #374151;
-  border-radius: 10px;
-  min-width: 180px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  z-index: 5001;
-  overflow: hidden;
-}
-.avatar-menu-header {
-  padding: 12px 16px;
-}
-.avatar-menu-name {
-  color: #f9fafb;
-  font-size: 16px;
-  font-weight: 600;
-}
-.avatar-menu-email {
-  color: #93c5fd;
-  font-size: 16px;
-  margin-top: 2px;
-}
-.avatar-menu-sep {
-  height: 1px;
-  background: #374151;
-}
-.avatar-menu-item {
-  display: block;
-  width: 100%;
-  padding: 12px 18px;
+  width: 32px;
+  height: 32px;
   background: none;
-  border: none;
-  color: #d1d5db;
-  font-size: 15px;
-  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #9ca3af;
   cursor: pointer;
-  transition: background 0.1s;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
-.avatar-menu-item:hover {
-  background: #1f2937;
+.signout-btn svg {
+  width: 18px;
+  height: 18px;
 }
-.avatar-menu-signout {
+.signout-btn:hover {
   color: #ef4444;
-}
-.avatar-menu-signout:hover {
   background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
 }
 </style>
