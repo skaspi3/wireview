@@ -1,8 +1,8 @@
 <script setup>
 import '@patternfly/elements/pf-button/pf-button.js';
 import '@patternfly/elements/pf-tooltip/pf-tooltip.js';
-import { ref, useTemplateRef, computed } from 'vue';
-import { displayFilter, packets, stoppedCapture, allPackets, idleCountdownSeconds, cancelIdleCountdown, apiFetch } from '../globals';
+import { ref, useTemplateRef, computed, onMounted, onUnmounted } from 'vue';
+import { displayFilter, packets, stoppedCapture, allPackets, idleCountdownSeconds, cancelIdleCountdown, apiFetch, authUser } from '../globals';
 import LiveCapture from "./LiveCapture.vue";
 
 const props = defineProps({
@@ -12,7 +12,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['clear', 'stop', 'openFileBrowser', 'openInsights', 'saveFiltered']);
+const emit = defineEmits(['clear', 'stop', 'openFileBrowser', 'openInsights', 'saveFiltered', 'signOut']);
 
 const liveCaptureRef = useTemplateRef('live-capture');
 
@@ -129,6 +129,29 @@ const savePackets = async () => {
   }
 };
 
+// User avatar menu
+const showAvatarMenu = ref(false);
+const avatarMenuRef = ref(null);
+const userInitial = computed(() => {
+  const name = authUser.value?.username || '?';
+  return name.charAt(0).toUpperCase();
+});
+
+const toggleAvatarMenu = () => { showAvatarMenu.value = !showAvatarMenu.value; };
+const closeAvatarMenu = (e) => {
+  if (avatarMenuRef.value && !avatarMenuRef.value.contains(e.target)) {
+    showAvatarMenu.value = false;
+  }
+};
+onMounted(() => document.addEventListener('click', closeAvatarMenu));
+onUnmounted(() => document.removeEventListener('click', closeAvatarMenu));
+
+const signOut = async () => {
+  showAvatarMenu.value = false;
+  try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
+  emit('signOut');
+};
+
 defineExpose({ loadPcapFile });
 </script>
 
@@ -217,6 +240,22 @@ defineExpose({ loadPcapFile });
           </pf-button>
           <pf-button variant="secondary" @click="closeSaveDialog">Cancel</pf-button>
         </div>
+      </div>
+    </div>
+
+    <!-- User Avatar + Name -->
+    <div v-if="authUser" ref="avatarMenuRef" class="avatar-container">
+      <button class="avatar-trigger" @click.stop="toggleAvatarMenu">
+        <span class="avatar-name">{{ authUser.username }}</span>
+        <span class="avatar-btn">{{ userInitial }}</span>
+      </button>
+      <div v-if="showAvatarMenu" class="avatar-menu">
+        <div class="avatar-menu-header">
+          <div class="avatar-menu-name">{{ authUser.username }}</div>
+          <div class="avatar-menu-email">{{ authUser.email }}</div>
+        </div>
+        <div class="avatar-menu-sep"></div>
+        <button class="avatar-menu-item avatar-menu-signout" @click="signOut">Sign Out</button>
       </div>
     </div>
   </div>
@@ -527,5 +566,102 @@ defineExpose({ loadPcapFile });
   transform: scale(0.95);
 }
 
-
+/* User Avatar */
+.avatar-container {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5000;
+}
+.avatar-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+}
+.avatar-name {
+  color: #d1d5db;
+  font-size: 13px;
+  font-weight: 500;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.avatar-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid #4b5563;
+  background: #374151;
+  color: #e5e7eb;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+.avatar-trigger:hover .avatar-btn {
+  border-color: #6b7280;
+  background: #4b5563;
+}
+.avatar-trigger:hover .avatar-name {
+  color: #f9fafb;
+}
+.avatar-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  background: #1a1d23;
+  border: 1px solid #374151;
+  border-radius: 10px;
+  min-width: 180px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 5001;
+  overflow: hidden;
+}
+.avatar-menu-header {
+  padding: 12px 16px;
+}
+.avatar-menu-name {
+  color: #f9fafb;
+  font-size: 16px;
+  font-weight: 600;
+}
+.avatar-menu-email {
+  color: #93c5fd;
+  font-size: 16px;
+  margin-top: 2px;
+}
+.avatar-menu-sep {
+  height: 1px;
+  background: #374151;
+}
+.avatar-menu-item {
+  display: block;
+  width: 100%;
+  padding: 12px 18px;
+  background: none;
+  border: none;
+  color: #d1d5db;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.avatar-menu-item:hover {
+  background: #1f2937;
+}
+.avatar-menu-signout {
+  color: #ef4444;
+}
+.avatar-menu-signout:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
 </style>

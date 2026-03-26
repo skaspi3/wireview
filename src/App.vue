@@ -2,7 +2,7 @@
 import '@patternfly/elements/pf-button/pf-button.js';
 import '@patternfly/elements/pf-tooltip/pf-tooltip.js';
 import { ref, useTemplateRef, computed, getCurrentInstance, watch, onMounted } from 'vue';
-import { clearPackets, packets, allPackets, captureActive, stoppedCapture, displayFilter, filterLoading, filterProgress, cancelFilter, savedCapturesCount, apiFetch, apiUrl, fetchInitialData } from './globals';
+import { clearPackets, packets, allPackets, captureActive, stoppedCapture, displayFilter, filterLoading, filterProgress, cancelFilter, savedCapturesCount, apiFetch, apiUrl, fetchInitialData, authUser } from './globals';
 import { getSentryConsent, enableSentry, disableSentry } from './sentry';
 import './packetCache';  // Initialize packet cache (registers clearer callback)
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
@@ -14,37 +14,38 @@ import DisplayFilter from './components/DisplayFilter.vue';
 import StatusBar from './components/StatusBar.vue';
 import FileBrowser from './components/FileBrowser.vue';
 import LoginPage from './components/LoginPage.vue';
-import ChangePasswordDialog from './components/ChangePasswordDialog.vue';
 
 // Auth state
 const authChecked = ref(false);
 const isAuthenticated = ref(false);
-const mustChangePassword = ref(false);
 
 onMounted(async () => {
   try {
     const res = await fetch('/api/auth/status');
     const data = await res.json();
     isAuthenticated.value = !!data.authenticated;
-    mustChangePassword.value = !!data.mustChangePassword;
+    if (data.authenticated) {
+      authUser.value = { userId: data.userId, shortId: data.shortId, username: data.username, email: data.email };
+    }
   } catch {
     isAuthenticated.value = false;
   }
   authChecked.value = true;
-  if (isAuthenticated.value && !mustChangePassword.value) {
+  if (isAuthenticated.value) {
     fetchInitialData();
   }
 });
 
-const onLoginSuccess = ({ mustChangePassword: mustChange }) => {
+const onLoginSuccess = ({ user }) => {
   isAuthenticated.value = true;
-  mustChangePassword.value = mustChange;
-  if (!mustChange) fetchInitialData();
+  if (user) authUser.value = { userId: user.userId, shortId: user.shortId, username: user.username, email: user.email };
+  fetchInitialData();
 };
 
-const onPasswordChanged = () => {
-  mustChangePassword.value = false;
-  fetchInitialData();
+const onSignOut = () => {
+  isAuthenticated.value = false;
+  authUser.value = null;
+  clearPackets();
 };
 
 // Show landing page when no packets and not actively using the app
@@ -270,7 +271,6 @@ const confirmOpenNo = () => {
     <!-- Auth gate -->
     <template v-if="!authChecked" />
     <LoginPage v-else-if="!isAuthenticated" @login-success="onLoginSuccess" />
-    <ChangePasswordDialog v-else-if="mustChangePassword" :first-run="mustChangePassword" @password-changed="onPasswordChanged" />
     <template v-else>
 
     <!-- Filter Loading Overlay -->
@@ -290,7 +290,7 @@ const confirmOpenNo = () => {
 
     <!-- Main UI -->
     <div class="main-content">
-      <IconRibbon ref="icon-ribbon" :hide-insights="showLandingPage" @clear="handleClear" @stop="handleStop" @openFileBrowser="handleOpenFileBrowser" @openInsights="handleOpenInsights" />
+      <IconRibbon ref="icon-ribbon" :hide-insights="showLandingPage" @clear="handleClear" @stop="handleStop" @openFileBrowser="handleOpenFileBrowser" @openInsights="handleOpenInsights" @sign-out="onSignOut" />
       <DisplayFilter v-if="!showLandingPage" />
 
       <!-- Landing Page with Interface Selector (teleport target) -->

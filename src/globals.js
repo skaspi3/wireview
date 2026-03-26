@@ -177,11 +177,18 @@ fetch('/VERSION', { cache: 'no-store' })
   .then(text => { const build = text.trim(); if (build) appVersion.value = `v1.0.${build}`; })
   .catch(() => {});
 
+// Auth user state (populated by App.vue after login)
+export const authUser = ref(null); // { userId, shortId, username, email }
+
 // Fetch certificate info and other initial data (called after auth succeeds)
 export const fetchInitialData = () => {
   apiFetch('/api/cert-info')
     .then(res => res.json())
     .then(data => { if (data && !data.error) certInfo.value = data; })
+    .catch(() => {});
+  apiFetch('/api/saved-captures')
+    .then(res => res.json())
+    .then(data => { if (data && data.files) savedCapturesCount.value = data.files.length; })
     .catch(() => {});
 };
 

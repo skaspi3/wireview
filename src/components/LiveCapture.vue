@@ -120,9 +120,8 @@
       </div>
     </div>
 
-    <!-- Session info (top-right corner) -->
+    <!-- Session info (top-right, left of avatar) -->
     <span v-if="isCapturing && sessionId" class="session-info" :title="'Session: ' + sessionId">
-      <span class="session-badge"><pf-badge :number="sessionClientCount"></pf-badge> viewer{{ sessionClientCount !== 1 ? 's' : '' }}</span>
       <pf-tooltip v-if="isSessionOwner" content="Share capture session">
         <pf-button class="btn-share" @click="showShareDialog = true">
           🔗 Share
@@ -1552,7 +1551,7 @@ onUnmounted(() => {
 /* Session sharing styles */
 .session-info {
   position: absolute;
-  right: 12px;
+  right: 140px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
