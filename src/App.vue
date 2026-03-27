@@ -1,7 +1,7 @@
 <script setup>
 import '@patternfly/elements/pf-button/pf-button.js';
 import '@patternfly/elements/pf-tooltip/pf-tooltip.js';
-import { ref, useTemplateRef, computed, getCurrentInstance, watch, onMounted } from 'vue';
+import { ref, useTemplateRef, computed, getCurrentInstance, watch, onMounted, onBeforeUnmount } from 'vue';
 import { clearPackets, packets, allPackets, captureActive, stoppedCapture, displayFilter, filterLoading, filterProgress, cancelFilter, savedCapturesCount, apiFetch, apiUrl, fetchInitialData, authUser } from './globals';
 import { getSentryConsent, enableSentry, disableSentry } from './sentry';
 import './packetCache';  // Initialize packet cache (registers clearer callback)
@@ -56,11 +56,26 @@ const onPasswordChanged = () => {
   fetchInitialData();
 };
 
-const onSignOut = () => {
+const doSignOut = async () => {
+  try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
   isAuthenticated.value = false;
   passwordChanged.value = true;
   authUser.value = null;
   clearPackets();
+};
+
+const onSignOut = () => {
+  if (captureActive.value && !stoppedCapture.value && window.$dialog) {
+    window.$dialog.warning({
+      title: 'Sign Out',
+      content: 'A live capture is in progress. Signing out will stop the capture and discard unsaved data. Continue?',
+      positiveText: 'Yes, Sign Out',
+      negativeText: 'Cancel',
+      onPositiveClick: () => { doSignOut(); },
+    });
+  } else {
+    doSignOut();
+  }
 };
 
 // Show landing page when no packets and not actively using the app
@@ -252,34 +267,38 @@ const downloadCapture = (name) => {
 };
 
 // Open in Browser
-const pendingOpenPath = ref(null);
-const showOpenConfirm = ref(false);
+const doOpenCapture = (filePath) => {
+  showSavedCaptures.value = false;
+  iconRibbonRef.value?.loadPcapFile(filePath);
+};
 
 const openCaptureRemotely = (filePath) => {
   // If live capture is running (not stopped), warn user
   if (captureActive.value && !stoppedCapture.value) {
-    pendingOpenPath.value = filePath;
-    showOpenConfirm.value = true;
+    if (!window.$dialog) return;
+    window.$dialog.warning({
+      title: 'Open Capture',
+      content: 'The current live capture will be lost (unsaved data). Continue?',
+      positiveText: 'Yes, Open',
+      negativeText: 'Cancel',
+      onPositiveClick: () => { doOpenCapture(filePath); },
+    });
   } else {
     doOpenCapture(filePath);
   }
 };
 
-const doOpenCapture = (filePath) => {
-  showSavedCaptures.value = false;
-  showOpenConfirm.value = false;
-  iconRibbonRef.value?.loadPcapFile(filePath);
+// Warn on browser reload/close during live capture
+const beforeUnloadHandler = (e) => {
+  if (captureActive.value && !stoppedCapture.value) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
 };
-
-const confirmOpenYes = () => {
-  doOpenCapture(pendingOpenPath.value);
-  pendingOpenPath.value = null;
-};
-
-const confirmOpenNo = () => {
-  showOpenConfirm.value = false;
-  pendingOpenPath.value = null;
-};
+window.addEventListener('beforeunload', beforeUnloadHandler);
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', beforeUnloadHandler);
+});
 </script>
 
 <template>
@@ -449,18 +468,6 @@ const confirmOpenNo = () => {
               </tr>
             </tbody>
           </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- Open in Browser confirm dialog -->
-    <div v-if="showOpenConfirm" class="saved-captures-overlay" @click.self="confirmOpenNo">
-      <div class="open-confirm-dialog">
-        <div class="open-confirm-title">Open Capture</div>
-        <div class="open-confirm-msg">The current live capture will be lost (unsaved data). Continue?</div>
-        <div class="open-confirm-actions">
-          <pf-button class="open-confirm-btn" @click="confirmOpenYes">Yes, Open</pf-button>
-          <pf-button variant="secondary" class="open-confirm-btn" @click="confirmOpenNo">Cancel</pf-button>
         </div>
       </div>
     </div>
@@ -816,38 +823,6 @@ const confirmOpenNo = () => {
 }
 .sc-delete:hover {
   background: rgba(239, 68, 68, 0.15);
-}
-
-/* Open confirm dialog */
-.open-confirm-dialog {
-  background: #1a1d23;
-  border: 1px solid #374151;
-  border-radius: 12px;
-  padding: 24px;
-  min-width: 380px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
-  text-align: center;
-}
-.open-confirm-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #f9fafb;
-  margin-bottom: 12px;
-}
-.open-confirm-msg {
-  color: #d1d5db;
-  font-size: 14px;
-  margin-bottom: 20px;
-  line-height: 1.5;
-}
-.open-confirm-actions {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-}
-.open-confirm-btn {
-  --pf-c-button--FontSize: 14px;
-  --pf-c-button--FontWeight: 600;
 }
 
 /* Sentry consent banner */

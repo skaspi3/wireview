@@ -1,20 +1,8 @@
-<template>
-  <pf-modal :open="isOpen || undefined" @close="handleCancel" variant="small">
-    <h3 slot="header">{{ title }}</h3>
-    <p class="confirm-body">{{ message }}</p>
-    <div slot="footer" class="confirm-footer">
-      <pf-button variant="tertiary" @click="handleCancel">Cancel</pf-button>
-      <pf-button variant="secondary" @click="handleNo">{{ noText }}</pf-button>
-      <pf-button @click="handleYes">{{ yesText }}</pf-button>
-    </div>
-  </pf-modal>
-</template>
-
 <script setup>
-import '@patternfly/elements/pf-modal/pf-modal.js';
-import '@patternfly/elements/pf-button/pf-button.js';
-import { ref } from 'vue';
-
+/**
+ * ConfirmDialog — Thin wrapper around Naive UI's $dialog.warning.
+ * Keeps the same open()/close() + emit API so callers don't change.
+ */
 const props = defineProps({
   title: { type: String, default: 'Confirm' },
   message: { type: String, default: 'Are you sure?' },
@@ -24,50 +12,31 @@ const props = defineProps({
 
 const emit = defineEmits(['yes', 'no', 'cancel', 'close']);
 
-const isOpen = ref(false);
+let dialogInstance = null;
 
 const open = () => {
-  isOpen.value = true;
+  if (!window.$dialog) return;
+  dialogInstance = window.$dialog.warning({
+    title: props.title,
+    content: props.message,
+    positiveText: props.yesText,
+    negativeText: props.noText,
+    closable: true,
+    maskClosable: false,
+    onPositiveClick: () => { emit('yes'); },
+    onNegativeClick: () => { emit('no'); },
+    onClose: () => { emit('cancel'); },
+    onMaskClick: () => { emit('cancel'); },
+  });
 };
 
 const close = () => {
-  isOpen.value = false;
+  if (dialogInstance) {
+    dialogInstance.destroy();
+    dialogInstance = null;
+  }
   emit('close');
-};
-
-const handleYes = () => {
-  isOpen.value = false;
-  emit('yes');
-};
-
-const handleNo = () => {
-  isOpen.value = false;
-  emit('no');
-};
-
-const handleCancel = () => {
-  isOpen.value = false;
-  emit('cancel');
 };
 
 defineExpose({ open, close });
 </script>
-
-<style scoped>
-.confirm-body {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.confirm-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  width: 100%;
-}
-
-.confirm-footer pf-button {
-  --pf-c-button--FontWeight: bold;
-}
-</style>

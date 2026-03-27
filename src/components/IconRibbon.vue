@@ -140,8 +140,7 @@ const getShareUrl = () => {
   return `${window.location.origin}${window.location.pathname}?session=${sessionId.value}`;
 };
 
-const signOut = async () => {
-  try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
+const signOut = () => {
   emit('signOut');
 };
 

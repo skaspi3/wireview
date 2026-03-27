@@ -11,9 +11,11 @@ import {
   NMessageProvider,
   NNotificationProvider,
   NLoadingBarProvider,
+  NDialogProvider,
   useMessage,
   useNotification,
   useLoadingBar,
+  useDialog,
 } from 'naive-ui';
 
 /**
@@ -26,10 +28,12 @@ const NaiveServiceRegistrar = defineComponent({
     const message = useMessage();
     const notification = useNotification();
     const loadingBar = useLoadingBar();
+    const dialog = useDialog();
 
     window.$message = message;
     window.$notification = notification;
     window.$loadingBar = loadingBar;
+    window.$dialog = dialog;
   },
   render() {
     return null;
@@ -104,12 +108,14 @@ const themeOverrides = {
 <template>
   <n-config-provider :theme="darkTheme" :theme-overrides="themeOverrides">
     <n-loading-bar-provider>
-      <n-message-provider :max="5" :duration="3000" placement="bottom">
-        <n-notification-provider :max="4" placement="bottom-right">
-          <NaiveServiceRegistrar />
-          <slot />
-        </n-notification-provider>
-      </n-message-provider>
+      <n-dialog-provider>
+        <n-message-provider :max="5" :duration="3000" placement="bottom">
+          <n-notification-provider :max="4" placement="bottom-right">
+            <NaiveServiceRegistrar />
+            <slot />
+          </n-notification-provider>
+        </n-message-provider>
+      </n-dialog-provider>
     </n-loading-bar-provider>
   </n-config-provider>
 </template>
