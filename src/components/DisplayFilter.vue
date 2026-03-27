@@ -1,6 +1,7 @@
 <script setup>
 import '@patternfly/elements/pf-tooltip/pf-tooltip.js';
 import { ref, watch, computed, onBeforeUnmount, onMounted, useTemplateRef, nextTick } from "vue";
+import { NAlert } from "naive-ui";
 import { displayFilter, filterError, applyDisplayFilter, websocket } from "../globals";
 import FilterApplyIcon from "./icons/FilterApplyIcon.vue";
 
@@ -698,9 +699,9 @@ onBeforeUnmount(() => document.body.removeEventListener("keydown", handleGlobalK
         </button>
       </pf-tooltip>
     </form>
-    <div v-if="filterError" class="filter-error" :title="filterError">
+    <n-alert v-if="filterError" type="error" :bordered="false" class="filter-error-alert" closable @close="filterError = null">
       {{ filterError }}
-    </div>
+    </n-alert>
   </div>
 </template>
 
@@ -823,13 +824,9 @@ onBeforeUnmount(() => document.body.removeEventListener("keydown", handleGlobalK
   color: var(--ws-text-color);
   background-color: var(--ws-dark-gray);
 }
-.filter-error {
-  color: #dc2626;
+.filter-error-alert {
   font-size: 11px;
-  padding: 2px 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
+  padding: 2px 8px !important;
+  min-height: auto !important;
 }
 </style>

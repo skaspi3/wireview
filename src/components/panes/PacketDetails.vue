@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, computed, onUnmounted } from "vue";
+import { NSkeleton, NEmpty } from "naive-ui";
 import { packets, activePacketIndex, activePacketDetails, activePacketHex, activePacketRawHex, highlightedByteRange, isSessionOwner, followOwner, broadcastOwnerState, onOwnerStateChange } from "../../globals";
 import { getPacketWithPrefetch, getCachedPacket, isFetchingBatch } from "../../packetCache";
 
@@ -1479,13 +1480,16 @@ const formatValue = (key, path, value) => {
 <template>
   <div class="details-container">
     <div v-if="activePacketIndex === null" class="no-selection">
-      Select a packet to view details
+      <n-empty description="Select a packet to view details" />
     </div>
-    <div v-else-if="isLoading" class="loading">
-      <div class="spinner"></div>
+    <div v-else-if="isLoading" class="loading-skeleton">
+      <n-skeleton text :repeat="4" style="margin-bottom: 8px;" />
+      <n-skeleton text style="width: 60%; margin-bottom: 16px;" />
+      <n-skeleton text :repeat="3" style="margin-bottom: 8px;" />
+      <n-skeleton text style="width: 45%;" />
     </div>
     <div v-else-if="!activePacketDetails" class="no-selection">
-      No details available
+      <n-empty description="No details available" />
     </div>
     <div v-else class="tree" @mouseleave="onTreeLeave">
       <!-- Layer headers with summaries -->
@@ -1624,26 +1628,8 @@ const formatValue = (key, path, value) => {
   font-size: 15px;
 }
 
-.loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  min-height: 100px;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid transparent;
-  border-top: 4px solid #3b82f6;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+.loading-skeleton {
+  padding: 12px 16px;
 }
 
 .tree {

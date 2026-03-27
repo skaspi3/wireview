@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, watch } from "vue";
+import { NSkeleton, NEmpty } from "naive-ui";
 import { activePacketIndex, activePacketRawHex, highlightedByteRange, packets, wsRequest } from "../../globals";
 import { isFetchingBatch } from "../../packetCache";
 
@@ -118,13 +119,14 @@ const onHexLeave = () => {
 <template>
   <div class="packet-bytes-wrapper">
     <div v-if="activePacketIndex === null" class="no-selection">
-      Select a packet to view hex dump
+      <n-empty description="Select a packet to view hex dump" />
     </div>
-    <div v-else-if="isFetchingBatch && bytes.length === 0" class="loading">
-      <div class="spinner"></div>
+    <div v-else-if="isFetchingBatch && bytes.length === 0" class="loading-skeleton">
+      <n-skeleton text :repeat="6" style="margin-bottom: 6px; font-family: monospace;" />
+      <n-skeleton text style="width: 70%;" />
     </div>
     <div v-else-if="bytes.length === 0" class="no-selection">
-      No hex data available
+      <n-empty description="No hex data available" />
     </div>
     <div v-else class="hex-display" @mouseleave="onHexLeave">
       <div v-for="row in hexRows" :key="row.offset" class="hex-row">
@@ -200,26 +202,8 @@ const onHexLeave = () => {
   font-size: 15px;
 }
 
-.loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  min-height: 100px;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid transparent;
-  border-top: 4px solid #3b82f6;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+.loading-skeleton {
+  padding: 12px 16px;
 }
 
 .hex-display {

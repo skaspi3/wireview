@@ -9,11 +9,13 @@
       </div>
 
       <div v-else class="selection-group">
-        <select v-model="selectedInterface" class="interface-select">
-          <option v-for="iface in interfaces" :key="iface" :value="iface">
-            {{ iface }}
-          </option>
-        </select>
+        <n-select
+          v-model:value="selectedInterface"
+          :options="interfaces.map(i => ({ label: i, value: i }))"
+          size="small"
+          style="width: 180px;"
+          placeholder="Interface"
+        />
         <pf-button @click="startCapture">
           <span class="icon">●</span> Start
         </pf-button>
@@ -45,12 +47,23 @@
     <!-- Loading Pcap State -->
     <div v-if="isLoadingPcap" class="status-bar loading-pcap">
       <span class="loading-indicator">
-        <span class="spinner-small"></span>
+        <n-spin :size="14" stroke="#3b82f6" />
         Loading {{ loadingPcapFilename }}...
       </span>
       <span class="progress-count" v-if="loadPcapProgress > 0">
         {{ loadPcapProgress.toLocaleString() }} packets
       </span>
+      <n-progress
+        v-if="loadPcapProgress > 0"
+        type="line"
+        :percentage="100"
+        :show-indicator="false"
+        :height="3"
+        :border-radius="2"
+        processing
+        status="info"
+        style="width: 120px; margin-left: 8px;"
+      />
     </div>
 
     <!-- Loaded Pcap File State -->
@@ -68,16 +81,20 @@
     <!-- Capturing State -->
     <div v-else-if="isCapturing" class="status-bar">
       <span class="recording-indicator">● Capture</span>
-      <span class="interface-tag-wrapper" @mouseenter="showIfaceTooltip = true" @mouseleave="showIfaceTooltip = false">
-        <pf-label color="cyan" compact>on {{ selectedInterface }}</pf-label>
-        <div v-if="showIfaceTooltip && activeIfaceDetails" class="iface-tooltip">
-          <div class="iface-tooltip-row" v-if="activeIfaceDetails.driver"><span class="iface-tooltip-label">Driver:</span> {{ activeIfaceDetails.driver }}</div>
-          <div class="iface-tooltip-row" v-if="activeIfaceDetails.mac"><span class="iface-tooltip-label">MAC:</span> {{ activeIfaceDetails.mac }}</div>
-          <div class="iface-tooltip-row" v-if="activeIfaceDetails.ip"><span class="iface-tooltip-label">IPv4:</span> {{ activeIfaceDetails.ip }}</div>
-          <div class="iface-tooltip-row" v-if="activeIfaceDetails.ipv6"><span class="iface-tooltip-label">IPv6:</span> {{ activeIfaceDetails.ipv6 }}</div>
-          <div class="iface-tooltip-row" v-if="activeIfaceDetails.speed"><span class="iface-tooltip-label">Speed:</span> {{ activeIfaceDetails.speed }} Mbps</div>
+      <n-popover trigger="hover" placement="bottom" :disabled="!activeIfaceDetails">
+        <template #trigger>
+          <span class="interface-tag-wrapper">
+            <pf-label color="cyan" compact>on {{ selectedInterface }}</pf-label>
+          </span>
+        </template>
+        <div v-if="activeIfaceDetails" class="iface-popover">
+          <div v-if="activeIfaceDetails.driver" class="iface-popover-row"><span class="iface-popover-label">Driver</span> {{ activeIfaceDetails.driver }}</div>
+          <div v-if="activeIfaceDetails.mac" class="iface-popover-row"><span class="iface-popover-label">MAC</span> {{ activeIfaceDetails.mac }}</div>
+          <div v-if="activeIfaceDetails.ip" class="iface-popover-row"><span class="iface-popover-label">IPv4</span> {{ activeIfaceDetails.ip }}</div>
+          <div v-if="activeIfaceDetails.ipv6" class="iface-popover-row"><span class="iface-popover-label">IPv6</span> {{ activeIfaceDetails.ipv6 }}</div>
+          <div v-if="activeIfaceDetails.speed" class="iface-popover-row"><span class="iface-popover-label">Speed</span> {{ activeIfaceDetails.speed }} Mbps</div>
         </div>
-      </span>
+      </n-popover>
 
       <div v-if="isSessionOwner || !sessionId" class="capture-controls">
         <pf-tooltip content="Restart Capture">
@@ -103,11 +120,13 @@
 
     <!-- Stopped Capture State -->
     <div v-else-if="showStoppedBar" class="status-bar stopped-bar">
-      <select v-model="selectedInterface" class="stopped-interface-select">
-        <option v-for="iface in interfaces" :key="iface" :value="iface">
-          {{ iface }}{{ interfaceDetails[iface] ? formatIfaceOption(interfaceDetails[iface]) : '' }}
-        </option>
-      </select>
+      <n-select
+        v-model:value="selectedInterface"
+        :options="interfaces.map(i => ({ label: i + (interfaceDetails[i] ? formatIfaceOption(interfaceDetails[i]) : ''), value: i }))"
+        size="small"
+        style="width: 260px;"
+        placeholder="Interface"
+      />
       <div class="capture-controls">
         <pf-tooltip content="Start Capture">
           <button @click="resumeCaptureOnSameInterface" class="ctrl-btn ctrl-play">
@@ -179,6 +198,7 @@ import '@patternfly/elements/pf-badge/pf-badge.js';
 import '@patternfly/elements/pf-label/pf-label.js';
 import '@patternfly/elements/pf-clipboard-copy/pf-clipboard-copy.js';
 import { ref, triggerRef, onUnmounted, onMounted, computed, watch } from 'vue';
+import { NSpin, NPopover, NProgress, NSelect } from 'naive-ui';
 import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, captureIncludePort443, sessionId, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange, resolveWsRequest, clearPendingWsRequests, pcapDirUsage, idleCountdownSeconds, setCancelIdleCountdown, linkSpeedMbps, savedCapturesCount, addWsEvent, clientId, apiFetch } from '../globals';
 import { decompress as zstdDecompress } from 'fzstd';
 import ConfirmDialog from './ConfirmDialog.vue';
@@ -194,7 +214,6 @@ const loadingBarActive = ref(false); // True while top loading bar is running (w
 const interfaces = ref([]);
 const selectedInterface = ref('');
 const interfaceDetails = ref({});
-const showIfaceTooltip = ref(false);
 const activeIfaceDetails = computed(() => {
   const d = interfaceDetails.value[selectedInterface.value];
   if (!d) return null;
@@ -1410,42 +1429,21 @@ onUnmounted(() => {
   cursor: default;
 }
 
-.iface-tooltip {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  background: #1f2937;
-  border: 1px solid #4b5563;
-  border-radius: 6px;
-  padding: 8px 12px;
+.iface-popover {
   font-size: 12px;
   font-family: monospace;
-  color: #e5e7eb;
-  white-space: nowrap;
-  z-index: 100;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
-.iface-tooltip::before {
-  content: '';
-  position: absolute;
-  top: -5px;
-  left: 16px;
-  width: 8px;
-  height: 8px;
-  background: #1f2937;
-  border-left: 1px solid #4b5563;
-  border-top: 1px solid #4b5563;
-  transform: rotate(45deg);
-}
-
-.iface-tooltip-row {
+.iface-popover-row {
   padding: 2px 0;
+  color: #e5e7eb;
 }
 
-.iface-tooltip-label {
+.iface-popover-label {
   color: #9ca3af;
-  margin-right: 6px;
+  margin-right: 8px;
+  min-width: 40px;
+  display: inline-block;
 }
 
 .error-toast {
@@ -1477,19 +1475,6 @@ onUnmounted(() => {
   color: #93c5fd;
 }
 
-.spinner-small {
-  width: 14px;
-  height: 14px;
-  border: 2px solid transparent;
-  border-top: 2px solid #3b82f6;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
 
 .progress-count {
   color: #9ca3af;

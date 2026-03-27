@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch, onMounted, onUnmounted, useTemplateRef } from "vue";
 import { useResizeObserver, useScroll } from "@vueuse/core";
+import { NTag } from "naive-ui";
 import { packets, activePacketIndex, displayFilter, allPackets, isSessionOwner, followOwner, broadcastOwnerState, onOwnerStateChange, applyDisplayFilter } from "../../globals";
 
 // Debounce helper for scroll broadcasts
@@ -315,6 +316,30 @@ const getProtocolColor = (protocol) => {
   return colors[protocol] || '#ffffff';
 };
 
+// Protocol tag colors (dark-themed mini badges)
+const getProtocolTagColor = (protocol) => {
+  const map = {
+    'TCP': { color: '#c4b5fd', borderColor: '#7c3aed', textColor: '#1e1b4b' },
+    'UDP': { color: '#93c5fd', borderColor: '#2563eb', textColor: '#1e3a5f' },
+    'DNS': { color: '#86efac', borderColor: '#16a34a', textColor: '#14532d' },
+    'DHCP': { color: '#86efac', borderColor: '#16a34a', textColor: '#14532d' },
+    'DHCPv6': { color: '#86efac', borderColor: '#16a34a', textColor: '#14532d' },
+    'HTTP': { color: '#4ade80', borderColor: '#15803d', textColor: '#052e16' },
+    'TLS': { color: '#c4b5fd', borderColor: '#7c3aed', textColor: '#1e1b4b' },
+    'ICMP': { color: '#f9a8d4', borderColor: '#db2777', textColor: '#4a0532' },
+    'ICMPv4': { color: '#f9a8d4', borderColor: '#db2777', textColor: '#4a0532' },
+    'ICMPv6': { color: '#f9a8d4', borderColor: '#db2777', textColor: '#4a0532' },
+    'ARP': { color: '#fde68a', borderColor: '#d97706', textColor: '#451a03' },
+    'MDNS': { color: '#93c5fd', borderColor: '#2563eb', textColor: '#1e3a5f' },
+    'SSDP': { color: '#93c5fd', borderColor: '#2563eb', textColor: '#1e3a5f' },
+    'QUIC': { color: '#67e8f9', borderColor: '#0891b2', textColor: '#083344' },
+    'SMB': { color: '#fde68a', borderColor: '#d97706', textColor: '#451a03' },
+    'SMB2': { color: '#fde68a', borderColor: '#d97706', textColor: '#451a03' },
+    'IGMP': { color: '#f9a8d4', borderColor: '#db2777', textColor: '#4a0532' },
+  };
+  return map[protocol] || { color: '#e5e7eb', borderColor: '#9ca3af', textColor: '#1f2937' };
+};
+
 // Format time
 const formatTime = (time) => {
   if (typeof time !== 'number') return '0.000000';
@@ -413,7 +438,14 @@ onUnmounted(() => {
             <td class="col-sport">{{ pkt.srcPort }}</td>
             <td class="col-dst">{{ pkt.dst }}</td>
             <td class="col-dport">{{ pkt.dstPort }}</td>
-            <td class="col-proto">{{ pkt.protocol }}</td>
+            <td class="col-proto">
+              <n-tag
+                :bordered="false"
+                size="tiny"
+                :color="getProtocolTagColor(pkt.protocol)"
+                class="proto-tag"
+              >{{ pkt.protocol }}</n-tag>
+            </td>
             <td class="col-len">{{ pkt.length }}</td>
             <td class="col-info">{{ pkt.info }}</td>
           </tr>
@@ -516,6 +548,16 @@ onUnmounted(() => {
 .packet-table tbody tr.selected {
   background-color: #3875d7 !important;
   color: #fff;
+}
+
+.proto-tag {
+  font-size: 10px !important;
+  height: 18px !important;
+  line-height: 18px !important;
+  padding: 0 5px !important;
+  font-weight: 600;
+  font-family: var(--ws-font-family-monospace);
+  letter-spacing: 0.3px;
 }
 
 .col-no { width: 60px; text-align: right; }
