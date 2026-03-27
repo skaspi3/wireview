@@ -4,12 +4,17 @@ import { ref } from 'vue';
 
 const emit = defineEmits(['login-success']);
 
+const username = ref('');
 const password = ref('');
 const error = ref('');
 const loading = ref(false);
 
 const login = async () => {
   error.value = '';
+  if (!username.value.trim()) {
+    error.value = 'Please enter a username';
+    return;
+  }
   if (!password.value) {
     error.value = 'Please enter a password';
     return;
@@ -19,7 +24,7 @@ const login = async () => {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: 'webpcap', password: password.value }),
+      body: JSON.stringify({ username: username.value.trim(), password: password.value }),
     });
     const data = await res.json();
     if (!res.ok || !data.success) {
@@ -45,10 +50,10 @@ const login = async () => {
           <label for="login-user">Username</label>
           <input
             id="login-user"
+            v-model="username"
             type="text"
-            value="webpcap"
-            readonly
-            class="login-readonly"
+            autocomplete="username"
+            autofocus
           />
         </div>
         <div class="login-field">
@@ -58,7 +63,6 @@ const login = async () => {
             v-model="password"
             type="password"
             autocomplete="current-password"
-            autofocus
             @keyup.enter="login"
           />
         </div>
@@ -124,10 +128,6 @@ const login = async () => {
 }
 .login-field input:focus {
   border-color: #3b82f6;
-}
-.login-readonly {
-  opacity: 0.6;
-  cursor: default;
 }
 .login-error {
   color: #ef4444;

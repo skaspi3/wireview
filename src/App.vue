@@ -5,6 +5,8 @@ import { ref, useTemplateRef, computed, getCurrentInstance, watch, onMounted } f
 import { clearPackets, packets, allPackets, captureActive, stoppedCapture, displayFilter, filterLoading, filterProgress, cancelFilter, savedCapturesCount, apiFetch, apiUrl, fetchInitialData, authUser } from './globals';
 import { getSentryConsent, enableSentry, disableSentry } from './sentry';
 import './packetCache';  // Initialize packet cache (registers clearer callback)
+import { NSpin, NProgress } from 'naive-ui';
+import NaiveProvider from './components/NaiveProvider.vue';
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
 import PacketList from './components/panes/PacketList.vue';
 import PacketDetails from './components/panes/PacketDetails.vue';
@@ -45,6 +47,7 @@ const onLoginSuccess = ({ user, passwordChanged: pwChanged }) => {
   passwordChanged.value = !!pwChanged;
   if (pwChanged) {
     fetchInitialData();
+    setTimeout(() => { if (window.$message) window.$message.success(`Welcome, ${user?.username || 'webpcap'}`); }, 300);
   }
 };
 
@@ -279,6 +282,7 @@ const confirmOpenNo = () => {
 </script>
 
 <template>
+  <NaiveProvider>
   <div class="app-layout">
     <!-- Auth gate -->
     <template v-if="!authChecked" />
@@ -289,11 +293,23 @@ const confirmOpenNo = () => {
     <!-- Filter Loading Overlay -->
     <div v-if="filterLoading" class="filter-loading-overlay">
       <div class="filter-loading-popup">
-        <div class="filter-loading-text">Applying filter...</div>
-        <div class="filter-spinner"></div>
+        <n-spin size="large" :stroke-width="14" stroke="#3b82f6">
+          <template #description>
+            <div class="filter-loading-text">Applying filter...</div>
+          </template>
+        </n-spin>
         <div v-if="filterProgress > 0" class="filter-progress">
-          {{ filterProgress }} packets found
+          {{ filterProgress.toLocaleString() }} packets found
         </div>
+        <n-progress
+          v-if="filterProgress > 0 && allPackets.length > 0"
+          type="line"
+          :percentage="Math.min(100, Math.round((filterProgress / allPackets.length) * 100))"
+          :show-indicator="false"
+          :height="4"
+          :border-radius="2"
+          style="width: 200px; margin-top: 8px;"
+        />
         <pf-button variant="secondary" class="filter-cancel-btn" @click="cancelFilter">Cancel</pf-button>
       </div>
     </div>
@@ -452,6 +468,7 @@ const confirmOpenNo = () => {
 
     </template><!-- end auth gate -->
   </div>
+  </NaiveProvider>
 </template>
 
 <style scoped>
@@ -524,27 +541,17 @@ const confirmOpenNo = () => {
   color: #e5e7eb;
   font-size: 16px;
   font-weight: 500;
-}
-.filter-spinner {
-  width: 60px;
-  height: 60px;
-  border: 5px solid transparent;
-  border-top: 5px solid #3b82f6;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  margin-top: 12px;
 }
 .filter-progress {
   color: #9ca3af;
   font-size: 14px;
   font-family: monospace;
+  margin-top: 8px;
 }
 .filter-cancel-btn {
-  margin-top: 10px;
+  margin-top: 14px;
   --pf-c-button--FontSize: 14px;
-}
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
 }
 
 /* Packet Counter - bottom edge center */

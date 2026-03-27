@@ -120,29 +120,13 @@
       </div>
     </div>
 
-    <!-- Session info (top-right, left of avatar) -->
-    <span v-if="isCapturing && sessionId" class="session-info" :title="'Session: ' + sessionId">
-      <pf-tooltip v-if="isSessionOwner" content="Share capture session">
-        <pf-button class="btn-share" @click="showShareDialog = true">
-          🔗 Share
-        </pf-button>
-      </pf-tooltip>
-      <label v-if="!isSessionOwner" class="follow-toggle" title="Follow owner's view (selected packet, scroll, filter)">
+    <!-- Session info (viewer follow toggle) -->
+    <span v-if="isCapturing && sessionId && !isSessionOwner" class="session-info" :title="'Session: ' + sessionId">
+      <label class="follow-toggle" title="Follow owner's view (selected packet, scroll, filter)">
         <input type="checkbox" v-model="followOwner" />
         <span class="follow-label">Follow</span>
       </label>
     </span>
-
-    <!-- Share Dialog -->
-    <div v-if="showShareDialog" class="share-dialog-overlay" @click.self="showShareDialog = false">
-      <div class="share-dialog">
-        <h3>Share Capture Session</h3>
-        <p>Others can view this live capture by opening this link:</p>
-        <pf-clipboard-copy :value="getShareUrl()" readonly click-tip="Copied!" hover-tip="Copy" @copy="showShareDialog = false"></pf-clipboard-copy>
-        <p class="share-note">Session ID: <code>{{ sessionId }}</code></p>
-        <pf-button variant="secondary" @click="showShareDialog = false">Close</pf-button>
-      </div>
-    </div>
 
     <!-- Join Request Popup (for owner) -->
     <div v-if="pendingJoinRequests.length > 0" class="join-request-popup">
@@ -206,6 +190,7 @@ const emit = defineEmits(['clear', 'stop', 'openFileBrowser']);
 const ws = ref(null);
 const isConnected = ref(false);
 const isCapturing = ref(false);
+const loadingBarActive = ref(false); // True while top loading bar is running (waiting for first packets)
 const interfaces = ref([]);
 const selectedInterface = ref('');
 const interfaceDetails = ref({});
@@ -306,7 +291,6 @@ setCancelIdleCountdown(() => onUserActivity());
 const isSessionOwner = ref(false);
 const sessionClientCount = ref(0);
 const pendingSessionJoin = ref(null);  // Session ID from URL to join after connect
-const showShareDialog = ref(false);
 const sessionNotification = ref(null);  // Toast notification for session events
 const myViewerId = ref(null);  // This client's viewer ID
 const pendingJoinRequests = ref([]);  // Array of { requestId, sessionId } for owner
@@ -525,6 +509,7 @@ const connect = ({ isReconnect = false } = {}) => {
       isConnected.value = true;
       backendStatus.value = 'connected';
       addWsEvent(isReconnect ? 'WebSocket reconnected' : 'WebSocket connected');
+      if (isReconnect && window.$message) window.$message.success('Reconnected to backend');
       websocket.value = ws.value; // Store in global for filter requests
       startHeartbeat();
 
@@ -623,6 +608,9 @@ const connect = ({ isReconnect = false } = {}) => {
           linkSpeedMbps.value = ifaceInfo?.speed || 0;
           savedCapturesCount.value = 0;  // Fresh session — reset count
           emit('clear');
+          if (window.$message) window.$message.success(`Capturing on ${msg.interface}`);
+          if (window.$loadingBar) window.$loadingBar.start();
+          loadingBarActive.value = true;
         }
 
         // Session joined - we are a viewer
@@ -701,10 +689,17 @@ const connect = ({ isReconnect = false } = {}) => {
           isCapturing.value = false;
           captureActive.value = false;
           stoppedCapture.value = true;
+          if (loadingBarActive.value) {
+            loadingBarActive.value = false;
+            if (window.$loadingBar) window.$loadingBar.finish();
+          }
           if (msg.reason === 'pcapStorageFull') {
             showSessionNotification('Capture stopped because the live RAM buffer is full', 5000);
+            if (window.$notification) window.$notification.warning({ title: 'Capture Stopped', content: 'Live RAM buffer is full.', duration: 5000 });
           } else if (!isSessionOwner.value) {
             showSessionNotification('Session owner stopped the capture', 5000);
+          } else {
+            if (window.$message) window.$message.info('Capture stopped');
           }
           emit('stop');
         }
@@ -738,6 +733,11 @@ const connect = ({ isReconnect = false } = {}) => {
         // Handle packet summaries from server
         if (msg.type === 'packet') {
           if (!isCapturing.value) return;
+          // Finish loading bar once first packets appear
+          if (loadingBarActive.value) {
+            loadingBarActive.value = false;
+            if (window.$loadingBar) window.$loadingBar.finish();
+          }
           // When no filter active: add to both arrays and update UI
           // When filter active: only add to allPackets (no UI update, wait for filteredPacket)
           if (!displayFilter.value) {
@@ -818,9 +818,17 @@ const connect = ({ isReconnect = false } = {}) => {
 
           if (msg.error) {
             filterError.value = msg.error;
+            if (window.$message) window.$message.error(`Filter error: ${msg.error}`);
           } else {
             filterError.value = null;
             displayFilter.value = msg.filter || '';
+            if (window.$message) {
+              if (msg.filter) {
+                window.$message.info(`Filter matched ${(msg.packets?.length || 0).toLocaleString()} packets`);
+              } else {
+                window.$message.info('Filter cleared');
+              }
+            }
 
             // If filter is empty, restore all packets from local cache
             if (!msg.filter) {
@@ -848,6 +856,7 @@ const connect = ({ isReconnect = false } = {}) => {
           allPackets.value = [];
           activePacketIndex.value = null;
           triggerRef(packets);
+          if (window.$loadingBar) window.$loadingBar.start();
         }
 
         if (msg.type === 'loadPcapProgress') {
@@ -876,6 +885,8 @@ const connect = ({ isReconnect = false } = {}) => {
           captureActive.value = true;
           // Packets already loaded via batches, just trigger final update
           triggerRef(packets);
+          if (window.$loadingBar) window.$loadingBar.finish();
+          if (window.$message) window.$message.success(`Loaded ${packets.value.length.toLocaleString()} packets`);
         }
 
         if (msg.type === 'loadPcapError') {
@@ -883,6 +894,8 @@ const connect = ({ isReconnect = false } = {}) => {
           loadPcapProgress.value = 0;
           loadingPcapFilename.value = '';
           error.value = msg.error;
+          if (window.$loadingBar) window.$loadingBar.error();
+          if (window.$message) window.$message.error(msg.error || 'Failed to load file');
         }
 
         // Handle save progress updates
@@ -892,11 +905,13 @@ const connect = ({ isReconnect = false } = {}) => {
           }
           if (msg.status === 'complete') {
             savedCapturesCount.value++;
+            if (window.$message) window.$message.success(`Capture saved: ${msg.filename || 'capture'}`);
           }
         }
 
         if (msg.type === 'error') {
           error.value = msg.message;
+          if (window.$notification) window.$notification.error({ title: 'Error', content: msg.message, duration: 6000 });
           if (isCapturing.value) {
             stopCapture();
           }
@@ -913,6 +928,10 @@ const connect = ({ isReconnect = false } = {}) => {
       isCapturing.value = false;
       backendStatus.value = 'disconnected';
       addWsEvent('WebSocket error');
+      if (loadingBarActive.value) {
+        loadingBarActive.value = false;
+        if (window.$loadingBar) window.$loadingBar.error();
+      }
     };
 
     ws.value.onclose = () => {
@@ -966,6 +985,10 @@ const stopCapture = () => {
   isCapturing.value = false;
   captureActive.value = false;
   stoppedCapture.value = true;
+  if (loadingBarActive.value) {
+    loadingBarActive.value = false;
+    if (window.$loadingBar) window.$loadingBar.finish();
+  }
   emit('stop');
 };
 
@@ -1004,13 +1027,6 @@ watch(isCapturing, (capturing) => {
     stopIdleDetection();
   }
 });
-
-// Get shareable URL for current session
-const getShareUrl = () => {
-  if (!sessionId.value) return '';
-  return `${window.location.origin}${window.location.pathname}?session=${sessionId.value}`;
-};
-
 
 const restartCapture = () => {
   // Clear any active filter
@@ -1551,29 +1567,12 @@ onUnmounted(() => {
 /* Session sharing styles */
 .session-info {
   position: absolute;
-  right: 140px;
+  right: 100px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.session-badge {
-  background: #065f46;
-  color: #d1fae5;
-  padding: 2.3px 9.2px;
-  border-radius: 14px;
-  font-size: 1.02em;
-  font-weight: 500;
-}
-
-.btn-share {
-  --pf-c-button--m-primary--BackgroundColor: #8b5cf6;
-  --pf-c-button--m-primary--hover--BackgroundColor: #a78bfa;
-  --pf-c-button--FontSize: 1.08em;
-  --pf-c-button--PaddingTop: 4px;
-  --pf-c-button--PaddingBottom: 4px;
 }
 
 /* Follow Owner toggle */
@@ -1601,65 +1600,6 @@ onUnmounted(() => {
 
 .follow-toggle:has(input:checked) .follow-label {
   color: #93c5fd;
-}
-
-.share-dialog-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 3000;
-}
-
-.share-dialog {
-  background: #1f2937;
-  border-radius: 12px;
-  padding: 24px;
-  max-width: 500px;
-  width: 90%;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-}
-
-.share-dialog h3 {
-  margin: 0 0 16px 0;
-  color: #f9fafb;
-  font-size: 1.2em;
-}
-
-.share-dialog p {
-  color: #9ca3af;
-  margin: 0 0 12px 0;
-  font-size: 0.95em;
-}
-
-.share-dialog pf-clipboard-copy {
-  margin-bottom: 16px;
-}
-
-.share-note {
-  color: #6b7280;
-  font-size: 0.85em;
-}
-
-.share-note code {
-  background: #374151;
-  padding: 2px 6px;
-  border-radius: 4px;
-  color: #a5b4fc;
-}
-
-.share-dialog .btn {
-  margin-top: 8px;
-}
-
-.share-dialog .btn-secondary {
-  width: 100%;
-  justify-content: center;
 }
 
 /* Session notification toast */

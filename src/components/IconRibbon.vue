@@ -1,8 +1,9 @@
 <script setup>
 import '@patternfly/elements/pf-button/pf-button.js';
 import '@patternfly/elements/pf-tooltip/pf-tooltip.js';
+import '@patternfly/elements/pf-clipboard-copy/pf-clipboard-copy.js';
 import { ref, useTemplateRef, computed } from 'vue';
-import { displayFilter, packets, stoppedCapture, allPackets, idleCountdownSeconds, cancelIdleCountdown, apiFetch } from '../globals';
+import { displayFilter, packets, stoppedCapture, allPackets, idleCountdownSeconds, cancelIdleCountdown, apiFetch, captureActive, sessionId, isSessionOwner } from '../globals';
 import LiveCapture from "./LiveCapture.vue";
 
 const props = defineProps({
@@ -119,14 +120,24 @@ const savePackets = async () => {
         liveCaptureRef.value.saveProgressIndicator.addSaveJob(data.jobId);
       }
       closeSaveDialog();
+      if (window.$message) window.$message.loading(`Saving ${filename}...`);
     } else if (data.error) {
       saveError.value = data.error;
+      if (window.$message) window.$message.error(data.error);
     }
   } catch (e) {
     saveError.value = e.message || 'Failed to save file';
+    if (window.$message) window.$message.error(e.message || 'Failed to save file');
   } finally {
     saveSaving.value = false;
   }
+};
+
+// Share dialog
+const showShareDialog = ref(false);
+const getShareUrl = () => {
+  if (!sessionId.value) return '';
+  return `${window.location.origin}${window.location.pathname}?session=${sessionId.value}`;
 };
 
 const signOut = async () => {
@@ -168,15 +179,8 @@ defineExpose({ loadPcapFile });
         <button class="idle-resume-btn" @click="resumeCapture">Resume</button>
       </div>
     </div>
+    <!-- Save button - shown when capture stopped and has packets -->
     <template v-if="!hideInsights">
-      <div class="separator"></div>
-      <pf-tooltip content="Open ntopng Insights">
-        <button class="insights-btn" @click="emit('openInsights')">
-          <img src="/ntopng-insights-icon.svg" alt="" class="insights-btn__icon" />
-          Insights
-        </button>
-      </pf-tooltip>
-      <!-- Save button - shown when capture stopped and has packets -->
       <pf-tooltip v-if="showSaveButton" content="Save capture">
         <button class="save-btn" @click="openSaveAllDialog">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -225,16 +229,40 @@ defineExpose({ loadPcapFile });
       </div>
     </div>
 
-    <!-- Sign Out -->
-    <pf-tooltip content="Sign Out">
+    <!-- Right side: Insights + Share + separator + Sign Out -->
+    <div class="ribbon-right">
+      <pf-tooltip content="Open ntopng Insights">
+        <button class="insights-btn" @click="emit('openInsights')">
+          <img src="/ntopng-insights-icon.svg" alt="" class="insights-btn__icon" />
+          Insights
+        </button>
+      </pf-tooltip>
+      <pf-tooltip v-if="captureActive && sessionId && isSessionOwner" content="Share capture session">
+        <pf-button class="btn-share" @click="showShareDialog = true">
+          🔗 Share
+        </pf-button>
+      </pf-tooltip>
+      <div class="ribbon-right-sep"></div>
       <button class="signout-btn" @click="signOut">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
           <polyline points="16 17 21 12 16 7"/>
           <line x1="21" y1="12" x2="9" y2="12"/>
         </svg>
+        Sign Out
       </button>
-    </pf-tooltip>
+    </div>
+
+    <!-- Share Dialog -->
+    <div v-if="showShareDialog" class="share-dialog-overlay" @click.self="showShareDialog = false">
+      <div class="share-dialog">
+        <h3>Share Capture Session</h3>
+        <p>Others can view this live capture by opening this link:</p>
+        <pf-clipboard-copy :value="getShareUrl()" readonly click-tip="Copied!" hover-tip="Copy" @copy="showShareDialog = false"></pf-clipboard-copy>
+        <p class="share-note">Session ID: <code>{{ sessionId }}</code></p>
+        <pf-button variant="secondary" @click="showShareDialog = false">Close</pf-button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -543,31 +571,102 @@ defineExpose({ loadPcapFile });
   transform: scale(0.95);
 }
 
-/* Sign Out button */
-.signout-btn {
+/* Right side group: Insights + Share + separator + Sign Out */
+.ribbon-right {
   position: absolute;
   right: 10px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  background: none;
-  border: 1px solid transparent;
+  gap: 8px;
+}
+.ribbon-right-sep {
+  width: 1px;
+  height: 22px;
+  background: #4b5563;
+}
+
+/* Share button (in ribbon-right) */
+.ribbon-right .btn-share {
+  --pf-c-button--m-primary--BackgroundColor: #8b5cf6;
+  --pf-c-button--m-primary--hover--BackgroundColor: #a78bfa;
+  --pf-c-button--FontSize: 1.08em;
+  --pf-c-button--PaddingTop: 4px;
+  --pf-c-button--PaddingBottom: 4px;
+}
+
+/* Sign Out button */
+.signout-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 7px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.35);
   border-radius: 6px;
-  color: #9ca3af;
+  color: #f87171;
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
   transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
 .signout-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 .signout-btn:hover {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+/* Share Dialog */
+.share-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+}
+.share-dialog {
+  background: #1f2937;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+.share-dialog h3 {
+  margin: 0 0 16px 0;
+  color: #f9fafb;
+  font-size: 1.2em;
+}
+.share-dialog p {
+  color: #9ca3af;
+  margin: 0 0 12px 0;
+  font-size: 0.95em;
+}
+.share-dialog pf-clipboard-copy {
+  margin-bottom: 16px;
+}
+.share-note {
+  color: #6b7280;
+  font-size: 0.85em;
+}
+.share-note code {
+  background: #374151;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #a5b4fc;
+}
+.share-dialog pf-button {
+  width: 100%;
+  justify-content: center;
 }
 </style>
