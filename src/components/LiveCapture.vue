@@ -625,7 +625,7 @@ const connect = ({ isReconnect = false } = {}) => {
           // Set link speed from interface details
           const ifaceInfo = interfaceDetails.value[msg.interface];
           linkSpeedMbps.value = ifaceInfo?.speed || 0;
-          savedCapturesCount.value = 0;  // Fresh session — reset count
+          // Do NOT reset savedCapturesCount — saved files persist on disk across sessions
           emit('clear');
           if (window.$message) window.$message.success(`Capturing on ${msg.interface}`);
           if (window.$loadingBar) window.$loadingBar.start();

@@ -196,6 +196,7 @@ const openSavedCaptures = async () => {
     const res = await apiFetch('/api/saved-captures');
     const data = await res.json();
     applySavedCapturesPayload(data);
+    savedCapturesCount.value = savedFiles.value.length;
   } catch (e) {
     savedFiles.value = [];
   }
