@@ -222,9 +222,6 @@ const filterSuggestions = [
   // MongoDB
   { field: "mongo", desc: "MongoDB protocol" },
 
-  // Redis
-  { field: "redis", desc: "Redis protocol" },
-
   // QUIC
   { field: "quic", desc: "QUIC protocol" },
   { field: "quic.version", desc: "QUIC version" },

@@ -66,14 +66,6 @@
             ></pf-switch>
             <span>Address Resolution</span>
           </span>
-          <span class="inline-opt">
-            <pf-switch
-              :checked.prop="interfaceCaptureOptions[iface.name].ntopngAnalyze"
-              @change="interfaceCaptureOptions[iface.name].ntopngAnalyze = $event.target.checked"
-              show-check-icon
-            ></pf-switch>
-            <span>ntopng Analyze</span>
-          </span>
         </div>
       </div>
     </div>
@@ -110,18 +102,15 @@ const interfaces = ref([])
 const selectedInterface = ref('')
 const loading = ref(false)
 const error = ref(null)
-const interfaceCaptureOptions = reactive({})  // { [ifaceName]: { httpsCapture, addressResolution, ntopngAnalyze } }
+const interfaceCaptureOptions = reactive({})  // { [ifaceName]: { httpsCapture, addressResolution } }
 
-const ensureCaptureOptions = (ifaceName, defaults = {}) => {
-  if (!ifaceName) return { httpsCapture: true, addressResolution: true, ntopngAnalyze: false };
+const ensureCaptureOptions = (ifaceName) => {
+  if (!ifaceName) return { httpsCapture: true, addressResolution: true };
   if (!interfaceCaptureOptions[ifaceName]) {
     interfaceCaptureOptions[ifaceName] = {
       httpsCapture: true,
       addressResolution: true,
-      ntopngAnalyze: defaults.ntopngAnalyze === true
     };
-  } else if (defaults.ntopngAnalyze === true) {
-    interfaceCaptureOptions[ifaceName].ntopngAnalyze = true;
   }
   return interfaceCaptureOptions[ifaceName];
 }
@@ -207,17 +196,9 @@ const fetchInterfaces = async () => {
     if (!response.ok) throw new Error('Failed to fetch interfaces')
     const data = await response.json()
     interfaces.value = data.interfaces || []
-    const enabledNtopngInterfaces = new Set(
-      (data.ntopngEnabledInterfaces || [])
-        .map((ifaceName) => String(ifaceName || '').trim())
-        .filter(Boolean)
-    )
-
     const activeIfaces = new Set(interfaces.value.map((iface) => iface.name))
     for (const ifaceName of activeIfaces) {
-      ensureCaptureOptions(ifaceName, {
-        ntopngAnalyze: enabledNtopngInterfaces.has(ifaceName)
-      })
+      ensureCaptureOptions(ifaceName)
     }
     for (const ifaceName of Object.keys(interfaceCaptureOptions)) {
       if (!activeIfaces.has(ifaceName)) {
@@ -252,7 +233,6 @@ const startCapture = () => {
       interface: selectedInterface.value,
       includePort443: options.httpsCapture,
       resolvePublicIps: options.addressResolution,
-      enableNtopng: options.ntopngAnalyze
     })
   }
 }

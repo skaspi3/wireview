@@ -6,14 +6,7 @@ import { ref, useTemplateRef, computed } from 'vue';
 import { displayFilter, packets, stoppedCapture, allPackets, idleCountdownSeconds, cancelIdleCountdown, apiFetch, captureActive, sessionId, isSessionOwner } from '../globals';
 import LiveCapture from "./LiveCapture.vue";
 
-const props = defineProps({
-  hideInsights: {
-    type: Boolean,
-    default: false
-  }
-});
-
-const emit = defineEmits(['clear', 'stop', 'openFileBrowser', 'openInsights', 'saveFiltered', 'signOut']);
+const emit = defineEmits(['clear', 'stop', 'openFileBrowser', 'saveFiltered', 'signOut']);
 
 const liveCaptureRef = useTemplateRef('live-capture');
 
@@ -156,7 +149,6 @@ defineExpose({ loadPcapFile });
       @openFileBrowser="() => emit('openFileBrowser')"
     />
     <img
-      v-if="!hideInsights"
       src="/webpcap-logo.png"
       alt="WebPCAP"
       class="ribbon-logo"
@@ -179,7 +171,6 @@ defineExpose({ loadPcapFile });
       </div>
     </div>
     <!-- Save button - shown when capture stopped and has packets -->
-    <template v-if="!hideInsights">
       <pf-tooltip v-if="showSaveButton" content="Save capture">
         <button class="save-btn" @click="openSaveAllDialog">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -201,7 +192,6 @@ defineExpose({ loadPcapFile });
           Save Selected
         </button>
       </pf-tooltip>
-    </template>
 
     <!-- Save Dialog -->
     <div v-if="showSaveDialog" class="save-dialog-overlay" @click.self="closeSaveDialog">
@@ -228,14 +218,8 @@ defineExpose({ loadPcapFile });
       </div>
     </div>
 
-    <!-- Right side: Insights + Share + separator + Sign Out -->
+    <!-- Right side: Share + separator + Sign Out -->
     <div class="ribbon-right">
-      <pf-tooltip content="Open ntopng Insights">
-        <button class="insights-btn" @click="emit('openInsights')">
-          <img src="/ntopng-insights-icon.svg" alt="" class="insights-btn__icon" />
-          Insights
-        </button>
-      </pf-tooltip>
       <pf-tooltip v-if="captureActive && sessionId && isSessionOwner" content="Share capture session">
         <pf-button class="btn-share" @click="showShareDialog = true">
           🔗 Share
@@ -317,41 +301,6 @@ defineExpose({ loadPcapFile });
   height: 16px;
   background-color: var(--ws-dark-gray);
   border-right: 1px solid var(--ws-gray);
-}
-
-.insights-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 3px 10px 3px 4px;
-  background: linear-gradient(180deg, #232a35, #171c24);
-  color: #f3f4f6;
-  border: 1px solid #364152;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  transition: background 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s;
-}
-
-.insights-btn:hover {
-  background: linear-gradient(180deg, #2b3442, #1e2530);
-  border-color: #4b5563;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
-  transform: translateY(-1px);
-}
-
-.insights-btn:active {
-  transform: translateY(0);
-}
-
-.insights-btn__icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  flex: 0 0 auto;
-  display: block;
 }
 
 .save-selected-btn {
@@ -570,7 +519,7 @@ defineExpose({ loadPcapFile });
   transform: scale(0.95);
 }
 
-/* Right side group: Insights + Share + separator + Sign Out */
+/* Right side group: Share + separator + Sign Out */
 .ribbon-right {
   position: absolute;
   right: 10px;

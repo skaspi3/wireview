@@ -505,7 +505,6 @@ const isCertValid = computed(() => {
             <li>Thin Client architecture — zstd-compressed packet delivery with up to 95% bandwidth reduction</li>
             <li>Display filters — apply Wireshark-compatible filters during live or stopped capture</li>
             <li>Session sharing — invite viewers to watch your capture in real-time</li>
-            <li>Capture Insights — proxied ntopng visibility for interfaces started with ntopng Analyze</li>
             <li>Save &amp; export — pcapng with optional zstd compression, filtered or full capture</li>
             <li>RAM-backed storage — pcap files written to tmpfs for minimal disk I/O</li>
             <li>Idle kill-switch — auto-stops capture after inactivity to protect system resources</li>

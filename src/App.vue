@@ -104,13 +104,6 @@ const handleFileSelect = (filePath) => {
   iconRibbonRef.value?.loadPcapFile(filePath);
 };
 
-const handleOpenInsights = () => {
-  const insightsWindow = window.open('/insights/', '_blank', 'noopener');
-  if (insightsWindow && typeof insightsWindow.focus === 'function') {
-    insightsWindow.focus();
-  }
-};
-
 // Total packet count (from allPackets when filter is active, otherwise from packets)
 const totalPacketCount = computed(() => {
   return allPackets.value.length > 0 ? allPackets.value.length : packets.value.length;
@@ -339,7 +332,7 @@ onBeforeUnmount(() => {
 
     <!-- Main UI -->
     <div class="main-content">
-      <IconRibbon ref="icon-ribbon" :hide-insights="showLandingPage" @clear="handleClear" @stop="handleStop" @openFileBrowser="handleOpenFileBrowser" @openInsights="handleOpenInsights" @sign-out="onSignOut" />
+      <IconRibbon ref="icon-ribbon" @clear="handleClear" @stop="handleStop" @openFileBrowser="handleOpenFileBrowser" @sign-out="onSignOut" />
       <DisplayFilter v-if="!showLandingPage" />
 
       <!-- Landing Page with Interface Selector (teleport target) -->
