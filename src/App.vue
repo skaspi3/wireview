@@ -252,13 +252,65 @@ const deleteCapture = async (name) => {
   } catch (e) {}
 };
 
+const clearAllCaptures = () => {
+  if (!window.$dialog) return;
+  window.$dialog.warning({
+    title: 'Clear All Captures',
+    content: `Delete all ${savedFiles.value.length} saved capture${savedFiles.value.length !== 1 ? 's' : ''}? This cannot be undone.`,
+    positiveText: 'Yes, Delete All',
+    negativeText: 'Cancel',
+    onPositiveClick: async () => {
+      try {
+        await apiFetch('/api/saved-captures/clear-all', { method: 'POST' });
+        await refreshSavedCaptures();
+        if (window.$message) window.$message.success('All captures deleted');
+      } catch (e) {
+        if (window.$message) window.$message.error('Failed to clear captures');
+      }
+    },
+  });
+};
+
+const dedupLoading = ref(false);
+const deleteDuplicates = async () => {
+  dedupLoading.value = true;
+  try {
+    const res = await apiFetch('/api/saved-captures/dedup', { method: 'POST' });
+    const data = await res.json();
+    if (data.error) {
+      if (window.$message) window.$message.error(data.error);
+    } else if (data.removed === 0) {
+      if (window.$message) window.$message.info('No duplicates found');
+    } else {
+      if (window.$message) window.$message.success(`Removed ${data.removed} duplicate${data.removed !== 1 ? 's' : ''}`);
+      await refreshSavedCaptures();
+    }
+  } catch (e) {
+    if (window.$message) window.$message.error('Failed to check duplicates');
+  }
+  dedupLoading.value = false;
+};
+
+const getFileExtension = (name) => {
+  const s = String(name || '');
+  const m = s.match(/(\.pcapng\.zst|\.pcap\.zst|\.pcapng|\.pcap|\.cap)$/i);
+  return m ? m[1] : '';
+};
+const getFileBaseName = (name) => {
+  const ext = getFileExtension(name);
+  return ext ? String(name).slice(0, -ext.length) : String(name);
+};
+
 const startRename = (file) => {
   renamingFile.value = file.name;
-  renameInput.value = file.name;
+  renameInput.value = getFileBaseName(file.name);
 };
 
 const confirmRename = async (oldName) => {
-  if (!renameInput.value.trim() || renameInput.value === oldName) {
+  const base = renameInput.value.trim();
+  const ext = getFileExtension(oldName);
+  const newName = base + ext;
+  if (!base || newName === oldName) {
     renamingFile.value = null;
     return;
   }
@@ -266,7 +318,7 @@ const confirmRename = async (oldName) => {
     await apiFetch('/api/saved-captures/rename', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ oldName, newName: renameInput.value.trim() })
+      body: JSON.stringify({ oldName, newName })
     });
     await refreshSavedCaptures();
   } catch (e) {}
@@ -402,6 +454,16 @@ onBeforeUnmount(() => {
         <div class="saved-captures-header">
           <span class="saved-captures-title">Saved Captures</span>
           <span class="saved-captures-count">{{ savedFiles.length }} file{{ savedFiles.length !== 1 ? 's' : '' }}</span>
+          <div class="sc-header-actions">
+            <button v-if="savedFiles.length > 1" class="sc-header-link sc-dedup-link" :disabled="dedupLoading" @click="deleteDuplicates">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 16v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h1"/><rect x="9" y="3" width="12" height="13" rx="2"/><line x1="12" y1="9.5" x2="18" y2="9.5"/></svg>
+              {{ dedupLoading ? 'Checking...' : 'Delete Duplicates' }}
+            </button>
+            <button v-if="savedFiles.length > 0" class="sc-header-link sc-clear-link" @click="clearAllCaptures">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              Clear All
+            </button>
+          </div>
           <button class="saved-captures-close" @click="showSavedCaptures = false">&times;</button>
         </div>
         <div v-if="savedFiles.length === 0" class="saved-captures-empty">No saved captures</div>
@@ -420,14 +482,17 @@ onBeforeUnmount(() => {
               <tr v-for="file in sortedFiles" :key="file.name">
                 <td class="sc-td-name">
                   <template v-if="renamingFile === file.name">
-                    <input
-                      class="saved-captures-rename-input"
-                      v-model="renameInput"
-                      @keyup.enter="confirmRename(file.name)"
-                      @keyup.escape="renamingFile = null"
-                      @blur="confirmRename(file.name)"
-                      autofocus
-                    />
+                    <div class="sc-rename-row">
+                      <input
+                        class="saved-captures-rename-input"
+                        v-model="renameInput"
+                        @keyup.enter="confirmRename(file.name)"
+                        @keyup.escape="renamingFile = null"
+                        @blur="confirmRename(file.name)"
+                        autofocus
+                      />
+                      <span class="sc-rename-ext">{{ getFileExtension(file.name) }}</span>
+                    </div>
                   </template>
                   <template v-else>
                     <span class="saved-captures-name" :title="displayCaptureName(file.name)">{{ displayCaptureName(file.name) }}</span>
@@ -447,11 +512,9 @@ onBeforeUnmount(() => {
                         </svg>
                       </button>
                     </pf-tooltip>
-                    <pf-tooltip :content="disableSavedCaptureDownload ? 'Local client: download not needed' : 'Download'">
+                    <pf-tooltip content="Download">
                       <button
                         class="sc-action-btn sc-download"
-                        :class="{ 'sc-action-disabled': disableSavedCaptureDownload }"
-                        :disabled="disableSavedCaptureDownload"
                         @click="downloadCapture(file.name)"
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -735,8 +798,49 @@ onBeforeUnmount(() => {
   color: #6b7280;
   font-family: monospace;
 }
-.saved-captures-close {
+.sc-header-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.sc-header-link {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  font-family: monospace;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+.sc-header-link svg {
+  width: 15px;
+  height: 15px;
+}
+.sc-header-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.sc-dedup-link {
+  color: #a78bfa;
+}
+.sc-dedup-link:hover:not(:disabled) {
+  background: rgba(167, 139, 250, 0.12);
+  color: #c4b5fd;
+}
+.sc-clear-link {
+  color: #ef4444;
+}
+.sc-clear-link:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
+.saved-captures-close {
+  margin-left: 12px;
   background: none;
   border: none;
   color: #6b7280;
@@ -828,17 +932,34 @@ onBeforeUnmount(() => {
 .sc-td-action {
   white-space: nowrap;
 }
+.sc-rename-row {
+  display: flex;
+  align-items: center;
+}
 .saved-captures-rename-input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   background: #1f2937;
   border: 1px solid #3b82f6;
-  border-radius: 4px;
+  border-radius: 4px 0 0 4px;
   padding: 5px 10px;
   color: #e5e7eb;
   font-family: monospace;
   font-size: 15px;
   outline: none;
   box-sizing: border-box;
+}
+.sc-rename-ext {
+  background: #111827;
+  border: 1px solid #3b82f6;
+  border-left: none;
+  border-radius: 0 4px 4px 0;
+  padding: 5px 8px;
+  color: #6b7280;
+  font-family: monospace;
+  font-size: 15px;
+  white-space: nowrap;
+  user-select: none;
 }
 .saved-captures-actions {
   display: flex;
