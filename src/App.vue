@@ -484,7 +484,7 @@ onBeforeUnmount(() => {
                 <td class="sc-td-packets">{{ file.packets ? file.packets.toLocaleString() : '—' }}</td>
                 <td class="sc-td-size">{{ formatFileSize(file.size) }}</td>
                 <td class="sc-td-time">{{ formatTimestamp(file.created) }}</td>
-                <td class="sc-td-status"><span v-if="file.status === 'OK'" class="sc-status-ok">OK</span><span v-else-if="file.status === 'BAD'" class="sc-status-bad">BAD</span><span v-else class="sc-status-unknown">—</span></td>
+                <td class="sc-td-status"><span v-if="file.status === 'OK'" class="sc-status-ok">OK</span><span v-else-if="file.status === 'WARN'" class="sc-status-warn">⚠</span><span v-else-if="file.status === 'BAD'" class="sc-status-bad">BAD</span><span v-else class="sc-status-unknown">—</span></td>
                 <td class="sc-td-action">
                   <div class="saved-captures-actions">
                     <pf-tooltip content="Open in Browser">
@@ -562,7 +562,7 @@ onBeforeUnmount(() => {
               <tr><td class="fi-label">Snap Length</td><td class="fi-value">{{ fileInfoData.snaplen?.toLocaleString() }}</td></tr>
               <tr><td class="fi-label">Link Type</td><td class="fi-value">{{ fileInfoData.linktypeDesc }} ({{ fileInfoData.linktype }})</td></tr>
               <tr><td class="fi-label">Total Packets</td><td class="fi-value">{{ fileInfoData.totalPackets?.toLocaleString() }}</td></tr>
-              <tr><td class="fi-label">Result</td><td class="fi-value"><span :class="fileInfoData.badPackets > 0 ? 'fi-bad' : 'fi-ok'">{{ fileInfoData.badPackets > 0 ? 'BAD' : 'OK' }}</span><span v-if="fileInfoData.badPackets > 0" class="fi-bad-count"> — {{ fileInfoData.badPackets.toLocaleString() }} issue{{ fileInfoData.badPackets !== 1 ? 's' : '' }}</span></td></tr>
+              <tr><td class="fi-label">Result</td><td class="fi-value"><span :class="fileInfoData.badPackets > 0 ? 'fi-bad' : fileInfoData.warnPackets > 0 ? 'fi-warn' : 'fi-ok'">{{ fileInfoData.badPackets > 0 ? 'BAD' : fileInfoData.warnPackets > 0 ? 'WARN' : 'OK' }}</span><span v-if="fileInfoData.badPackets > 0" class="fi-bad-count"> — {{ fileInfoData.badPackets.toLocaleString() }} error{{ fileInfoData.badPackets !== 1 ? 's' : '' }}</span><span v-if="fileInfoData.warnPackets > 0" class="fi-warn-count"> — {{ fileInfoData.warnPackets.toLocaleString() }} warning{{ fileInfoData.warnPackets !== 1 ? 's' : '' }}</span></td></tr>
               <tr v-if="fileInfoData.compressed"><td class="fi-label">Compressed</td><td class="fi-value">zstd</td></tr>
               <tr v-if="fileInfoData.loopError"><td class="fi-label">Read Error</td><td class="fi-value fi-bad">{{ fileInfoData.loopError }}</td></tr>
             </tbody>
@@ -580,11 +580,11 @@ onBeforeUnmount(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="pkt in fileInfoData.packets" :key="pkt.n" :class="{ 'fi-row-bad': pkt.msg }">
+                  <tr v-for="pkt in fileInfoData.packets" :key="pkt.n" :class="{ 'fi-row-bad': pkt.sev === 'b', 'fi-row-warn': pkt.sev === 'w' }">
                     <td>{{ pkt.n }}</td>
                     <td>{{ pkt.ol }}</td>
                     <td>{{ pkt.cl }}</td>
-                    <td><span :class="pkt.msg ? 'fi-bad' : 'fi-ok'">{{ pkt.msg ? 'BAD' : 'OK' }}</span><span v-if="pkt.msg" class="fi-bad-reason"> {{ pkt.msg }}</span></td>
+                    <td><span :class="pkt.sev === 'b' ? 'fi-bad' : pkt.sev === 'w' ? 'fi-warn' : 'fi-ok'">{{ pkt.sev === 'b' ? 'BAD' : pkt.sev === 'w' ? 'WARN' : 'OK' }}</span><span v-if="pkt.msg" class="fi-bad-reason"> {{ pkt.msg }}</span></td>
                   </tr>
                 </tbody>
               </table>
@@ -920,6 +920,10 @@ onBeforeUnmount(() => {
 .sc-status-ok {
   color: #22c55e;
 }
+.sc-status-warn {
+  color: #f59e0b;
+  font-size: 16px;
+}
 .sc-status-bad {
   color: #ef4444;
 }
@@ -1083,11 +1087,19 @@ onBeforeUnmount(() => {
   color: #22c55e;
   font-weight: 700;
 }
+.fi-warn {
+  color: #f59e0b;
+  font-weight: 700;
+}
 .fi-bad {
   color: #ef4444;
   font-weight: 700;
 }
 .fi-bad-count {
+  color: #9ca3af;
+  font-weight: 400;
+}
+.fi-warn-count {
   color: #9ca3af;
   font-weight: 400;
 }
@@ -1143,6 +1155,9 @@ onBeforeUnmount(() => {
 }
 .fi-row-bad {
   background: rgba(239, 68, 68, 0.06);
+}
+.fi-row-warn {
+  background: rgba(245, 158, 11, 0.06);
 }
 .fi-bad-reason {
   color: #9ca3af;
