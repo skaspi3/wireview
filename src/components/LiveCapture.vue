@@ -120,13 +120,19 @@
 
     <!-- Stopped Capture State -->
     <div v-else-if="showStoppedBar" class="status-bar stopped-bar">
-      <n-select
-        v-model:value="selectedInterface"
-        :options="interfaces.map(i => ({ label: i + (interfaceDetails[i] ? formatIfaceOption(interfaceDetails[i]) : ''), value: i }))"
+      <n-dropdown
+        :options="interfaces.map(i => ({ label: i + (interfaceDetails[i] ? formatIfaceOption(interfaceDetails[i]) : ''), key: i }))"
+        @select="(key) => selectedInterface = key"
+        trigger="click"
         size="small"
-        style="width: 260px;"
-        placeholder="Interface"
-      />
+      >
+        <button class="iface-dropdown-trigger">
+          <span class="iface-dropdown-label">{{ selectedInterface + (interfaceDetails[selectedInterface] ? formatIfaceOption(interfaceDetails[selectedInterface]) : '') || 'Interface' }}</span>
+          <svg class="iface-dropdown-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </button>
+      </n-dropdown>
       <div class="capture-controls">
         <pf-tooltip content="Start Capture">
           <button @click="resumeCaptureOnSameInterface" class="ctrl-btn ctrl-play">
@@ -199,7 +205,7 @@ import '@patternfly/elements/pf-badge/pf-badge.js';
 import '@patternfly/elements/pf-label/pf-label.js';
 import '@patternfly/elements/pf-clipboard-copy/pf-clipboard-copy.js';
 import { ref, triggerRef, onUnmounted, onMounted, computed, watch } from 'vue';
-import { NSpin, NPopover, NProgress, NSelect } from 'naive-ui';
+import { NSpin, NPopover, NProgress, NSelect, NDropdown } from 'naive-ui';
 import { nodeVersion, tsharkLuaVersion, tsharkLibraries, backendPort, backendStatus, certInfo, packets, allPackets, websocket, displayFilter, filterError, filterLoading, filterProgress, trackReceived, trackSent, activePacketIndex, hostIP, captureActive, stoppedCapture, captureIncludePort443, sessionId, isSessionOwner as globalIsSessionOwner, followOwner, notifyOwnerStateChange, resolveWsRequest, clearPendingWsRequests, pcapDirUsage, idleCountdownSeconds, setCancelIdleCountdown, linkSpeedMbps, savedCapturesCount, addWsEvent, clientId, apiFetch } from '../globals';
 import { decompress as zstdDecompress } from 'fzstd';
 import ConfirmDialog from './ConfirmDialog.vue';
@@ -1339,6 +1345,40 @@ onUnmounted(() => {
 
 .stopped-bar {
   background: #1a2332;
+}
+
+.iface-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #111827;
+  color: #e5e7eb;
+  border: 1px solid #374151;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+  max-width: 280px;
+}
+
+.iface-dropdown-trigger:hover {
+  border-color: #22c55e;
+}
+
+.iface-dropdown-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.iface-dropdown-chevron {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 0.6;
 }
 
 .stopped-interface-select {
