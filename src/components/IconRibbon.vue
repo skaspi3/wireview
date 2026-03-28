@@ -147,7 +147,30 @@ defineExpose({ loadPcapFile });
       @clear="() => emit('clear')"
       @stop="() => emit('stop')"
       @openFileBrowser="() => emit('openFileBrowser')"
-    />
+    >
+      <template #stopped-actions>
+        <pf-tooltip v-if="showSaveButton" content="Save capture">
+          <button class="save-btn" @click="openSaveAllDialog">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/>
+              <polyline points="7 3 7 8 15 8"/>
+            </svg>
+            Save
+          </button>
+        </pf-tooltip>
+        <pf-tooltip v-if="displayFilter" content="Save filtered packets">
+          <button class="save-selected-btn" @click="openSaveFilteredDialog">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/>
+              <polyline points="7 3 7 8 15 8"/>
+            </svg>
+            Save Selected
+          </button>
+        </pf-tooltip>
+      </template>
+    </LiveCapture>
     <img
       src="/webpcap-logo.png"
       alt="WebPCAP"
@@ -170,28 +193,7 @@ defineExpose({ loadPcapFile });
         <button class="idle-resume-btn" @click="resumeCapture">Resume</button>
       </div>
     </div>
-    <!-- Save button - shown when capture stopped and has packets -->
-      <pf-tooltip v-if="showSaveButton" content="Save capture">
-        <button class="save-btn" @click="openSaveAllDialog">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-            <polyline points="17 21 17 13 7 13 7 21"/>
-            <polyline points="7 3 7 8 15 8"/>
-          </svg>
-          Save
-        </button>
-      </pf-tooltip>
-      <!-- Save Selected button - shown when filter is active -->
-      <pf-tooltip v-if="displayFilter" content="Save filtered packets">
-        <button class="save-selected-btn" @click="openSaveFilteredDialog">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-            <polyline points="17 21 17 13 7 13 7 21"/>
-            <polyline points="7 3 7 8 15 8"/>
-          </svg>
-          Save Selected
-        </button>
-      </pf-tooltip>
+    <!-- Save buttons are now grouped with Start in LiveCapture's stopped-actions slot -->
 
     <!-- Save Dialog -->
     <div v-if="showSaveDialog" class="save-dialog-overlay" @click.self="closeSaveDialog">
@@ -303,64 +305,68 @@ defineExpose({ loadPcapFile });
   border-right: 1px solid var(--ws-gray);
 }
 
+.save-btn,
 .save-selected-btn {
+  position: relative;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 4px 10px;
-  margin-left: 6px;
+  padding: 7px 12px;
   background: linear-gradient(135deg, #22c55e, #16a34a);
   color: #fff;
   border: none;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.save-selected-btn:hover {
-  background: linear-gradient(135deg, #4ade80, #22c55e);
-  transform: translateY(-1px);
-}
-
-.save-selected-btn:active {
-  transform: translateY(0);
-}
-
-.save-selected-btn svg {
-  width: 16px;
-  height: 16px;
-}
-
-.save-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  margin-left: 6px;
-  background: linear-gradient(135deg, #22c55e, #16a34a);
-  color: #fff;
-  border: none;
-  border-radius: 4px;
+  border-left: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 0;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  overflow: hidden;
+  transition: filter 0.2s, transform 0.1s;
 }
 
-.save-btn:hover {
-  background: linear-gradient(135deg, #4ade80, #22c55e);
-  transform: translateY(-1px);
+.save-btn:hover,
+.save-selected-btn:hover {
+  filter: brightness(1.2);
 }
 
-.save-btn:active {
-  transform: translateY(0);
+.save-btn:active,
+.save-selected-btn:active {
+  transform: scale(0.93);
+  filter: brightness(0.95);
 }
 
-.save-btn svg {
-  width: 16px;
-  height: 16px;
+.save-btn svg,
+.save-selected-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Shimmer effect matching Start button */
+.save-btn::before,
+.save-selected-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    120deg,
+    transparent 0%,
+    transparent 30%,
+    rgba(255, 255, 255, 0.4) 50%,
+    transparent 70%,
+    transparent 100%
+  );
+  z-index: 2;
+  transition: none;
+}
+
+.save-btn:hover::before,
+.save-selected-btn:hover::before {
+  left: 100%;
+  transition: left 0.5s ease;
 }
 
 /* Save Dialog */

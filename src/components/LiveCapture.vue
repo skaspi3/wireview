@@ -136,6 +136,7 @@
             Start
           </button>
         </pf-tooltip>
+        <slot name="stopped-actions" />
       </div>
     </div>
 
@@ -1319,7 +1320,6 @@ onUnmounted(() => {
 .ctrl-play {
   background: linear-gradient(135deg, #22c55e, #16a34a);
   color: white;
-  border-radius: 8px;
   gap: 6px;
   font-size: 13px;
   font-weight: 600;
