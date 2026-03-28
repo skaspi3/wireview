@@ -758,9 +758,10 @@ const isCertValid = computed(() => {
 <style scoped>
 .status-bar {
   display: flex;
-  padding: 2px 5px;
+  padding: 0 5px;
   position: relative;
   align-items: center;
+  height: 22px;
 }
 .left-section {
   flex: 1;

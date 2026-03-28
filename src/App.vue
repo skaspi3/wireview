@@ -576,12 +576,13 @@ onBeforeUnmount(() => {
 /* Saved Captures label */
 .saved-captures-label {
   position: fixed;
-  bottom: 2px;
+  bottom: 0;
   right: calc(50% - 310px);
   transform: translateX(50%);
   display: flex;
   align-items: center;
   gap: 5px;
+  height: 22px;
   color: #60a5fa;
   font-family: monospace;
   font-size: 15px;
