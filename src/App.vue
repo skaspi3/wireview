@@ -273,25 +273,7 @@ const clearAllCaptures = () => {
   });
 };
 
-const dedupLoading = ref(false);
-const deleteDuplicates = async () => {
-  dedupLoading.value = true;
-  try {
-    const res = await apiFetch('/api/saved-captures/dedup', { method: 'POST' });
-    const data = await res.json();
-    if (data.error) {
-      if (window.$message) window.$message.error(data.error);
-    } else if (data.removed === 0) {
-      if (window.$message) window.$message.info('No duplicates found');
-    } else {
-      if (window.$message) window.$message.success(`Removed ${data.removed} duplicate${data.removed !== 1 ? 's' : ''}`);
-      await refreshSavedCaptures();
-    }
-  } catch (e) {
-    if (window.$message) window.$message.error('Failed to check duplicates');
-  }
-  dedupLoading.value = false;
-};
+
 
 const getFileExtension = (name) => {
   const s = String(name || '');
@@ -457,10 +439,6 @@ onBeforeUnmount(() => {
           <span class="saved-captures-title">Saved Captures</span>
           <span class="saved-captures-count">{{ savedFiles.length }} file{{ savedFiles.length !== 1 ? 's' : '' }}</span>
           <div class="sc-header-actions">
-            <button v-if="savedFiles.length > 1" class="sc-header-link sc-dedup-link" :disabled="dedupLoading" @click="deleteDuplicates">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 16v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h1"/><rect x="9" y="3" width="12" height="13" rx="2"/><line x1="12" y1="9.5" x2="18" y2="9.5"/></svg>
-              {{ dedupLoading ? 'Checking...' : 'Delete Duplicates' }}
-            </button>
             <button v-if="savedFiles.length > 0" class="sc-header-link sc-clear-link" @click="clearAllCaptures">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
               Clear All
@@ -828,13 +806,6 @@ onBeforeUnmount(() => {
 .sc-header-link:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-.sc-dedup-link {
-  color: #a78bfa;
-}
-.sc-dedup-link:hover:not(:disabled) {
-  background: rgba(167, 139, 250, 0.12);
-  color: #c4b5fd;
 }
 .sc-clear-link {
   color: #ef4444;
