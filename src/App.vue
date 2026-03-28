@@ -196,6 +196,27 @@ const formatTimestamp = (ts) => {
   return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 };
 
+const fileInfoLoading = ref(null);
+const fileInfoData = ref(null);
+const showFileInfo = ref(false);
+
+const fetchFileInfo = async (name) => {
+  fileInfoLoading.value = name;
+  try {
+    const res = await apiFetch(`/api/saved-captures/info?file=${encodeURIComponent(name)}`);
+    const data = await res.json();
+    if (data.error) {
+      if (window.$message) window.$message.error(data.error);
+    } else {
+      fileInfoData.value = data;
+      showFileInfo.value = true;
+    }
+  } catch (e) {
+    if (window.$message) window.$message.error('Failed to fetch file info');
+  }
+  fileInfoLoading.value = null;
+};
+
 const renamingFile = ref(null);
 const renameInput = ref('');
 
@@ -440,6 +461,15 @@ onBeforeUnmount(() => {
                         </svg>
                       </button>
                     </pf-tooltip>
+                    <pf-tooltip content="File Info">
+                      <button class="sc-action-btn sc-info" @click="fetchFileInfo(file.name)" :disabled="fileInfoLoading === file.name">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <circle cx="12" cy="12" r="10"/>
+                          <line x1="12" y1="16" x2="12" y2="12"/>
+                          <line x1="12" y1="8" x2="12.01" y2="8"/>
+                        </svg>
+                      </button>
+                    </pf-tooltip>
                     <pf-tooltip content="Rename">
                       <button class="sc-action-btn sc-rename" @click="startRename(file)">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -461,6 +491,55 @@ onBeforeUnmount(() => {
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- File Info modal -->
+    <div v-if="showFileInfo && fileInfoData" class="saved-captures-overlay" @click.self="showFileInfo = false">
+      <div class="file-info-popup">
+        <div class="saved-captures-header">
+          <span class="saved-captures-title">File Info</span>
+          <span class="saved-captures-count">{{ fileInfoData.fileName }}</span>
+          <button class="saved-captures-close" @click="showFileInfo = false">&times;</button>
+        </div>
+        <div class="file-info-body">
+          <table class="file-info-meta">
+            <tbody>
+              <tr><td class="fi-label">Format</td><td class="fi-value">{{ fileInfoData.format || '—' }}{{ fileInfoData.magicDesc ? ` (${fileInfoData.magicDesc})` : '' }}</td></tr>
+              <tr v-if="fileInfoData.version"><td class="fi-label">Version</td><td class="fi-value">{{ fileInfoData.version }}</td></tr>
+              <tr><td class="fi-label">File Size</td><td class="fi-value">{{ formatFileSize(fileInfoData.fileSize || 0) }}</td></tr>
+              <tr><td class="fi-label">Snap Length</td><td class="fi-value">{{ fileInfoData.snaplen?.toLocaleString() }}</td></tr>
+              <tr><td class="fi-label">Link Type</td><td class="fi-value">{{ fileInfoData.linktypeDesc }} ({{ fileInfoData.linktype }})</td></tr>
+              <tr><td class="fi-label">Total Packets</td><td class="fi-value">{{ fileInfoData.totalPackets?.toLocaleString() }}</td></tr>
+              <tr><td class="fi-label">Result</td><td class="fi-value"><span :class="fileInfoData.badPackets > 0 ? 'fi-bad' : 'fi-ok'">{{ fileInfoData.badPackets > 0 ? 'BAD' : 'OK' }}</span><span v-if="fileInfoData.badPackets > 0" class="fi-bad-count"> — {{ fileInfoData.badPackets.toLocaleString() }} issue{{ fileInfoData.badPackets !== 1 ? 's' : '' }}</span></td></tr>
+              <tr v-if="fileInfoData.compressed"><td class="fi-label">Compressed</td><td class="fi-value">zstd</td></tr>
+              <tr v-if="fileInfoData.loopError"><td class="fi-label">Read Error</td><td class="fi-value fi-bad">{{ fileInfoData.loopError }}</td></tr>
+            </tbody>
+          </table>
+          <div v-if="fileInfoData.issues && fileInfoData.issues.length > 0" class="fi-issues-section">
+            <div class="fi-issues-title">Issues ({{ fileInfoData.issues.length }}{{ fileInfoData.issuesTruncated ? '+' : '' }})</div>
+            <div class="fi-issues-wrap">
+              <table class="fi-issues-table">
+                <thead>
+                  <tr>
+                    <th>Packet #</th>
+                    <th>Orig Len</th>
+                    <th>Cap Len</th>
+                    <th>Message</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="issue in fileInfoData.issues" :key="issue.packet">
+                    <td>{{ issue.packet }}</td>
+                    <td>{{ issue.origLen }}</td>
+                    <td>{{ issue.capLen }}</td>
+                    <td>{{ issue.message }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -812,11 +891,107 @@ onBeforeUnmount(() => {
 .sc-rename:hover {
   background: rgba(245, 158, 11, 0.15);
 }
+.sc-info {
+  color: #06b6d4;
+}
+.sc-info:hover {
+  background: rgba(6, 182, 212, 0.15);
+}
 .sc-delete {
   color: #ef4444;
 }
 .sc-delete:hover {
   background: rgba(239, 68, 68, 0.15);
+}
+
+/* File Info modal */
+.file-info-popup {
+  background: #1a1d23;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  padding: 24px 28px;
+  width: min(92vw, 680px);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.file-info-body {
+  overflow-y: auto;
+  max-height: 70vh;
+}
+.file-info-meta {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: monospace;
+  font-size: 14px;
+}
+.file-info-meta td {
+  padding: 6px 12px;
+  border-bottom: 1px solid #1f2937;
+}
+.fi-label {
+  color: #9ca3af;
+  width: 140px;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.fi-value {
+  color: #e5e7eb;
+}
+.fi-ok {
+  color: #22c55e;
+  font-weight: 700;
+}
+.fi-bad {
+  color: #ef4444;
+  font-weight: 700;
+}
+.fi-bad-count {
+  color: #9ca3af;
+  font-weight: 400;
+}
+.fi-issues-section {
+  margin-top: 16px;
+}
+.fi-issues-title {
+  color: #f59e0b;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: monospace;
+  margin-bottom: 8px;
+}
+.fi-issues-wrap {
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid #374151;
+  border-radius: 6px;
+}
+.fi-issues-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: monospace;
+  font-size: 13px;
+}
+.fi-issues-table thead th {
+  text-align: left;
+  color: #d1d5db;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-bottom: 1px solid #374151;
+  background: #111318;
+  position: sticky;
+  top: 0;
+}
+.fi-issues-table tbody td {
+  padding: 4px 10px;
+  border-bottom: 1px solid #1f2937;
+  color: #e5e7eb;
+}
+.fi-issues-table tbody tr:hover {
+  background: #1f2937;
 }
 
 /* Sentry consent banner */
