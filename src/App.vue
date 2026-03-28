@@ -583,24 +583,24 @@ onBeforeUnmount(() => {
               <tr v-if="fileInfoData.loopError"><td class="fi-label">Read Error</td><td class="fi-value fi-bad">{{ fileInfoData.loopError }}</td></tr>
             </tbody>
           </table>
-          <div v-if="fileInfoData.issues && fileInfoData.issues.length > 0" class="fi-issues-section">
-            <div class="fi-issues-title">Issues ({{ fileInfoData.issues.length }}{{ fileInfoData.issuesTruncated ? '+' : '' }})</div>
-            <div class="fi-issues-wrap">
-              <table class="fi-issues-table">
+          <div v-if="fileInfoData.packets && fileInfoData.packets.length > 0" class="fi-packets-section">
+            <div class="fi-packets-title">Packets ({{ fileInfoData.totalPackets?.toLocaleString() }}{{ fileInfoData.packetsTruncated ? ' — showing first ' + fileInfoData.packets.length.toLocaleString() : '' }})</div>
+            <div class="fi-packets-wrap">
+              <table class="fi-packets-table">
                 <thead>
                   <tr>
-                    <th>Packet #</th>
-                    <th>Orig Len</th>
-                    <th>Cap Len</th>
-                    <th>Message</th>
+                    <th>Packet</th>
+                    <th>OrigLen</th>
+                    <th>CapLen</th>
+                    <th>Result</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="issue in fileInfoData.issues" :key="issue.packet">
-                    <td>{{ issue.packet }}</td>
-                    <td>{{ issue.origLen }}</td>
-                    <td>{{ issue.capLen }}</td>
-                    <td>{{ issue.message }}</td>
+                  <tr v-for="pkt in fileInfoData.packets" :key="pkt.n" :class="{ 'fi-row-bad': pkt.msg }">
+                    <td>{{ pkt.n }}</td>
+                    <td>{{ pkt.ol }}</td>
+                    <td>{{ pkt.cl }}</td>
+                    <td><span :class="pkt.msg ? 'fi-bad' : 'fi-ok'">{{ pkt.msg ? 'BAD' : 'OK' }}</span><span v-if="pkt.msg" class="fi-bad-reason"> {{ pkt.msg }}</span></td>
                   </tr>
                 </tbody>
               </table>
@@ -1082,29 +1082,29 @@ onBeforeUnmount(() => {
 .fi-dim {
   color: #6b7280;
 }
-.fi-issues-section {
+.fi-packets-section {
   margin-top: 16px;
 }
-.fi-issues-title {
-  color: #f59e0b;
+.fi-packets-title {
+  color: #60a5fa;
   font-size: 14px;
   font-weight: 700;
   font-family: monospace;
   margin-bottom: 8px;
 }
-.fi-issues-wrap {
-  max-height: 280px;
+.fi-packets-wrap {
+  max-height: 360px;
   overflow-y: auto;
   border: 1px solid #374151;
   border-radius: 6px;
 }
-.fi-issues-table {
+.fi-packets-table {
   width: 100%;
   border-collapse: collapse;
   font-family: monospace;
   font-size: 13px;
 }
-.fi-issues-table thead th {
+.fi-packets-table thead th {
   text-align: left;
   color: #d1d5db;
   font-size: 12px;
@@ -1115,14 +1115,23 @@ onBeforeUnmount(() => {
   background: #111318;
   position: sticky;
   top: 0;
+  z-index: 1;
 }
-.fi-issues-table tbody td {
-  padding: 4px 10px;
+.fi-packets-table tbody td {
+  padding: 3px 10px;
   border-bottom: 1px solid #1f2937;
   color: #e5e7eb;
 }
-.fi-issues-table tbody tr:hover {
+.fi-packets-table tbody tr:hover {
   background: #1f2937;
+}
+.fi-row-bad {
+  background: rgba(239, 68, 68, 0.06);
+}
+.fi-bad-reason {
+  color: #9ca3af;
+  font-size: 12px;
+  margin-left: 6px;
 }
 
 /* Sentry consent banner */
