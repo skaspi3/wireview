@@ -574,7 +574,7 @@ onBeforeUnmount(() => {
               <tr v-if="fileInfoData.version"><td class="fi-label">Version</td><td class="fi-value">{{ fileInfoData.version }}</td></tr>
               <tr v-if="fileInfoData.thiszone"><td class="fi-label">Timezone</td><td class="fi-value fi-mono">{{ fileInfoData.thiszone }}</td></tr>
               <tr v-if="fileInfoData.sigfigs"><td class="fi-label">Sigfigs</td><td class="fi-value fi-mono">{{ fileInfoData.sigfigs }}</td></tr>
-              <tr><td class="fi-label">File Size</td><td class="fi-value">{{ formatFileSize(fileInfoData.fileSize || 0) }}</td></tr>
+              <tr><td class="fi-label">File Size</td><td class="fi-value">{{ formatFileSize(fileInfoData.fileSize || 0) }}<span v-if="fileInfoData.compressedSize" class="fi-dim"> ({{ formatFileSize(fileInfoData.compressedSize) }} on disk, zstd)</span></td></tr>
               <tr><td class="fi-label">Snap Length</td><td class="fi-value">{{ fileInfoData.snaplen?.toLocaleString() }}</td></tr>
               <tr><td class="fi-label">Link Type</td><td class="fi-value">{{ fileInfoData.linktypeDesc }} ({{ fileInfoData.linktype }})</td></tr>
               <tr><td class="fi-label">Total Packets</td><td class="fi-value">{{ fileInfoData.totalPackets?.toLocaleString() }}</td></tr>
@@ -1151,5 +1151,15 @@ onBeforeUnmount(() => {
   --pf-c-button--FontSize: 12px;
   --pf-c-button--FontWeight: 600;
   white-space: nowrap;
+}
+</style>
+
+<style>
+/* Ensure Naive UI dialogs render above the saved-captures overlay (z-index: 3000) */
+.n-modal-mask {
+  z-index: 4000 !important;
+}
+.n-modal-container {
+  z-index: 4000 !important;
 }
 </style>
