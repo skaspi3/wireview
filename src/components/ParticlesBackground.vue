@@ -1,9 +1,8 @@
 <script setup>
-import { onMounted, ref } from 'vue';
-import Particles from '@tsparticles/vue3';
-import { loadSlim } from '@tsparticles/slim';
+import { computed } from 'vue';
 
 const props = defineProps({
+  id: { type: String, default: 'particles' },
   color: { type: String, default: '#c0c0c0' },
   linkColor: { type: String, default: '#c0c0c0' },
   count: { type: Number, default: 80 },
@@ -12,14 +11,7 @@ const props = defineProps({
   opacity: { type: Number, default: 0.4 },
 });
 
-const ready = ref(false);
-
-const particlesInit = async (engine) => {
-  await loadSlim(engine);
-  ready.value = true;
-};
-
-const options = {
+const options = computed(() => ({
   fullScreen: false,
   background: { color: 'transparent' },
   fpsLimit: 60,
@@ -52,11 +44,11 @@ const options = {
     },
   },
   detectRetina: true,
-};
+}));
 </script>
 
 <template>
-  <Particles class="particles-bg" :options="options" :particlesInit="particlesInit" />
+  <vue-particles :id="id" :options="options" class="particles-bg" />
 </template>
 
 <style scoped>
@@ -64,6 +56,5 @@ const options = {
   position: absolute;
   inset: 0;
   z-index: 0;
-  pointer-events: auto;
 }
 </style>

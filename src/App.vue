@@ -396,7 +396,7 @@ onBeforeUnmount(() => {
       <!-- Landing Page with Interface Selector (teleport target) -->
       <!-- Always render container for Teleport, use v-show to hide -->
       <div class="landing-page" :class="{ 'landing-hidden': !showLandingPage }">
-        <ParticlesBackground v-if="showLandingPage" color="#94a3b8" link-color="#94a3b8" :count="70" :speed="0.8" :link-distance="160" :opacity="0.35" />
+        <ParticlesBackground v-if="showLandingPage" id="landing-particles" color="#94a3b8" link-color="#94a3b8" :count="70" :speed="0.8" :link-distance="160" :opacity="0.35" />
         <div id="interface-selector-container" class="landing-content"></div>
         <!-- Sentry consent banner -->
         <div v-if="showSentryBanner && showLandingPage" class="sentry-banner">

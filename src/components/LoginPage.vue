@@ -43,7 +43,7 @@ const login = async () => {
 
 <template>
   <div class="login-page">
-    <ParticlesBackground color="#374151" link-color="#374151" :count="60" :speed="0.6" :link-distance="140" :opacity="0.25" />
+    <ParticlesBackground id="login-particles" color="#374151" link-color="#374151" :count="60" :speed="0.6" :link-distance="140" :opacity="0.25" />
     <div class="login-card">
       <img src="/webpcap-logo.png" alt="WebPCAP" class="login-logo" />
 
