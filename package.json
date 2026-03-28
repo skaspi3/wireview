@@ -14,6 +14,7 @@
     "@sentry/vue": "^10.42.0",
     "@tsparticles/slim": "^3.9.1",
     "@tsparticles/vue3": "^3.0.1",
+    "@vicons/ionicons5": "^0.13.0",
     "@vueuse/core": "^14.2.1",
     "fzstd": "^0.1.1",
     "naive-ui": "^2.44.1",

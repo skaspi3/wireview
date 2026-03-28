@@ -1,11 +1,12 @@
 <script setup>
 import '@patternfly/elements/pf-button/pf-button.js';
 import '@patternfly/elements/pf-tooltip/pf-tooltip.js';
-import { ref, useTemplateRef, computed, getCurrentInstance, watch, onMounted, onBeforeUnmount } from 'vue';
+import { ref, useTemplateRef, computed, getCurrentInstance, watch, onMounted, onBeforeUnmount, h } from 'vue';
 import { clearPackets, packets, allPackets, captureActive, stoppedCapture, displayFilter, filterLoading, filterProgress, cancelFilter, savedCapturesCount, apiFetch, apiUrl, fetchInitialData, authUser } from './globals';
 import { getSentryConsent, enableSentry, disableSentry } from './sentry';
 import './packetCache';  // Initialize packet cache (registers clearer callback)
-import { NSpin, NProgress } from 'naive-ui';
+import { NSpin, NProgress, NDataTable, NIcon, NTooltip } from 'naive-ui';
+import { DownloadOutline, CreateOutline, InformationCircleOutline, TrashOutline, OpenOutline } from '@vicons/ionicons5';
 import NaiveProvider from './components/NaiveProvider.vue';
 import DefaultLayout from './components/layouts/DefaultLayout.vue';
 import PacketList from './components/panes/PacketList.vue';
@@ -133,8 +134,6 @@ const onSentryDismiss = () => {
 const showSavedCaptures = ref(false);
 const savedFiles = ref([]);
 const savedCapturesGlow = ref(false);
-const sortColumn = ref('created'); // 'name', 'size', 'created'
-const sortAsc = ref(false);
 const localClientHint = ref(null);
 
 const isLoopbackHostname = () => {
@@ -156,28 +155,107 @@ const applySavedCapturesPayload = (data) => {
   }
 };
 
-const sortedFiles = computed(() => {
-  const col = sortColumn.value;
-  const asc = sortAsc.value;
-  return [...savedFiles.value].sort((a, b) => {
-    let cmp = 0;
-    if (col === 'name') cmp = a.name.localeCompare(b.name);
-    else if (col === 'packets') cmp = (a.packets || 0) - (b.packets || 0);
-    else if (col === 'size') cmp = (a.size || 0) - (b.size || 0);
-    else if (col === 'created') cmp = new Date(a.created || 0) - new Date(b.created || 0);
-    else if (col === 'status') cmp = (a.status || '').localeCompare(b.status || '');
-    return asc ? cmp : -cmp;
-  });
+const actionCol = (title, icon, color, clickFn, disabledFn) => ({
+  title,
+  key: 'act_' + title.toLowerCase(),
+  width: 52,
+  align: 'center',
+  render(row) {
+    const dis = disabledFn ? disabledFn(row) : false;
+    return h(NTooltip, { trigger: 'hover' }, {
+      trigger: () => h('span', {
+        class: 'sc-icon-cell' + (dis ? ' sc-icon-disabled' : ''),
+        style: `color: ${dis ? '#4b5563' : color}`,
+        onClick: dis ? undefined : () => clickFn(row),
+      }, [h(NIcon, { size: 22 }, { default: () => h(icon) })]),
+      default: () => title,
+    });
+  },
 });
 
-const toggleSort = (col) => {
-  if (sortColumn.value === col) {
-    sortAsc.value = !sortAsc.value;
-  } else {
-    sortColumn.value = col;
-    sortAsc.value = true;
-  }
-};
+const savedCapturesColumns = computed(() => [
+  {
+    title: 'File Name',
+    key: 'name',
+    sorter: (a, b) => a.name.localeCompare(b.name),
+    ellipsis: { tooltip: true },
+    resizable: true,
+    minWidth: 160,
+    render(row) {
+      if (renamingFile.value === row.name) {
+        return h('div', { class: 'sc-rename-row' }, [
+          h('input', {
+            class: 'saved-captures-rename-input',
+            value: renameInput.value,
+            autofocus: true,
+            onInput: (e) => { renameInput.value = e.target.value; },
+            onKeyup: (e) => {
+              if (e.key === 'Enter') confirmRename(row.name);
+              if (e.key === 'Escape') { renamingFile.value = null; }
+            },
+            onBlur: () => confirmRename(row.name),
+          }),
+          h('span', { class: 'sc-rename-ext' }, getFileExtension(row.name)),
+        ]);
+      }
+      return h('span', { class: 'saved-captures-name', title: displayCaptureName(row.name) }, displayCaptureName(row.name));
+    },
+  },
+  {
+    title: '#Packets',
+    key: 'packets',
+    width: 100,
+    align: 'right',
+    sorter: (a, b) => (a.packets || 0) - (b.packets || 0),
+    render(row) {
+      return row.packets ? row.packets.toLocaleString() : '—';
+    },
+  },
+  {
+    title: 'Size',
+    key: 'size',
+    width: 100,
+    sorter: (a, b) => (a.size || 0) - (b.size || 0),
+    render(row) {
+      return formatFileSize(row.size);
+    },
+  },
+  {
+    title: 'Time',
+    key: 'created',
+    width: 170,
+    defaultSortOrder: 'descend',
+    sorter: (a, b) => new Date(a.created || 0) - new Date(b.created || 0),
+    render(row) {
+      return formatTimestamp(row.created);
+    },
+  },
+  {
+    title: 'Status',
+    key: 'status',
+    width: 80,
+    align: 'center',
+    sorter: (a, b) => (a.status || '').localeCompare(b.status || ''),
+    render(row) {
+      if (row.status === 'OK') return h('span', { style: 'color:#22c55e;font-weight:700' }, 'OK');
+      if (row.status === 'WARN') return h('span', { style: 'color:#f59e0b;font-weight:700;font-size:16px' }, '\u26A0');
+      if (row.status === 'BAD') return h('span', { style: 'color:#ef4444;font-weight:700' }, 'BAD');
+      if (checkingStatus.value === row.name) return h('span', { style: 'color:#9ca3af;font-size:13px' }, '...');
+      return h('a', {
+        href: '#',
+        style: 'color:#60a5fa;font-size:13px;text-decoration:none;cursor:pointer',
+        onClick: (e) => { e.preventDefault(); checkFileStatus(row.name); },
+        onMouseover: (e) => { e.target.style.textDecoration = 'underline'; },
+        onMouseout: (e) => { e.target.style.textDecoration = 'none'; },
+      }, 'Check');
+    },
+  },
+  actionCol('Open', OpenOutline, '#22c55e', (row) => openCaptureRemotely(row.path)),
+  actionCol('Download', DownloadOutline, '#3b82f6', (row) => downloadCapture(row.name)),
+  actionCol('Info', InformationCircleOutline, '#06b6d4', (row) => fetchFileInfo(row.name), (row) => fileInfoLoading.value === row.name),
+  actionCol('Rename', CreateOutline, '#f59e0b', (row) => startRename(row)),
+  actionCol('Delete', TrashOutline, '#ef4444', (row) => deleteCapture(row.name)),
+]);
 
 watch(savedCapturesCount, (newVal, oldVal) => {
   if (newVal > oldVal) {
@@ -218,6 +296,47 @@ const fetchFileInfo = async (name) => {
     if (window.$message) window.$message.error('Failed to fetch file info');
   }
   fileInfoLoading.value = null;
+};
+
+const checkingStatus = ref(null);
+const checkFileStatus = async (name) => {
+  checkingStatus.value = name;
+  try {
+    const res = await apiFetch(`/api/saved-captures/info?file=${encodeURIComponent(name)}`);
+    const data = await res.json();
+    if (data.error) {
+      if (window.$message) window.$message.error(data.error);
+    } else {
+      refreshSavedCaptures();
+    }
+  } catch (e) {
+    if (window.$message) window.$message.error('Status check failed');
+  }
+  checkingStatus.value = null;
+};
+
+const fixingCapture = ref(false);
+const fixTruncatedCapture = async () => {
+  if (!fileInfoData.value) return;
+  fixingCapture.value = true;
+  try {
+    const res = await apiFetch('/api/saved-captures/fix', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file: fileInfoData.value.fileName }),
+    });
+    const data = await res.json();
+    if (data.error) {
+      if (window.$message) window.$message.error(data.error);
+    } else {
+      if (window.$message) window.$message.success('File repaired');
+      // Re-run info to refresh modal data
+      await fetchFileInfo(fileInfoData.value.fileName);
+    }
+  } catch (e) {
+    if (window.$message) window.$message.error('Repair failed');
+  }
+  fixingCapture.value = false;
 };
 
 const renamingFile = ref(null);
@@ -449,96 +568,16 @@ onBeforeUnmount(() => {
           <button class="saved-captures-close" @click="showSavedCaptures = false">&times;</button>
         </div>
         <div v-if="savedFiles.length === 0" class="saved-captures-empty">No saved captures</div>
-        <div v-else class="saved-captures-table-wrap">
-          <table class="saved-captures-table">
-            <thead>
-              <tr>
-                <th class="sc-th-sort" @click="toggleSort('name')">File Name <span class="sc-sort-arrow">{{ sortColumn === 'name' ? (sortAsc ? '▲' : '▼') : '⇅' }}</span></th>
-                <th class="sc-th-sort" @click="toggleSort('packets')">#Packets <span class="sc-sort-arrow">{{ sortColumn === 'packets' ? (sortAsc ? '▲' : '▼') : '⇅' }}</span></th>
-                <th class="sc-th-sort" @click="toggleSort('size')">Size <span class="sc-sort-arrow">{{ sortColumn === 'size' ? (sortAsc ? '▲' : '▼') : '⇅' }}</span></th>
-                <th class="sc-th-sort" @click="toggleSort('created')">Time <span class="sc-sort-arrow">{{ sortColumn === 'created' ? (sortAsc ? '▲' : '▼') : '⇅' }}</span></th>
-                <th class="sc-th-sort" @click="toggleSort('status')">Status <span class="sc-sort-arrow">{{ sortColumn === 'status' ? (sortAsc ? '▲' : '▼') : '⇅' }}</span></th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="file in sortedFiles" :key="file.name">
-                <td class="sc-td-name">
-                  <template v-if="renamingFile === file.name">
-                    <div class="sc-rename-row">
-                      <input
-                        class="saved-captures-rename-input"
-                        v-model="renameInput"
-                        @keyup.enter="confirmRename(file.name)"
-                        @keyup.escape="renamingFile = null"
-                        @blur="confirmRename(file.name)"
-                        autofocus
-                      />
-                      <span class="sc-rename-ext">{{ getFileExtension(file.name) }}</span>
-                    </div>
-                  </template>
-                  <template v-else>
-                    <span class="saved-captures-name" :title="displayCaptureName(file.name)">{{ displayCaptureName(file.name) }}</span>
-                  </template>
-                </td>
-                <td class="sc-td-packets">{{ file.packets ? file.packets.toLocaleString() : '—' }}</td>
-                <td class="sc-td-size">{{ formatFileSize(file.size) }}</td>
-                <td class="sc-td-time">{{ formatTimestamp(file.created) }}</td>
-                <td class="sc-td-status"><span v-if="file.status === 'OK'" class="sc-status-ok">OK</span><span v-else-if="file.status === 'WARN'" class="sc-status-warn">⚠</span><span v-else-if="file.status === 'BAD'" class="sc-status-bad">BAD</span><span v-else class="sc-status-unknown">—</span></td>
-                <td class="sc-td-action">
-                  <div class="saved-captures-actions">
-                    <pf-tooltip content="Open in Browser">
-                      <button class="sc-action-btn sc-open" @click="openCaptureRemotely(file.path)">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                          <polyline points="15 3 21 3 21 9"/>
-                          <line x1="10" y1="14" x2="21" y2="3"/>
-                        </svg>
-                      </button>
-                    </pf-tooltip>
-                    <pf-tooltip content="Download">
-                      <button
-                        class="sc-action-btn sc-download"
-                        @click="downloadCapture(file.name)"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                          <polyline points="7 10 12 15 17 10"/>
-                          <line x1="12" y1="15" x2="12" y2="3"/>
-                        </svg>
-                      </button>
-                    </pf-tooltip>
-                    <pf-tooltip content="File Info">
-                      <button class="sc-action-btn sc-info" @click="fetchFileInfo(file.name)" :disabled="fileInfoLoading === file.name">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <circle cx="12" cy="12" r="10"/>
-                          <line x1="12" y1="16" x2="12" y2="12"/>
-                          <line x1="12" y1="8" x2="12.01" y2="8"/>
-                        </svg>
-                      </button>
-                    </pf-tooltip>
-                    <pf-tooltip content="Rename">
-                      <button class="sc-action-btn sc-rename" @click="startRename(file)">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
-                      </button>
-                    </pf-tooltip>
-                    <pf-tooltip content="Delete">
-                      <button class="sc-action-btn sc-delete" @click="deleteCapture(file.name)">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <line x1="18" y1="6" x2="6" y2="18"/>
-                          <line x1="6" y1="6" x2="18" y2="18"/>
-                        </svg>
-                      </button>
-                    </pf-tooltip>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <n-data-table
+          v-else
+          :columns="savedCapturesColumns"
+          :data="savedFiles"
+          :row-key="(row) => row.name"
+          :max-height="'62vh'"
+          :scroll-x="950"
+          size="small"
+          class="sc-data-table"
+        />
       </div>
     </div>
 
@@ -564,7 +603,7 @@ onBeforeUnmount(() => {
               <tr><td class="fi-label">Total Packets</td><td class="fi-value">{{ fileInfoData.totalPackets?.toLocaleString() }}</td></tr>
               <tr><td class="fi-label">Result</td><td class="fi-value"><span :class="fileInfoData.badPackets > 0 ? 'fi-bad' : fileInfoData.warnPackets > 0 ? 'fi-warn' : 'fi-ok'">{{ fileInfoData.badPackets > 0 ? 'BAD' : fileInfoData.warnPackets > 0 ? 'WARN' : 'OK' }}</span><span v-if="fileInfoData.badPackets > 0" class="fi-bad-count"> — {{ fileInfoData.badPackets.toLocaleString() }} error{{ fileInfoData.badPackets !== 1 ? 's' : '' }}</span><span v-if="fileInfoData.warnPackets > 0" class="fi-warn-count"> — {{ fileInfoData.warnPackets.toLocaleString() }} warning{{ fileInfoData.warnPackets !== 1 ? 's' : '' }}</span></td></tr>
               <tr v-if="fileInfoData.compressed"><td class="fi-label">Compressed</td><td class="fi-value">zstd</td></tr>
-              <tr v-if="fileInfoData.loopError"><td class="fi-label">Read Error</td><td class="fi-value fi-bad">{{ fileInfoData.loopError }}</td></tr>
+              <tr v-if="fileInfoData.loopError"><td class="fi-label">Read Error</td><td class="fi-value fi-bad">{{ fileInfoData.loopError }} <button v-if="fileInfoData.loopError.toLowerCase().includes('truncat')" class="fi-fix-btn" :disabled="fixingCapture" @click="fixTruncatedCapture">{{ fixingCapture ? 'Fixing...' : 'Fix' }}</button></td></tr>
             </tbody>
           </table>
           <div v-if="fileInfoData.packets && fileInfoData.packets.length > 0" class="fi-packets-section">
@@ -761,9 +800,9 @@ onBeforeUnmount(() => {
   border: 1px solid #374151;
   border-radius: 12px;
   padding: 24px 28px;
-  width: min(94vw, 1080px);
-  min-width: 760px;
-  max-width: 1080px;
+  width: min(96vw, 1200px);
+  min-width: 860px;
+  max-width: 1200px;
   max-height: 86vh;
   display: flex;
   flex-direction: column;
@@ -841,53 +880,6 @@ onBeforeUnmount(() => {
   padding: 24px 0;
   font-style: italic;
 }
-.saved-captures-table-wrap {
-  max-height: 62vh;
-  overflow-y: auto;
-}
-.saved-captures-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: monospace;
-  font-size: 15px;
-}
-.saved-captures-table thead th {
-  text-align: left;
-  color: #d1d5db;
-  font-size: 15px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 6px 10px;
-  border-bottom: 1px solid #374151;
-  user-select: none;
-}
-.sc-th-sort {
-  cursor: pointer;
-  transition: color 0.15s;
-}
-.sc-th-sort:hover {
-  color: #60a5fa;
-}
-.sc-sort-arrow {
-  font-size: 16px;
-  color: #9ca3af;
-  margin-left: 4px;
-}
-.saved-captures-table tbody tr {
-  transition: background 0.15s;
-}
-.saved-captures-table tbody tr:hover {
-  background: #1f2937;
-}
-.saved-captures-table td {
-  padding: 9px 12px;
-  border-bottom: 1px solid #1f2937;
-  vertical-align: middle;
-}
-.sc-td-name {
-  max-width: 520px;
-}
 .saved-captures-name {
   color: #e5e7eb;
   overflow: hidden;
@@ -895,43 +887,17 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   display: block;
 }
-.sc-td-packets {
-  color: #60a5fa;
+.sc-data-table {
+  font-family: monospace;
   font-size: 14px;
-  white-space: nowrap;
-  text-align: right;
-}
-.sc-td-size {
-  color: #9ca3af;
-  font-size: 14px;
-  white-space: nowrap;
-}
-.sc-td-time {
-  color: #9ca3af;
-  font-size: 14px;
-  white-space: nowrap;
-}
-.sc-td-status {
-  text-align: center;
-  white-space: nowrap;
-  font-weight: 700;
-  font-size: 14px;
-}
-.sc-status-ok {
-  color: #22c55e;
-}
-.sc-status-warn {
-  color: #f59e0b;
-  font-size: 16px;
-}
-.sc-status-bad {
-  color: #ef4444;
-}
-.sc-status-unknown {
-  color: #4b5563;
-}
-.sc-td-action {
-  white-space: nowrap;
+  --n-th-color: transparent;
+  --n-td-color: transparent;
+  --n-th-color-hover: transparent;
+  --n-td-color-hover: #1f293780;
+  --n-border-color: #1f2937;
+  --n-th-text-color: #d1d5db;
+  --n-td-text-color: #c0c6d0;
+  --n-th-font-weight: 600;
 }
 .sc-rename-row {
   display: flex;
@@ -962,71 +928,35 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   user-select: none;
 }
-.saved-captures-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.sc-action-btn {
-  display: flex;
+.sc-icon-cell {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 34px;
   height: 34px;
-  border: none;
   border-radius: 6px;
   cursor: pointer;
-  background: transparent;
-  transition: background 0.15s, transform 0.1s;
+  transition: transform 0.1s, background 0.15s;
 }
-.sc-action-btn svg {
-  width: 18px;
-  height: 18px;
+.sc-icon-cell:hover {
+  transform: scale(1.2);
+  background: rgba(255, 255, 255, 0.08);
 }
-.sc-action-btn:hover {
-  transform: scale(1.1);
+.sc-icon-cell:active {
+  transform: scale(0.9);
 }
-.sc-action-btn:active {
-  transform: scale(0.95);
-}
-.sc-action-btn:disabled,
-.sc-action-disabled {
+.sc-icon-disabled {
   opacity: 0.35;
   cursor: not-allowed;
-  transform: none !important;
+  pointer-events: none;
 }
-.sc-action-btn:disabled:hover {
-  background: transparent !important;
+.sc-data-table :deep(.n-data-table-th) {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
-.sc-open {
-  color: #22c55e;
-}
-.sc-open:hover {
-  background: rgba(34, 197, 94, 0.15);
-}
-.sc-download {
-  color: #3b82f6;
-}
-.sc-download:hover {
-  background: rgba(59, 130, 246, 0.15);
-}
-.sc-rename {
-  color: #f59e0b;
-}
-.sc-rename:hover {
-  background: rgba(245, 158, 11, 0.15);
-}
-.sc-info {
-  color: #06b6d4;
-}
-.sc-info:hover {
-  background: rgba(6, 182, 212, 0.15);
-}
-.sc-delete {
-  color: #ef4444;
-}
-.sc-delete:hover {
-  background: rgba(239, 68, 68, 0.15);
+.sc-data-table :deep(.n-data-table-td) {
+  padding: 10px 12px;
 }
 
 /* File Info modal */
@@ -1163,6 +1093,25 @@ onBeforeUnmount(() => {
   color: #9ca3af;
   font-size: 12px;
   margin-left: 6px;
+}
+.fi-fix-btn {
+  margin-left: 10px;
+  background: #b45309;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.fi-fix-btn:hover:not(:disabled) {
+  background: #d97706;
+}
+.fi-fix-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Sentry consent banner */
