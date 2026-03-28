@@ -164,6 +164,7 @@ const sortedFiles = computed(() => {
     else if (col === 'packets') cmp = (a.packets || 0) - (b.packets || 0);
     else if (col === 'size') cmp = (a.size || 0) - (b.size || 0);
     else if (col === 'created') cmp = new Date(a.created || 0) - new Date(b.created || 0);
+    else if (col === 'status') cmp = (a.status || '').localeCompare(b.status || '');
     return asc ? cmp : -cmp;
   });
 });
@@ -210,6 +211,7 @@ const fetchFileInfo = async (name) => {
     } else {
       fileInfoData.value = data;
       showFileInfo.value = true;
+      refreshSavedCaptures();
     }
   } catch (e) {
     if (window.$message) window.$message.error('Failed to fetch file info');
@@ -475,6 +477,7 @@ onBeforeUnmount(() => {
                 <th class="sc-th-sort" @click="toggleSort('packets')">#Packets <span class="sc-sort-arrow">{{ sortColumn === 'packets' ? (sortAsc ? '▲' : '▼') : '⇅' }}</span></th>
                 <th class="sc-th-sort" @click="toggleSort('size')">Size <span class="sc-sort-arrow">{{ sortColumn === 'size' ? (sortAsc ? '▲' : '▼') : '⇅' }}</span></th>
                 <th class="sc-th-sort" @click="toggleSort('created')">Time <span class="sc-sort-arrow">{{ sortColumn === 'created' ? (sortAsc ? '▲' : '▼') : '⇅' }}</span></th>
+                <th class="sc-th-sort" @click="toggleSort('status')">Status <span class="sc-sort-arrow">{{ sortColumn === 'status' ? (sortAsc ? '▲' : '▼') : '⇅' }}</span></th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -501,6 +504,7 @@ onBeforeUnmount(() => {
                 <td class="sc-td-packets">{{ file.packets ? file.packets.toLocaleString() : '—' }}</td>
                 <td class="sc-td-size">{{ formatFileSize(file.size) }}</td>
                 <td class="sc-td-time">{{ formatTimestamp(file.created) }}</td>
+                <td class="sc-td-status"><span v-if="file.status === 'OK'" class="sc-status-ok">OK</span><span v-else-if="file.status === 'BAD'" class="sc-status-bad">BAD</span><span v-else class="sc-status-unknown">—</span></td>
                 <td class="sc-td-action">
                   <div class="saved-captures-actions">
                     <pf-tooltip content="Open in Browser">
@@ -561,10 +565,10 @@ onBeforeUnmount(() => {
     <!-- File Info modal -->
     <div v-if="showFileInfo && fileInfoData" class="saved-captures-overlay" @click.self="showFileInfo = false">
       <div class="file-info-popup">
+        <button class="fi-close-btn" @click="showFileInfo = false">&times;</button>
         <div class="saved-captures-header">
           <span class="saved-captures-title">File Info</span>
           <span class="saved-captures-count">{{ fileInfoData.fileName }}</span>
-          <button class="saved-captures-close" @click="showFileInfo = false">&times;</button>
         </div>
         <div class="file-info-body">
           <table class="file-info-meta">
@@ -929,6 +933,21 @@ onBeforeUnmount(() => {
   font-size: 14px;
   white-space: nowrap;
 }
+.sc-td-status {
+  text-align: center;
+  white-space: nowrap;
+  font-weight: 700;
+  font-size: 14px;
+}
+.sc-status-ok {
+  color: #22c55e;
+}
+.sc-status-bad {
+  color: #ef4444;
+}
+.sc-status-unknown {
+  color: #4b5563;
+}
 .sc-td-action {
   white-space: nowrap;
 }
@@ -1029,7 +1048,26 @@ onBeforeUnmount(() => {
 }
 
 /* File Info modal */
+.fi-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 32px;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+  z-index: 2;
+  transition: color 0.15s;
+}
+.fi-close-btn:hover {
+  color: #f9fafb;
+}
 .file-info-popup {
+  position: relative;
   background: #1a1d23;
   border: 1px solid #374151;
   border-radius: 12px;
