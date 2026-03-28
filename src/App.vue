@@ -765,7 +765,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 3000;
+  z-index: 1500;
 }
 .saved-captures-popup {
   background: #1a1d23;
@@ -1160,15 +1160,5 @@ onBeforeUnmount(() => {
   --pf-c-button--FontSize: 12px;
   --pf-c-button--FontWeight: 600;
   white-space: nowrap;
-}
-</style>
-
-<style>
-/* Ensure Naive UI dialogs render above the saved-captures overlay (z-index: 3000) */
-.n-modal-mask {
-  z-index: 4000 !important;
-}
-.n-modal-container {
-  z-index: 4000 !important;
 }
 </style>
