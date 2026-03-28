@@ -17,6 +17,7 @@ import StatusBar from './components/StatusBar.vue';
 import FileBrowser from './components/FileBrowser.vue';
 import LoginPage from './components/LoginPage.vue';
 import ChangePasswordDialog from './components/ChangePasswordDialog.vue';
+import ParticlesBackground from './components/ParticlesBackground.vue';
 
 // Auth state
 const authChecked = ref(false);
@@ -395,7 +396,8 @@ onBeforeUnmount(() => {
       <!-- Landing Page with Interface Selector (teleport target) -->
       <!-- Always render container for Teleport, use v-show to hide -->
       <div class="landing-page" :class="{ 'landing-hidden': !showLandingPage }">
-        <div id="interface-selector-container"></div>
+        <ParticlesBackground v-if="showLandingPage" color="#94a3b8" link-color="#94a3b8" :count="70" :speed="0.8" :link-distance="160" :opacity="0.35" />
+        <div id="interface-selector-container" class="landing-content"></div>
         <!-- Sentry consent banner -->
         <div v-if="showSentryBanner && showLandingPage" class="sentry-banner">
           <span class="sentry-banner-text">Help improve WebPCAP — automatically send crash reports to help fix bugs. No personal data is collected.</span>
@@ -632,9 +634,14 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #e8f4fc 0%, #d4e9f7 50%, #c5e0f5 100%);
+  background: #f5f7fa;
   min-height: 0;
   overflow: auto;
+  position: relative;
+}
+.landing-content {
+  position: relative;
+  z-index: 1;
 }
 
 .landing-hidden {

@@ -1,6 +1,7 @@
 <script setup>
 import '@patternfly/elements/pf-button/pf-button.js';
 import { ref } from 'vue';
+import ParticlesBackground from './ParticlesBackground.vue';
 
 const emit = defineEmits(['login-success']);
 
@@ -42,6 +43,7 @@ const login = async () => {
 
 <template>
   <div class="login-page">
+    <ParticlesBackground color="#374151" link-color="#374151" :count="60" :speed="0.6" :link-distance="140" :opacity="0.25" />
     <div class="login-card">
       <img src="/webpcap-logo.png" alt="WebPCAP" class="login-logo" />
 
@@ -82,8 +84,12 @@ const login = async () => {
   justify-content: center;
   height: 100vh;
   background: #111318;
+  position: relative;
+  overflow: hidden;
 }
 .login-card {
+  position: relative;
+  z-index: 1;
   background: #1a1d23;
   border: 1px solid #2d3240;
   border-radius: 14px;
