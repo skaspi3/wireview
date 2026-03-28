@@ -37,10 +37,7 @@ const options = computed(() => ({
   },
   interactivity: {
     events: {
-      onHover: { enable: true, mode: 'grab' },
-    },
-    modes: {
-      grab: { distance: 180, links: { opacity: 0.6 } },
+      onHover: { enable: false },
     },
   },
   detectRetina: true,
@@ -56,5 +53,6 @@ const options = computed(() => ({
   position: absolute;
   inset: 0;
   z-index: 0;
+  pointer-events: none;
 }
 </style>
