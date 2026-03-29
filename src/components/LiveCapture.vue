@@ -617,6 +617,8 @@ const connect = ({ isReconnect = false } = {}) => {
 
         // Session created - we are the owner
         if (msg.type === 'sessionCreated') {
+          // Clear first — clearPackets() resets captureActive, so set state after
+          emit('clear');
           sessionId.value = msg.sessionId;
           isSessionOwner.value = true;
           globalIsSessionOwner.value = true;
@@ -633,7 +635,6 @@ const connect = ({ isReconnect = false } = {}) => {
           const ifaceInfo = interfaceDetails.value[msg.interface];
           linkSpeedMbps.value = ifaceInfo?.speed || 0;
           // Do NOT reset savedCapturesCount — saved files persist on disk across sessions
-          emit('clear');
           if (window.$message) window.$message.success(`Capturing on ${msg.interface}`);
           if (window.$loadingBar) window.$loadingBar.start();
           loadingBarActive.value = true;
